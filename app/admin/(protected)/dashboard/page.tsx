@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { LiveRefresh } from "@/components/LiveRefresh";
 
 type Counts = {
   teams: number;
@@ -68,6 +69,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-8">
+      <LiveRefresh
+        tables={["fixtures", "match_results", "teams", "players", "officials"]}
+      />
       <header className="mb-8">
         <p className="text-gold-600 font-display tracking-widest text-xs">
           OVERVIEW
@@ -75,6 +79,7 @@ export default async function DashboardPage() {
         <h1 className="font-display text-4xl font-bold text-navy-900">
           Dashboard
         </h1>
+        <p className="text-slate-500 text-sm mt-1">Live — updates automatically.</p>
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
