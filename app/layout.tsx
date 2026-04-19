@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
-import { Inter, Oswald } from "next/font/google";
+import { Poppins, Anton } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+// GRLF brand: Poppins for body, Anton for display headings.
+const poppins = Poppins({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-poppins",
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
-const oswald = Oswald({
+const anton = Anton({
   subsets: ["latin"],
-  variable: "--font-oswald",
-  weight: ["400", "500", "600", "700"],
+  variable: "--font-anton",
+  weight: ["400"],
   display: "swap",
 });
 
@@ -28,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${oswald.variable} ${inter.className}`}
+      className={`${poppins.variable} ${anton.variable} ${poppins.className}`}
     >
       <body className="font-sans antialiased bg-white text-navy-900">
         {children}

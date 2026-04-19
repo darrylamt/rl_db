@@ -10,7 +10,13 @@ const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function NewPlayerPage() {
   const supabase = createAdminClient();
-  const { data: teams } = await supabase.from("teams").select("team_id, name").order("name");
+  // Only clubs — representative teams (national / president_xv) are selected
+  // separately from the club-level roster.
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("team_id, name")
+    .eq("team_type", "club")
+    .order("name");
 
   return (
     <FormShell title="Add Player" backHref="/admin/players" onSubmit={createPlayer} submitLabel="Create player">
@@ -22,7 +28,7 @@ export default async function NewPlayerPage() {
           <Input name="last_name" required />
         </Field>
       </div>
-      <Field label="Team">
+      <Field label="Club">
         <Select name="team_id" defaultValue="">
           <option value="">— unassigned —</option>
           {(teams ?? []).map((t: any) => (

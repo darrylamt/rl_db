@@ -9,23 +9,29 @@ export default function EnterLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-navy-900 text-white">
-      <header className="bg-navy-950 border-b border-navy-700">
+    <div className="min-h-screen bg-black text-white">
+      {/* Ghana flag accent strip */}
+      <div className="flex h-1 w-full">
+        <div className="flex-1 bg-ghanaRed-500" />
+        <div className="flex-1 bg-ghanaYellow-500" />
+        <div className="flex-1 bg-ghanaGreen-500" />
+      </div>
+      <header className="bg-neutral-950 border-b border-white/10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="flex items-baseline gap-2">
-            <span className="font-display text-gold-400 text-sm tracking-widest">
+            <span className="font-display text-ghanaYellow-500 text-sm tracking-widest">
               GRLF
             </span>
-            <span className="text-navy-200 text-xs">Match Day Entry</span>
+            <span className="text-slate-300 text-xs">Match Day Entry</span>
           </Link>
           <nav className="flex gap-3 text-xs">
-            <Link href="/enter/result" className="text-navy-200 hover:text-gold-400">
+            <Link href="/enter/result" className="text-slate-300 hover:text-ghanaYellow-500">
               Result
             </Link>
-            <Link href="/enter/events" className="text-navy-200 hover:text-gold-400">
+            <Link href="/enter/events" className="text-slate-300 hover:text-ghanaYellow-500">
               Events
             </Link>
-            <Link href="/enter/fixture" className="text-navy-200 hover:text-gold-400">
+            <Link href="/enter/fixture" className="text-slate-300 hover:text-ghanaYellow-500">
               Fixture
             </Link>
           </nav>

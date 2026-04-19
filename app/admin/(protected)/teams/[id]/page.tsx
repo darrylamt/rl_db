@@ -15,9 +15,18 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
 
   return (
     <FormShell title={`Edit: ${team.name}`} backHref="/admin/teams" onSubmit={bound} submitLabel="Save changes">
-      <Field label="Name">
-        <Input name="name" required defaultValue={team.name} />
-      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Name">
+          <Input name="name" required defaultValue={team.name} />
+        </Field>
+        <Field label="Type">
+          <Select name="team_type" defaultValue={team.team_type ?? "club"}>
+            <option value="club">Club</option>
+            <option value="national">National</option>
+            <option value="president_xv">President XIII</option>
+          </Select>
+        </Field>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" defaultValue={team.region ?? ""} />

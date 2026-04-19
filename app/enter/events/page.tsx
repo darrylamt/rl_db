@@ -41,6 +41,7 @@ type Event = {
 
 const EVENT_TYPES = [
   "try",
+  "try_assist",
   "conversion",
   "penalty",
   "drop_goal",

@@ -15,9 +15,20 @@ function intOrNull(fd: FormData, k: string) {
   return Number.isNaN(n) ? null : n;
 }
 
+const TEAM_TYPES = ["club", "national", "president_xv"] as const;
+type TeamType = (typeof TEAM_TYPES)[number];
+
+function teamType(fd: FormData): TeamType {
+  const v = str(fd, "team_type");
+  return (TEAM_TYPES as readonly string[]).includes(v ?? "")
+    ? (v as TeamType)
+    : "club";
+}
+
 function payloadFromForm(fd: FormData) {
   return {
     name: str(fd, "name"),
+    team_type: teamType(fd),
     region: str(fd, "region"),
     city: str(fd, "city"),
     founded_year: intOrNull(fd, "founded_year"),

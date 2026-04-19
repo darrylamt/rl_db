@@ -35,10 +35,51 @@ const config: Config = {
           900: "#633b17",
           950: "#391f09",
         },
+        // Ghana flag palette — official GRLF brand colors.
+        // Pure hex anchored at 500; tints / shades derived either side.
+        ghanaRed: {
+          50: "#fff1f1",
+          100: "#ffe0e0",
+          200: "#ffb8b8",
+          300: "#ff7a7a",
+          400: "#ff3d3d",
+          500: "#ff0000", // brand red
+          600: "#cc0000",
+          700: "#a00000",
+          800: "#7a0000",
+          900: "#570000",
+          950: "#2e0000",
+        },
+        ghanaYellow: {
+          50: "#fffff0",
+          100: "#ffffcc",
+          200: "#ffff99",
+          300: "#ffff66",
+          400: "#ffff33",
+          500: "#ffff00", // brand yellow
+          600: "#cccc00",
+          700: "#999900",
+          800: "#666600",
+          900: "#333300",
+          950: "#1a1a00",
+        },
+        ghanaGreen: {
+          50: "#e8f5e8",
+          100: "#c8e6c8",
+          200: "#9bd49b",
+          300: "#66bb66",
+          400: "#339a33",
+          500: "#008000", // brand green
+          600: "#006a00",
+          700: "#005200",
+          800: "#003e00",
+          900: "#002900",
+          950: "#001700",
+        },
       },
       fontFamily: {
-        display: ["var(--font-oswald)", "Impact", "system-ui", "sans-serif"],
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-anton)", "Impact", "system-ui", "sans-serif"],
+        sans: ["var(--font-poppins)", "system-ui", "sans-serif"],
       },
     },
   },

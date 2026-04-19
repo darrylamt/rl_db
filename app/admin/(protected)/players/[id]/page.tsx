@@ -11,11 +11,29 @@ const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function EditPlayerPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
-  const [{ data: p }, { data: teams }] = await Promise.all([
+  // Only clubs in the selector — rep-team membership belongs at the club level.
+  // If the player happens to be on a non-club (legacy / bad data), surface it
+  // at the top of the list so the admin can see + re-assign.
+  const [{ data: p }, { data: clubs }] = await Promise.all([
     supabase.from("players").select("*").eq("player_id", params.id).maybeSingle(),
-    supabase.from("teams").select("team_id, name").order("name"),
+    supabase
+      .from("teams")
+      .select("team_id, name, team_type")
+      .eq("team_type", "club")
+      .order("name"),
   ]);
   if (!p) notFound();
+
+  let currentNonClub: { team_id: string; name: string } | null = null;
+  if (p.team_id && !(clubs ?? []).some((t: any) => t.team_id === p.team_id)) {
+    const { data } = await supabase
+      .from("teams")
+      .select("team_id, name")
+      .eq("team_id", p.team_id)
+      .maybeSingle();
+    if (data) currentNonClub = data;
+  }
+
   const bound = updatePlayer.bind(null, params.id);
 
   return (
@@ -28,10 +46,15 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           <Input name="last_name" required defaultValue={p.last_name} />
         </Field>
       </div>
-      <Field label="Team">
+      <Field label="Club">
         <Select name="team_id" defaultValue={p.team_id ?? ""}>
           <option value="">— unassigned —</option>
-          {(teams ?? []).map((t: any) => (
+          {currentNonClub && (
+            <option value={currentNonClub.team_id}>
+              {currentNonClub.name} (non-club, current)
+            </option>
+          )}
+          {(clubs ?? []).map((t: any) => (
             <option key={t.team_id} value={t.team_id}>{t.name}</option>
           ))}
         </Select>
