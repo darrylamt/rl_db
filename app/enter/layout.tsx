@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+// /enter forms read live data from Supabase on mount — no point prerendering.
+export const dynamic = "force-dynamic";
+
 export default function EnterLayout({
   children,
 }: {

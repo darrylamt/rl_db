@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+// Admin pages are per-user (authed) and pull live data — never prerender.
+export const dynamic = "force-dynamic";
+
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/teams", label: "Teams" },
