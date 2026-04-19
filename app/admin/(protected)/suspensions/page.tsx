@@ -2,8 +2,10 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { SuspensionStatusButtons } from "@/components/admin/SuspensionStatusButtons";
+import { getPageParams } from "@/lib/pagination";
 import { deleteSuspension, markSuspensionStatus } from "./actions";
 
 function fmt(d: string | null) {
@@ -11,23 +13,36 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function SuspensionsPage() {
+export default async function SuspensionsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: suspensions, error } = await supabase
-    .from("suspensions")
-    .select(
-      "suspension_id, reason, matches_banned, start_date, end_date, status, player:player_id(first_name, last_name, team:team_id(name))"
-    )
-    .order("start_date", { ascending: false });
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
 
-  const activeCount = (suspensions ?? []).filter((s: any) => s.status === "active").length;
+  const [{ data: suspensions, error, count }, { count: activeCount }] =
+    await Promise.all([
+      supabase
+        .from("suspensions")
+        .select(
+          "suspension_id, reason, matches_banned, start_date, end_date, status, player:player_id(first_name, last_name, team:team_id(name))",
+          { count: "exact" }
+        )
+        .order("start_date", { ascending: false })
+        .range(from, to),
+      supabase
+        .from("suspensions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active"),
+    ]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["suspensions"]} />
       <ListHeader title="Suspensions" addHref="/admin/suspensions/new" addLabel="Add Suspension" />
 
-      {activeCount > 0 && (
+      {(activeCount ?? 0) > 0 && (
         <div className="bg-red-50 border border-red-200 text-red-900 text-sm px-3 py-2 rounded mb-4">
           <strong>{activeCount}</strong> active suspension{activeCount === 1 ? "" : "s"}.
         </div>
@@ -39,7 +54,7 @@ export default async function SuspensionsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -95,6 +110,8 @@ export default async function SuspensionsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

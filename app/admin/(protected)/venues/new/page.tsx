@@ -7,7 +7,7 @@ export default function NewVenuePage() {
       <Field label="Name">
         <Input name="name" required placeholder="e.g. El-Wak Stadium" />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" placeholder="Greater Accra" />
         </Field>

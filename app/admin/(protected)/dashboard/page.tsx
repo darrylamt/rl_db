@@ -85,7 +85,7 @@ export default async function DashboardPage() {
     recentYears.length === 0 ? currentYear.toString() : recentYears.join(" / ");
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh
         tables={["fixtures", "match_results", "teams", "players", "officials"]}
       />
@@ -93,7 +93,7 @@ export default async function DashboardPage() {
         <p className="text-gold-600 font-display tracking-widest text-xs">
           OVERVIEW
         </p>
-        <h1 className="font-display text-4xl font-bold text-navy-900">
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-navy-900">
           Dashboard
         </h1>
         <p className="text-slate-500 text-sm mt-1">Live — updates automatically.</p>
@@ -108,7 +108,7 @@ export default async function DashboardPage() {
             <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
               {s.label}
             </p>
-            <p className="font-display text-4xl font-bold text-navy-900 mt-2">
+            <p className="font-display text-3xl md:text-4xl font-bold text-navy-900 mt-2">
               {s.value}
             </p>
           </div>

@@ -3,20 +3,20 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="min-h-screen bg-navy-900 text-white">
-      <div className="max-w-4xl mx-auto px-6 py-16">
-        <header className="border-b border-navy-700 pb-8 mb-12">
-          <p className="text-gold-400 font-display tracking-[0.2em] text-sm mb-2">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-16">
+        <header className="border-b border-navy-700 pb-6 md:pb-8 mb-8 md:mb-12">
+          <p className="text-gold-400 font-display tracking-[0.2em] text-xs md:text-sm mb-2">
             GHANA RUGBY LEAGUE FEDERATION
           </p>
-          <h1 className="font-display text-5xl md:text-6xl font-bold leading-tight">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-tight">
             GRLF Management Platform
           </h1>
-          <p className="text-navy-200 mt-4 max-w-2xl">
+          <p className="text-navy-200 text-sm md:text-base mt-4 max-w-2xl">
             Fixtures, results, players, officials and standings — one source of truth for Ghana Rugby League.
           </p>
         </header>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
           <section className="bg-navy-800 border border-navy-700 rounded-lg p-6">
             <h2 className="font-display text-2xl text-gold-400 mb-2">
               Match Day Entry

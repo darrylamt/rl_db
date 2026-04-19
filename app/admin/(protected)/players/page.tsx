@@ -2,27 +2,39 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deletePlayer } from "./actions";
 
-export default async function PlayersPage({ searchParams }: { searchParams: { team?: string } }) {
+export default async function PlayersPage({
+  searchParams,
+}: {
+  searchParams: { team?: string; page?: string };
+}) {
   const supabase = createAdminClient();
   const selectedTeam = searchParams.team || "";
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
 
   const teamsP = supabase.from("teams").select("team_id, name").order("name");
 
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, jersey_number, position, is_captain, playing_status, photo_url, team:team_id(name)"
+      "player_id, first_name, last_name, jersey_number, position, is_captain, playing_status, photo_url, team:team_id(name)",
+      { count: "exact" }
     )
-    .order("last_name");
+    .order("last_name")
+    .range(from, to);
   if (selectedTeam) query = query.eq("team_id", selectedTeam);
 
-  const [{ data: teams }, { data: players, error }] = await Promise.all([teamsP, query]);
+  const [{ data: teams }, { data: players, error, count }] = await Promise.all([
+    teamsP,
+    query,
+  ]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["players"]} />
       <ListHeader title="Players" addHref="/admin/players/new" addLabel="Add Player" />
 
@@ -52,7 +64,7 @@ export default async function PlayersPage({ searchParams }: { searchParams: { te
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -119,6 +131,8 @@ export default async function PlayersPage({ searchParams }: { searchParams: { te
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

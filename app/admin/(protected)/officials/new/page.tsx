@@ -7,7 +7,7 @@ const STATUSES = ["active","inactive","retired"];
 export default function NewOfficialPage() {
   return (
     <FormShell title="Add Official" backHref="/admin/officials" onSubmit={createOfficial} submitLabel="Create official">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="First name">
           <Input name="first_name" required />
         </Field>
@@ -15,7 +15,7 @@ export default function NewOfficialPage() {
           <Input name="last_name" required />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Role">
           <Select name="role" defaultValue="">
             <option value="">—</option>
@@ -28,7 +28,7 @@ export default function NewOfficialPage() {
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" />
         </Field>
@@ -39,7 +39,7 @@ export default function NewOfficialPage() {
       <Field label="Date of birth">
         <Input name="date_of_birth" type="date" />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Phone">
           <Input name="phone" type="tel" />
         </Field>

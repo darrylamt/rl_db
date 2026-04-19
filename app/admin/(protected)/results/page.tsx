@@ -2,7 +2,9 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteResult } from "./actions";
 
 function fmt(d: string | null) {
@@ -10,17 +12,24 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function ResultsPage() {
+export default async function ResultsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: results, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: results, error, count } = await supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season))"
+      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season))",
+      { count: "exact" }
     )
-    .order("recorded_at", { ascending: false });
+    .order("recorded_at", { ascending: false })
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["match_results", "fixtures"]} />
       <ListHeader title="Results" addHref="/admin/fixtures" addLabel="Record via Fixtures" />
       <p className="text-sm text-slate-500 mb-4 -mt-2">
@@ -34,7 +43,7 @@ export default async function ResultsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -84,6 +93,8 @@ export default async function ResultsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

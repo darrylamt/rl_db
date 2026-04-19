@@ -17,7 +17,7 @@ export default async function EditCompetitionPage({ params }: { params: { id: st
       <Field label="Name">
         <Input name="name" required defaultValue={c.name} />
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Season">
           <Input name="season" defaultValue={c.season ?? ""} />
         </Field>
@@ -33,7 +33,7 @@ export default async function EditCompetitionPage({ params }: { params: { id: st
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Start date">
           <Input name="start_date" type="date" defaultValue={c.start_date ?? ""} />
         </Field>

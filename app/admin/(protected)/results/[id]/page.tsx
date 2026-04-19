@@ -27,7 +27,7 @@ export default async function EditResultPage({ params }: { params: { id: string 
       onSubmit={bound}
       submitLabel={result ? "Update result" : "Record result"}
     >
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={`${f.home?.name ?? "Home"} score`}>
           <Input name="home_score" type="number" min={0} defaultValue={r.home_score ?? 0} required />
         </Field>
@@ -63,7 +63,7 @@ export default async function EditResultPage({ params }: { params: { id: string 
           <Input name="away_drop_goals" type="number" min={0} defaultValue={r.away_drop_goals ?? 0} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Attendance">
           <Input name="attendance" type="number" min={0} defaultValue={r.attendance ?? ""} />
         </Field>

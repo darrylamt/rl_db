@@ -36,7 +36,7 @@ export default async function NewSuspensionPage() {
       <Field label="Reason">
         <Input name="reason" placeholder="Red card — dangerous tackle" />
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Matches banned">
           <Input name="matches_banned" type="number" min={0} />
         </Field>

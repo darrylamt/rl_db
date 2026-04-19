@@ -2,18 +2,29 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteOfficial } from "./actions";
 
-export default async function OfficialsPage() {
+export default async function OfficialsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: officials, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: officials, error, count } = await supabase
     .from("officials")
-    .select("official_id, first_name, last_name, role, region, status, photo_url")
-    .order("last_name");
+    .select(
+      "official_id, first_name, last_name, role, region, status, photo_url",
+      { count: "exact" }
+    )
+    .order("last_name")
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["officials"]} />
       <ListHeader title="Officials" addHref="/admin/officials/new" addLabel="Add Official" />
 
@@ -23,7 +34,7 @@ export default async function OfficialsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -81,6 +92,8 @@ export default async function OfficialsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

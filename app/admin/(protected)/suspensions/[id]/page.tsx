@@ -40,7 +40,7 @@ export default async function EditSuspensionPage({ params }: { params: { id: str
       <Field label="Reason">
         <Input name="reason" defaultValue={s.reason ?? ""} />
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Matches banned">
           <Input name="matches_banned" type="number" min={0} defaultValue={s.matches_banned ?? ""} />
         </Field>

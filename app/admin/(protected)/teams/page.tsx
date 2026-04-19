@@ -2,20 +2,29 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteTeam } from "./actions";
 
-export default async function TeamsPage() {
+export default async function TeamsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: teams, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: teams, error, count } = await supabase
     .from("teams")
     .select(
-      "team_id, name, region, city, manager_name, coach_name, founded_year, home_venue:home_venue_id(name)"
+      "team_id, name, region, city, manager_name, coach_name, founded_year, home_venue:home_venue_id(name)",
+      { count: "exact" }
     )
-    .order("name");
+    .order("name")
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["teams"]} />
       <ListHeader title="Teams" addHref="/admin/teams/new" addLabel="Add Team" />
 
@@ -25,7 +34,7 @@ export default async function TeamsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -76,6 +85,8 @@ export default async function TeamsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

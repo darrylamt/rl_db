@@ -10,7 +10,7 @@ export default function NewCompetitionPage() {
       <Field label="Name">
         <Input name="name" required placeholder="Ghana Rugby League Championship" />
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Season">
           <Input name="season" placeholder="2026" />
         </Field>
@@ -26,7 +26,7 @@ export default function NewCompetitionPage() {
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Start date">
           <Input name="start_date" type="date" />
         </Field>

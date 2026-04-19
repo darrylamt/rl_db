@@ -20,7 +20,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
 
   return (
     <FormShell title={`Edit: ${p.first_name} ${p.last_name}`} backHref="/admin/players" onSubmit={bound} submitLabel="Save changes">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="First name">
           <Input name="first_name" required defaultValue={p.first_name} />
         </Field>
@@ -36,7 +36,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} defaultValue={p.jersey_number ?? ""} />
         </Field>
@@ -52,7 +52,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date of birth">
           <Input name="date_of_birth" type="date" defaultValue={p.date_of_birth ?? ""} />
         </Field>
@@ -66,7 +66,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
       <Field label="Nationality">
         <Input name="nationality" defaultValue={p.nationality ?? ""} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Phone">
           <Input name="phone" type="tel" defaultValue={p.phone ?? ""} />
         </Field>

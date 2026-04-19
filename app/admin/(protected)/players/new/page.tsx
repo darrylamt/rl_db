@@ -14,7 +14,7 @@ export default async function NewPlayerPage() {
 
   return (
     <FormShell title="Add Player" backHref="/admin/players" onSubmit={createPlayer} submitLabel="Create player">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="First name">
           <Input name="first_name" required />
         </Field>
@@ -30,7 +30,7 @@ export default async function NewPlayerPage() {
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} />
         </Field>
@@ -46,7 +46,7 @@ export default async function NewPlayerPage() {
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date of birth">
           <Input name="date_of_birth" type="date" />
         </Field>
@@ -60,7 +60,7 @@ export default async function NewPlayerPage() {
       <Field label="Nationality">
         <Input name="nationality" placeholder="Ghanaian" />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Phone">
           <Input name="phone" type="tel" />
         </Field>

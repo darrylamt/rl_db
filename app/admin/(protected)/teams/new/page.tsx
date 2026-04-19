@@ -14,7 +14,7 @@ export default async function NewTeamPage() {
       <Field label="Name">
         <Input name="name" required placeholder="e.g. Accra Panthers" />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" placeholder="Greater Accra" />
         </Field>
@@ -30,7 +30,7 @@ export default async function NewTeamPage() {
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Manager">
           <Input name="manager_name" />
         </Field>
@@ -38,7 +38,7 @@ export default async function NewTeamPage() {
           <Input name="coach_name" />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Founded year">
           <Input name="founded_year" type="number" min={1800} max={2100} />
         </Field>

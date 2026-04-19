@@ -14,7 +14,7 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
 
   return (
     <FormShell title={`Edit: ${o.first_name} ${o.last_name}`} backHref="/admin/officials" onSubmit={bound} submitLabel="Save changes">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="First name">
           <Input name="first_name" required defaultValue={o.first_name} />
         </Field>
@@ -22,7 +22,7 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
           <Input name="last_name" required defaultValue={o.last_name} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Role">
           <Select name="role" defaultValue={o.role ?? ""}>
             <option value="">—</option>
@@ -35,7 +35,7 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" defaultValue={o.region ?? ""} />
         </Field>
@@ -46,7 +46,7 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
       <Field label="Date of birth">
         <Input name="date_of_birth" type="date" defaultValue={o.date_of_birth ?? ""} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Phone">
           <Input name="phone" type="tel" defaultValue={o.phone ?? ""} />
         </Field>

@@ -26,7 +26,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["match_results", "fixtures"]} />
       <ListHeader title="Standings" />
 
@@ -67,7 +67,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
           {Array.from(groups.entries()).map(([key, group]) => (
             <section key={key}>
               <h2 className="font-display text-xl font-bold text-navy-900 mb-3">{group.name}</h2>
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 text-slate-700 text-left">
                     <tr>

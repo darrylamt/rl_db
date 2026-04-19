@@ -24,7 +24,7 @@ export default async function NewFixturePage() {
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Home team">
           <Select name="home_team_id" required defaultValue="">
             <option value="">— select —</option>
@@ -50,7 +50,7 @@ export default async function NewFixturePage() {
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date">
           <Input name="scheduled_date" type="date" />
         </Field>

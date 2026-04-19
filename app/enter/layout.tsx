@@ -11,7 +11,7 @@ export default function EnterLayout({
   return (
     <div className="min-h-screen bg-navy-900 text-white">
       <header className="bg-navy-950 border-b border-navy-700">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="flex items-baseline gap-2">
             <span className="font-display text-gold-400 text-sm tracking-widest">
               GRLF
@@ -31,7 +31,7 @@ export default function EnterLayout({
           </nav>
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-2xl mx-auto px-4 py-6 md:py-8">{children}</main>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export default async function EditVenuePage({ params }: { params: { id: string }
       <Field label="Name">
         <Input name="name" required defaultValue={v.name} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" defaultValue={v.region ?? ""} />
         </Field>

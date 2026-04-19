@@ -18,7 +18,7 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
       <Field label="Name">
         <Input name="name" required defaultValue={team.name} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Region">
           <Input name="region" defaultValue={team.region ?? ""} />
         </Field>
@@ -34,7 +34,7 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Manager">
           <Input name="manager_name" defaultValue={team.manager_name ?? ""} />
         </Field>
@@ -42,7 +42,7 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
           <Input name="coach_name" defaultValue={team.coach_name ?? ""} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Founded year">
           <Input name="founded_year" type="number" min={1800} max={2100} defaultValue={team.founded_year ?? ""} />
         </Field>

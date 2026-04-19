@@ -28,7 +28,7 @@ export default async function EditFixturePage({ params }: { params: { id: string
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Home team">
           <Select name="home_team_id" required defaultValue={f.home_team_id ?? ""}>
             <option value="">— select —</option>
@@ -54,7 +54,7 @@ export default async function EditFixturePage({ params }: { params: { id: string
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date">
           <Input name="scheduled_date" type="date" defaultValue={f.scheduled_date ?? ""} />
         </Field>

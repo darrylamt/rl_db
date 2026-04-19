@@ -2,7 +2,9 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteCompetition } from "./actions";
 
 function fmt(d: string | null) {
@@ -10,15 +12,24 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function CompetitionsPage() {
+export default async function CompetitionsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: comps, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: comps, error, count } = await supabase
     .from("competitions")
-    .select("competition_id, name, season, type, status, start_date, end_date")
-    .order("start_date", { ascending: false });
+    .select(
+      "competition_id, name, season, type, status, start_date, end_date",
+      { count: "exact" }
+    )
+    .order("start_date", { ascending: false })
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["competitions"]} />
       <ListHeader title="Competitions" addHref="/admin/competitions/new" addLabel="Add Competition" />
 
@@ -28,7 +39,7 @@ export default async function CompetitionsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -79,6 +90,8 @@ export default async function CompetitionsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

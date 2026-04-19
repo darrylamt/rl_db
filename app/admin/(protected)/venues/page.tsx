@@ -2,18 +2,26 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteVenue } from "./actions";
 
-export default async function VenuesPage() {
+export default async function VenuesPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: venues, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: venues, error, count } = await supabase
     .from("venues")
-    .select("venue_id, name, region, city, capacity")
-    .order("name");
+    .select("venue_id, name, region, city, capacity", { count: "exact" })
+    .order("name")
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["venues"]} />
       <ListHeader title="Venues" addHref="/admin/venues/new" addLabel="Add Venue" />
 
@@ -23,7 +31,7 @@ export default async function VenuesPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -61,6 +69,8 @@ export default async function VenuesPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }

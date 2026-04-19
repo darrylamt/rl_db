@@ -107,7 +107,7 @@ export function FormShell({
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       <nav className="mb-4">
         <Link
           href={backHref}
@@ -116,17 +116,17 @@ export function FormShell({
           ← Back
         </Link>
       </nav>
-      <h1 className="font-display text-3xl font-bold text-navy-900 mb-6">
+      <h1 className="font-display text-2xl md:text-3xl font-bold text-navy-900 mb-6">
         {title}
       </h1>
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-slate-200 rounded-lg p-6">
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-slate-200 rounded-lg p-4 md:p-6">
         {children}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded">
             {error}
           </div>
         )}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-wrap gap-2 pt-2">
           <button
             type="submit"
             disabled={pending}

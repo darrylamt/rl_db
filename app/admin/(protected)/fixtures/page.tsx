@@ -2,7 +2,9 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { getPageParams } from "@/lib/pagination";
 import { deleteFixture } from "./actions";
 
 function fmt(d: string | null) {
@@ -10,17 +12,24 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function FixturesPage() {
+export default async function FixturesPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createAdminClient();
-  const { data: fixtures, error } = await supabase
+  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { data: fixtures, error, count } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)"
+      "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)",
+      { count: "exact" }
     )
-    .order("scheduled_date", { ascending: false });
+    .order("scheduled_date", { ascending: false })
+    .range(from, to);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <LiveRefresh tables={["fixtures", "match_results"]} />
       <ListHeader title="Fixtures" addHref="/admin/fixtures/new" addLabel="Add Fixture" />
 
@@ -30,7 +39,7 @@ export default async function FixturesPage() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
@@ -89,6 +98,8 @@ export default async function FixturesPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
     </div>
   );
 }
