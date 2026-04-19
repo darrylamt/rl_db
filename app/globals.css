@@ -10,8 +10,24 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Browsers reset font on form controls to OS default — force them to inherit Inter. */
+input,
+select,
+textarea,
+button,
+option,
+label {
+  font-family: inherit;
+  font-feature-settings: inherit;
+}
+
+/* Make select dropdowns render in the Inter font on Windows/Linux too. */
+select option {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
 }
 
 @layer utilities {

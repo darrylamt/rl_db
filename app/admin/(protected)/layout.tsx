@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/players", label: "Players" },
   { href: "/admin/officials", label: "Officials" },
   { href: "/admin/competitions", label: "Competitions" },
+  { href: "/admin/venues", label: "Venues" },
   { href: "/admin/fixtures", label: "Fixtures" },
   { href: "/admin/results", label: "Results" },
   { href: "/admin/standings", label: "Standings" },
