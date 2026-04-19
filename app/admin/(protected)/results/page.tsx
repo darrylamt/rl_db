@@ -15,7 +15,7 @@ export default async function ResultsPage() {
   const { data: results, error } = await supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name))"
+      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season))"
     )
     .order("recorded_at", { ascending: false });
 
@@ -59,7 +59,10 @@ export default async function ResultsPage() {
                   <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
                     {fmt(r.fixture?.scheduled_date)}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{r.fixture?.competition?.name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-600">
+                    {r.fixture?.competition?.name ?? "—"}
+                    {r.fixture?.competition?.season && <span className="text-slate-400"> · {r.fixture.competition.season}</span>}
+                  </td>
                   <td className="px-4 py-2.5 font-medium text-navy-900">
                     {r.fixture?.home?.name ?? "?"} <span className="text-slate-400">vs</span> {r.fixture?.away?.name ?? "?"}
                   </td>

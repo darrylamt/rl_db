@@ -270,6 +270,13 @@ for (const r of rows) {
   const competition_id = comp && year ? compIds.get(`${comp}|${year}`) : null;
   if (!home_team_id || !away_team_id) continue;
 
+  // Determine status from scores
+  const rawH = r["Home Team Score"];
+  const rawA = r["Away Team Score"];
+  const played = !((rawH === null || rawH === undefined || rawH === "") &&
+                   (rawA === null || rawA === undefined || rawA === ""));
+  const fixtureStatus = played ? "completed" : "scheduled";
+
   // Fixture: dedupe on (competition, date, home, away)
   let fixture_id;
   {
@@ -281,8 +288,10 @@ for (const r of rows) {
     if (competition_id) q.eq("competition_id", competition_id);
     if (date) q.eq("scheduled_date", date);
     const { data: ex } = await q.maybeSingle();
-    if (ex) fixture_id = ex.fixture_id;
-    else {
+    if (ex) {
+      fixture_id = ex.fixture_id;
+      await supabase.from("fixtures").update({ status: fixtureStatus }).eq("fixture_id", fixture_id);
+    } else {
       const { data, error } = await supabase
         .from("fixtures")
         .insert({
@@ -291,7 +300,7 @@ for (const r of rows) {
           away_team_id,
           venue_id: venue_id ?? null,
           scheduled_date: date,
-          status: "completed",
+          status: fixtureStatus,
         })
         .select("fixture_id")
         .single();
@@ -301,9 +310,22 @@ for (const r of rows) {
     }
   }
 
-  // Result
-  const home_score = Number(r["Home Team Score"]) || 0;
-  const away_score = Number(r["Away Team Score"]) || 0;
+  // Result — skip if this is an unplayed fixture (scores absent)
+  const rawHome = r["Home Team Score"];
+  const rawAway = r["Away Team Score"];
+  const isUnplayed = (rawHome === null || rawHome === undefined || rawHome === "") &&
+                     (rawAway === null || rawAway === undefined || rawAway === "");
+
+  if (isUnplayed) {
+    // Make sure no stray 0-0 result exists and fixture status is scheduled
+    await supabase.from("match_results").delete().eq("fixture_id", fixture_id);
+    await supabase.from("fixtures").update({ status: "scheduled" }).eq("fixture_id", fixture_id);
+    await supabase.from("match_events").delete().eq("fixture_id", fixture_id);
+    continue;
+  }
+
+  const home_score = Number(rawHome) || 0;
+  const away_score = Number(rawAway) || 0;
   const tries4 = parseScorers(r["Tries 4pts"]);
   const tries5 = parseScorers(r["Tries 5pts"]);
   const convs = parseScorers(r["Conversions"]);

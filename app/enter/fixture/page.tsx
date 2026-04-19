@@ -36,13 +36,17 @@ export default function EnterFixturePage() {
       const [{ data: comps }, { data: t }, { data: v }] = await Promise.all([
         supabase
           .from("competitions")
-          .select("competition_id, name")
-          .order("name"),
+          .select("competition_id, name, season")
+          .order("name")
+          .order("season", { ascending: false }),
         supabase.from("teams").select("team_id, name").order("name"),
         supabase.from("venues").select("venue_id, name").order("name"),
       ]);
       setCompetitions(
-        (comps ?? []).map((r: any) => ({ id: r.competition_id, name: r.name }))
+        (comps ?? []).map((r: any) => ({
+          id: r.competition_id,
+          name: r.season ? `${r.name} · ${r.season}` : r.name,
+        }))
       );
       setTeams((t ?? []).map((r: any) => ({ id: r.team_id, name: r.name })));
       setVenues((v ?? []).map((r: any) => ({ id: r.venue_id, name: r.name })));

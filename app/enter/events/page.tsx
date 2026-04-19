@@ -17,7 +17,7 @@ type Fixture = {
   away_team_id: string | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
-  competition: { name: string } | null;
+  competition: { name: string; season: string | null } | null;
 };
 
 type Player = {
@@ -72,7 +72,7 @@ export default function EnterEventsPage() {
       const { data } = await supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name)"
+          "fixture_id, scheduled_date, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season)"
         )
         .order("scheduled_date", { ascending: false })
         .limit(100);
@@ -189,7 +189,7 @@ export default function EnterEventsPage() {
           {fixtures.map((f) => (
             <option key={f.fixture_id} value={f.fixture_id}>
               {f.home_team?.name} vs {f.away_team?.name} — {f.scheduled_date}
-              {f.competition?.name ? ` (${f.competition.name})` : ""}
+              {f.competition?.name ? ` (${f.competition.name}${f.competition.season ? ` ${f.competition.season}` : ""})` : ""}
             </option>
           ))}
         </Select>

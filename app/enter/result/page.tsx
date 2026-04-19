@@ -11,7 +11,7 @@ import {
   Notice,
 } from "@/components/FormFields";
 
-type Competition = { competition_id: string; name: string };
+type Competition = { competition_id: string; name: string; season: string | null };
 type Fixture = {
   fixture_id: string;
   scheduled_date: string | null;
@@ -49,9 +49,10 @@ export default function EnterResultPage() {
     (async () => {
       const { data } = await supabase
         .from("competitions")
-        .select("competition_id, name")
-        .order("name");
-      setCompetitions(data ?? []);
+        .select("competition_id, name, season")
+        .order("name")
+        .order("season", { ascending: false });
+      setCompetitions((data ?? []) as any);
     })();
   }, [supabase]);
 
@@ -148,7 +149,7 @@ export default function EnterResultPage() {
             <option value="">— Select competition —</option>
             {competitions.map((c) => (
               <option key={c.competition_id} value={c.competition_id}>
-                {c.name}
+                {c.name}{c.season ? ` · ${c.season}` : ""}
               </option>
             ))}
           </Select>

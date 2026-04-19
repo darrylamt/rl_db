@@ -26,7 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${oswald.variable}`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${oswald.variable} ${inter.className}`}
+    >
       <body className="font-sans antialiased bg-white text-navy-900">
         {children}
       </body>

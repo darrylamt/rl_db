@@ -7,10 +7,11 @@
   --foreground: #081529;
 }
 
+html,
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -20,14 +21,16 @@ select,
 textarea,
 button,
 option,
-label {
-  font-family: inherit;
+label,
+th,
+td {
+  font-family: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
   font-feature-settings: inherit;
 }
 
-/* Make select dropdowns render in the Inter font on Windows/Linux too. */
-select option {
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+/* Headings / Oswald display font (only where we explicitly ask for it) */
+.font-display {
+  font-family: var(--font-oswald), Impact, "Arial Narrow Bold", system-ui, sans-serif !important;
 }
 
 @layer utilities {

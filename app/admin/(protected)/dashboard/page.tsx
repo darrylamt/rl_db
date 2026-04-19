@@ -27,30 +27,35 @@ async function getCounts(): Promise<Counts> {
 async function getUpcoming() {
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
-  const next7 = new Date(Date.now() + 7 * 24 * 3600_000)
-    .toISOString()
-    .slice(0, 10);
   const { data } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, round, status, home_team:home_team_id(name), away_team:away_team_id(name), venue:venue_id(name), competition:competition_id(name)"
+      "fixture_id, scheduled_date, scheduled_time, round, status, home_team:home_team_id(name), away_team:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)"
     )
     .gte("scheduled_date", today)
-    .lte("scheduled_date", next7)
-    .order("scheduled_date", { ascending: true });
+    .eq("status", "scheduled")
+    .order("scheduled_date", { ascending: true })
+    .limit(5);
   return data ?? [];
 }
 
 async function getRecentResults() {
   const supabase = createAdminClient();
+  // Ignore placeholder 0-0 rows from unplayed fixtures: require at least one score > 0
   const { data } = await supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, recorded_at, fixture:fixture_id(scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name))"
+      "result_id, home_score, away_score, recorded_at, fixture:fixture_id(scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season))"
     )
+    .or("home_score.gt.0,away_score.gt.0")
     .order("recorded_at", { ascending: false })
     .limit(5);
   return data ?? [];
+}
+
+function fmtDate(d: string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default async function DashboardPage() {
@@ -66,6 +71,18 @@ export default async function DashboardPage() {
     { label: "Officials", value: counts.officials },
     { label: "Fixtures", value: counts.fixtures },
   ];
+
+  const currentYear = new Date().getFullYear();
+  const upcomingYears = Array.from(
+    new Set((upcoming as any[]).map((f) => f.scheduled_date?.slice(0, 4)).filter(Boolean))
+  ).sort();
+  const recentYears = Array.from(
+    new Set((recent as any[]).map((r) => r.fixture?.scheduled_date?.slice(0, 4)).filter(Boolean))
+  ).sort();
+  const upcomingYearLabel =
+    upcomingYears.length === 0 ? currentYear.toString() : upcomingYears.join(" / ");
+  const recentYearLabel =
+    recentYears.length === 0 ? currentYear.toString() : recentYears.join(" / ");
 
   return (
     <div className="p-8">
@@ -101,7 +118,7 @@ export default async function DashboardPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <section className="bg-white border border-slate-200 rounded-lg p-6">
           <h2 className="font-display text-xl font-bold text-navy-900 mb-4">
-            Upcoming this week
+            Upcoming fixtures <span className="text-slate-400 font-normal">· {upcomingYearLabel}</span>
           </h2>
           {upcoming.length === 0 ? (
             <p className="text-slate-500 text-sm">No fixtures scheduled.</p>
@@ -113,9 +130,10 @@ export default async function DashboardPage() {
                     {f.home_team?.name} vs {f.away_team?.name}
                   </div>
                   <div className="text-slate-500 text-xs">
-                    {f.scheduled_date}
-                    {f.scheduled_time ? ` @ ${f.scheduled_time}` : ""} •{" "}
-                    {f.competition?.name || "—"} • {f.venue?.name || "—"}
+                    {fmtDate(f.scheduled_date)}
+                    {f.scheduled_time ? ` @ ${f.scheduled_time.slice(0, 5)}` : ""} •{" "}
+                    {f.competition?.name || "—"}
+                    {f.competition?.season ? ` ${f.competition.season}` : ""} • {f.venue?.name || "—"}
                   </div>
                 </li>
               ))}
@@ -125,7 +143,7 @@ export default async function DashboardPage() {
 
         <section className="bg-white border border-slate-200 rounded-lg p-6">
           <h2 className="font-display text-xl font-bold text-navy-900 mb-4">
-            Recent results
+            Recent results <span className="text-slate-400 font-normal">· {recentYearLabel}</span>
           </h2>
           {recent.length === 0 ? (
             <p className="text-slate-500 text-sm">No results recorded yet.</p>
@@ -134,12 +152,13 @@ export default async function DashboardPage() {
               {recent.map((r: any) => (
                 <li key={r.result_id} className="py-3 text-sm">
                   <div className="font-medium">
-                    {r.fixture?.home_team?.name} {r.home_score} –{" "}
-                    {r.away_score} {r.fixture?.away_team?.name}
+                    {r.fixture?.home_team?.name} <span className="font-display">{r.home_score}</span> –{" "}
+                    <span className="font-display">{r.away_score}</span> {r.fixture?.away_team?.name}
                   </div>
                   <div className="text-slate-500 text-xs">
-                    {r.fixture?.competition?.name || "—"} •{" "}
-                    {r.fixture?.scheduled_date || "—"}
+                    {r.fixture?.competition?.name || "—"}
+                    {r.fixture?.competition?.season ? ` ${r.fixture.competition.season}` : ""} •{" "}
+                    {fmtDate(r.fixture?.scheduled_date)}
                   </div>
                 </li>
               ))}
