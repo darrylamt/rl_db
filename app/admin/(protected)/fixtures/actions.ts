@@ -47,6 +47,12 @@ export async function updateFixture(id: string, fd: FormData) {
 
 export async function deleteFixture(id: string) {
   const supabase = createAdminClient();
+  // Delete dependents first (no cascade on match_results/events/officials)
+  await supabase.from("match_events").delete().eq("fixture_id", id);
+  await supabase.from("fixture_officials").delete().eq("fixture_id", id);
+  await supabase.from("match_results").delete().eq("fixture_id", id);
+  // match_lineups has ON DELETE CASCADE but delete explicitly to be safe
+  await supabase.from("match_lineups").delete().eq("fixture_id", id);
   const { error } = await supabase.from("fixtures").delete().eq("fixture_id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/fixtures");
