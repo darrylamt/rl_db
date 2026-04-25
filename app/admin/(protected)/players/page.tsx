@@ -142,17 +142,17 @@ export default async function PlayersPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
               <th className="px-4 py-2.5 font-medium"></th>
               <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">Team</th>
-              <th className="px-4 py-2.5 font-medium">#</th>
-              <th className="px-4 py-2.5 font-medium">Position</th>
-              <th className="px-4 py-2.5 font-medium">Gender</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Team</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">#</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Position</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Gender</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5 text-right"></th>
             </tr>
           </thead>
@@ -177,37 +177,56 @@ export default async function PlayersPage({
             ) : (
               (players ?? []).map((p: any) => (
                 <tr key={p.player_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2">
+                  {/* Avatar */}
+                  <td className="px-3 py-2 w-10">
                     {p.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.photo_url} alt="" className="h-8 w-8 rounded-full object-cover border border-slate-200" />
+                      <img src={p.photo_url} alt="" className="h-9 w-9 rounded-full object-cover border border-slate-200" />
                     ) : (
-                      <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-500 text-xs flex items-center justify-center">
+                      <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-500 text-xs flex items-center justify-center font-medium">
                         {p.first_name?.[0]}{p.last_name?.[0]}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-navy-900">
+
+                  {/* Name — on mobile also shows team + status below */}
+                  <td className="px-3 py-2.5 font-medium text-navy-900">
                     <Link href={`/admin/players/${p.player_id}/view`} className="hover:underline">
                       {p.first_name} {p.last_name}
                     </Link>
                     {p.is_captain && (
-                      <span className="ml-2 bg-gold-100 text-gold-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      <span className="ml-1.5 bg-gold-100 text-gold-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">
                         Capt
                       </span>
                     )}
+                    {/* Mobile-only: team + status pill */}
+                    <div className="md:hidden mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                      {p.team?.name && <span>{p.team.name}</span>}
+                      {p.team?.name && p.playing_status && <span>·</span>}
+                      {p.playing_status && (
+                        <span className={`px-1.5 py-0.5 rounded-full ${
+                          p.playing_status === "active" ? "bg-emerald-50 text-emerald-700" :
+                          p.playing_status === "injured" ? "bg-amber-50 text-amber-700" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>
+                          {p.playing_status}
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">
+
+                  {/* Desktop-only columns */}
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">
                     {p.team?.team_id ? (
                       <Link href={`/admin/teams/${p.team.team_id}/view`} className="hover:underline">
                         {p.team.name}
                       </Link>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{p.jersey_number ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{p.position ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600 capitalize">{p.gender ?? "—"}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{p.jersey_number ?? "—"}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{p.position ?? "—"}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 capitalize">{p.gender ?? "—"}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       p.playing_status === "active" ? "bg-emerald-50 text-emerald-700" :
                       p.playing_status === "injured" ? "bg-amber-50 text-amber-700" :
@@ -217,9 +236,20 @@ export default async function PlayersPage({
                       {p.playing_status ?? "—"}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                    <Link href={`/admin/players/${p.player_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
-                    <DeleteRowButton id={p.player_id} action={deletePlayer} />
+
+                  {/* Actions — View on mobile, View+Edit+Delete on desktop */}
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <Link
+                      href={`/admin/players/${p.player_id}/view`}
+                      className="inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700 md:hidden"
+                    >
+                      View
+                    </Link>
+                    <span className="hidden md:inline-flex items-center gap-3">
+                      <Link href={`/admin/players/${p.player_id}/view`} className="text-slate-600 hover:underline text-sm">View</Link>
+                      <Link href={`/admin/players/${p.player_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                      <DeleteRowButton id={p.player_id} action={deletePlayer} />
+                    </span>
                   </td>
                 </tr>
               ))
