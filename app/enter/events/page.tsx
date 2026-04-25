@@ -45,6 +45,8 @@ const EVENT_TYPES = [
   "conversion",
   "penalty",
   "drop_goal",
+  "tackle",
+  "line_break",
   "sin_bin",
   "yellow_card",
   "red_card",

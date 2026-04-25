@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { updatePlayer } from "../actions";
 
 const POSITIONS = [
@@ -11,9 +12,6 @@ const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function EditPlayerPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
-  // Only clubs in the selector — rep-team membership belongs at the club level.
-  // If the player happens to be on a non-club (legacy / bad data), surface it
-  // at the top of the list so the admin can see + re-assign.
   const [{ data: p }, { data: clubs }] = await Promise.all([
     supabase.from("players").select("*").eq("player_id", params.id).maybeSingle(),
     supabase
@@ -70,7 +68,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           </Select>
         </Field>
         <Field label="Status">
-          <Select name="playing_status" defaultValue={p.playing_status ?? "active"}>
+          <Select name="playing_status" defaultValue={p.playing_status ?? "inactive"}>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </Select>
         </Field>
@@ -97,8 +95,8 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           <Input name="email" type="email" defaultValue={p.email ?? ""} />
         </Field>
       </div>
-      <Field label="Photo URL">
-        <Input name="photo_url" defaultValue={p.photo_url ?? ""} />
+      <Field label="Player Photo">
+        <PhotoUpload name="photo" currentUrl={p.photo_url} label="Photo" shape="round" />
       </Field>
       <Checkbox name="is_captain" defaultChecked={!!p.is_captain} label="Team captain" />
     </FormShell>

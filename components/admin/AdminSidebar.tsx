@@ -39,7 +39,7 @@ export function AdminSidebar({
       <div className="md:hidden sticky top-0 z-30 bg-navy-900 text-white border-b border-navy-700 flex items-center justify-between px-4 h-14">
         <Link href="/admin/dashboard" className="flex items-baseline gap-2">
           <span className="text-gold-400 font-display tracking-[0.15em] text-xs">
-            GRLF
+            RLFG
           </span>
           <span className="font-display text-sm font-bold">Admin</span>
         </Link>
@@ -105,7 +105,7 @@ export function AdminSidebar({
       >
         <div className="px-6 py-6 border-b border-navy-700 hidden md:block">
           <p className="text-gold-400 font-display tracking-[0.15em] text-xs">
-            GRLF
+            RLFG
           </p>
           <h2 className="font-display text-lg font-bold mt-1">Admin</h2>
         </div>

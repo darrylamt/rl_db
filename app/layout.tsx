@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Poppins, Anton } from "next/font/google";
 import "./globals.css";
 
-// GRLF brand: Poppins for body, Anton for display headings.
+// RLFG brand: Poppins for body, Anton for display headings.
 const poppins = Poppins({
   subsets: ["latin"],
   variable: "--font-poppins",
@@ -18,8 +18,8 @@ const anton = Anton({
 });
 
 export const metadata: Metadata = {
-  title: "GRLF — Ghana Rugby League Federation",
-  description: "Official management platform for the Ghana Rugby League Federation",
+  title: "RLFG — Rugby League Federation Ghana",
+  description: "Official management platform for the Rugby League Federation Ghana",
 };
 
 export default function RootLayout({

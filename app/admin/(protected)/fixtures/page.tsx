@@ -12,6 +12,10 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function FixturesPage({
   searchParams,
 }: {
@@ -19,19 +23,90 @@ export default async function FixturesPage({
 }) {
   const supabase = createAdminClient();
   const { page, pageSize, from, to } = getPageParams(searchParams, 20);
-  const { data: fixtures, error, count } = await supabase
+
+  // Seasons + competition-id lookup (for the year filter).
+  const { data: allComps } = await supabase
+    .from("competitions")
+    .select("competition_id, season");
+  const seasons = Array.from(
+    new Set(
+      (allComps ?? [])
+        .map((c: any) => c.season)
+        .filter(Boolean) as string[]
+    )
+  ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+
+  const rawYear = first(searchParams?.year);
+  const currentYear = String(new Date().getFullYear());
+  const selectedYear =
+    rawYear === "all"
+      ? ""
+      : rawYear && seasons.includes(rawYear)
+      ? rawYear
+      : seasons.includes(currentYear)
+      ? currentYear
+      : "";
+
+  const compIdsInYear = selectedYear
+    ? (allComps ?? [])
+        .filter((c: any) => c.season === selectedYear)
+        .map((c: any) => c.competition_id as string)
+    : [];
+
+  let q = supabase
     .from("fixtures")
     .select(
       "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)",
       { count: "exact" }
-    )
+    );
+
+  if (selectedYear) {
+    if (compIdsInYear.length > 0) q = q.in("competition_id", compIdsInYear);
+    else q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000"); // empty
+  }
+
+  const { data: fixtures, error, count } = await q
     .order("scheduled_date", { ascending: false })
     .range(from, to);
+
+  const nonDefaultYear =
+    rawYear === "all" || (selectedYear && selectedYear !== currentYear);
 
   return (
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["fixtures", "match_results"]} />
       <ListHeader title="Fixtures" addHref="/admin/fixtures/new" addLabel="Add Fixture" />
+
+      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+            Year
+          </span>
+          <select
+            name="year"
+            defaultValue={rawYear === "all" ? "all" : selectedYear}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[8rem]"
+          >
+            <option value="all">All years</option>
+            {seasons.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="submit"
+          className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium"
+        >
+          Apply
+        </button>
+        {nonDefaultYear && (
+          <Link href="/admin/fixtures" className="text-xs text-slate-500 hover:underline">
+            reset
+          </Link>
+        )}
+      </form>
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">
@@ -57,10 +132,14 @@ export default async function FixturesPage({
             {(fixtures ?? []).length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No fixtures yet.{" "}
-                  <Link href="/admin/fixtures/new" className="text-navy-700 hover:underline">
-                    Add the first one →
-                  </Link>
+                  {selectedYear
+                    ? `No fixtures in ${selectedYear}.`
+                    : "No fixtures yet."}{" "}
+                  {!selectedYear && (
+                    <Link href="/admin/fixtures/new" className="text-navy-700 hover:underline">
+                      Add the first one →
+                    </Link>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -88,6 +167,7 @@ export default async function FixturesPage({
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
+                    <Link href={`/admin/fixtures/${f.fixture_id}/lineup`} className="text-emerald-700 hover:underline text-sm">Lineup</Link>
                     <Link href={`/admin/results/${f.fixture_id}`} className="text-gold-700 hover:underline text-sm">Result</Link>
                     <Link href={`/admin/fixtures/${f.fixture_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
                     <DeleteRowButton id={f.fixture_id} action={deleteFixture} />

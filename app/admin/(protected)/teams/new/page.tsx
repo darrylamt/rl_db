@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createTeam } from "../actions";
 
 export default async function NewTeamPage() {
@@ -47,14 +48,12 @@ export default async function NewTeamPage() {
           <Input name="coach_name" />
         </Field>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Founded year">
-          <Input name="founded_year" type="number" min={1800} max={2100} />
-        </Field>
-        <Field label="Logo URL">
-          <Input name="logo_url" placeholder="https://..." />
-        </Field>
-      </div>
+      <Field label="Founded year">
+        <Input name="founded_year" type="number" min={1800} max={2100} />
+      </Field>
+      <Field label="Club Logo">
+        <PhotoUpload name="logo" label="Logo" shape="square" />
+      </Field>
     </FormShell>
   );
 }

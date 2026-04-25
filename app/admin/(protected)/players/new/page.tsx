@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createPlayer } from "../actions";
 
 const POSITIONS = [
@@ -10,8 +11,6 @@ const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function NewPlayerPage() {
   const supabase = createAdminClient();
-  // Only clubs — representative teams (national / president_xv) are selected
-  // separately from the club-level roster.
   const { data: teams } = await supabase
     .from("teams")
     .select("team_id, name")
@@ -47,7 +46,7 @@ export default async function NewPlayerPage() {
           </Select>
         </Field>
         <Field label="Status">
-          <Select name="playing_status" defaultValue="active">
+          <Select name="playing_status" defaultValue="inactive">
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </Select>
         </Field>
@@ -74,8 +73,8 @@ export default async function NewPlayerPage() {
           <Input name="email" type="email" />
         </Field>
       </div>
-      <Field label="Photo URL">
-        <Input name="photo_url" placeholder="https://..." />
+      <Field label="Player Photo">
+        <PhotoUpload name="photo" label="Photo" shape="round" />
       </Field>
       <Checkbox name="is_captain" label="Team captain" />
     </FormShell>

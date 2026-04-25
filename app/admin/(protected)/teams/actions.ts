@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { resolveImageUrl } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
 
 function str(fd: FormData, k: string) {
@@ -35,7 +36,7 @@ function payloadFromForm(fd: FormData) {
     home_venue_id: str(fd, "home_venue_id"),
     manager_name: str(fd, "manager_name"),
     coach_name: str(fd, "coach_name"),
-    logo_url: str(fd, "logo_url"),
+    logo_url: null as string | null,
   };
 }
 
@@ -43,6 +44,7 @@ export async function createTeam(fd: FormData) {
   const supabase = createAdminClient();
   const payload = payloadFromForm(fd);
   if (!payload.name) throw new Error("Name is required");
+  payload.logo_url = await resolveImageUrl(fd, "logo", "team-logos", "teams", null);
   const { error } = await supabase.from("teams").insert(payload);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/teams");
@@ -51,8 +53,14 @@ export async function createTeam(fd: FormData) {
 
 export async function updateTeam(id: string, fd: FormData) {
   const supabase = createAdminClient();
+  const { data: existing } = await supabase
+    .from("teams")
+    .select("logo_url")
+    .eq("team_id", id)
+    .maybeSingle();
   const payload = payloadFromForm(fd);
   if (!payload.name) throw new Error("Name is required");
+  payload.logo_url = await resolveImageUrl(fd, "logo", "team-logos", "teams", existing?.logo_url);
   const { error } = await supabase.from("teams").update(payload).eq("team_id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/teams");

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 // GET /api — index listing available endpoints.
 export async function GET() {
   return ok({
-    name: "GRLF Public API",
+    name: "RLFG Public API",
     version: "1.0",
     endpoints: {
       "GET /api/teams": "List all teams",

@@ -13,10 +13,10 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-16">
         <header className="border-b border-white/10 pb-6 md:pb-8 mb-8 md:mb-12">
           <p className="text-ghanaYellow-500 font-display tracking-[0.2em] text-xs md:text-sm mb-2">
-            GHANA RUGBY LEAGUE FEDERATION
+            RUGBY LEAGUE FEDERATION GHANA
           </p>
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-tight">
-            GRLF Management Platform
+            RLFG Management Platform
           </h1>
           <p className="text-slate-300 text-sm md:text-base mt-4 max-w-2xl">
             Fixtures, results, players, officials and standings — one source of truth for Ghana Rugby League.
@@ -70,7 +70,7 @@ export default function Home() {
         </div>
 
         <footer className="mt-16 pt-8 border-t border-white/10 text-slate-400 text-sm">
-          © {new Date().getFullYear()} Ghana Rugby League Federation.
+          © {new Date().getFullYear()} Rugby League Federation Ghana.
         </footer>
       </div>
     </main>

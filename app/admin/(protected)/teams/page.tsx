@@ -124,7 +124,14 @@ export default async function TeamsPage({
                 const tt = (t.team_type ?? "club") as Exclude<TypeFilter, "all">;
                 return (
                   <tr key={t.team_id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 font-medium text-navy-900">{t.name}</td>
+                    <td className="px-4 py-2.5 font-medium text-navy-900">
+                      <Link
+                        href={`/admin/teams/${t.team_id}/view`}
+                        className="hover:underline"
+                      >
+                        {t.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_BADGE[tt]}`}>
                         {TYPE_LABEL[tt]}

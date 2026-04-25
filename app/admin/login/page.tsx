@@ -34,7 +34,7 @@ function LoginForm() {
     <div className="min-h-screen bg-navy-900 text-white flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-navy-800 border border-navy-700 rounded-lg p-8 shadow-2xl">
         <Link href="/" className="text-gold-400 text-sm font-display tracking-widest hover:underline">
-          ← GRLF
+          ← RLFG
         </Link>
         <h1 className="font-display text-3xl font-bold mt-4 mb-1">Admin Login</h1>
         <p className="text-navy-200 text-sm mb-6">

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { updateTeam } from "../actions";
 
 export default async function EditTeamPage({ params }: { params: { id: string } }) {
@@ -51,14 +52,12 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
           <Input name="coach_name" defaultValue={team.coach_name ?? ""} />
         </Field>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Founded year">
-          <Input name="founded_year" type="number" min={1800} max={2100} defaultValue={team.founded_year ?? ""} />
-        </Field>
-        <Field label="Logo URL">
-          <Input name="logo_url" defaultValue={team.logo_url ?? ""} />
-        </Field>
-      </div>
+      <Field label="Founded year">
+        <Input name="founded_year" type="number" min={1800} max={2100} defaultValue={team.founded_year ?? ""} />
+      </Field>
+      <Field label="Club Logo">
+        <PhotoUpload name="logo" currentUrl={team.logo_url} label="Logo" shape="square" />
+      </Field>
     </FormShell>
   );
 }

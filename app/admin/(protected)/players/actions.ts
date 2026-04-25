@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { resolveImageUrl } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
 
 function str(fd: FormData, k: string) {
@@ -30,8 +31,8 @@ function payload(fd: FormData) {
     jersey_number: intOrNull(fd, "jersey_number"),
     position: str(fd, "position"),
     is_captain: boolVal(fd, "is_captain"),
-    playing_status: str(fd, "playing_status") ?? "active",
-    photo_url: str(fd, "photo_url"),
+    playing_status: str(fd, "playing_status") ?? "inactive",
+    photo_url: null as string | null,
     phone: str(fd, "phone"),
     email: str(fd, "email"),
   };
@@ -41,6 +42,7 @@ export async function createPlayer(fd: FormData) {
   const supabase = createAdminClient();
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
+  p.photo_url = await resolveImageUrl(fd, "photo", "player-photos", "players", null);
   const { error } = await supabase.from("players").insert(p);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/players");
@@ -49,8 +51,14 @@ export async function createPlayer(fd: FormData) {
 
 export async function updatePlayer(id: string, fd: FormData) {
   const supabase = createAdminClient();
+  const { data: existing } = await supabase
+    .from("players")
+    .select("photo_url")
+    .eq("player_id", id)
+    .maybeSingle();
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
+  p.photo_url = await resolveImageUrl(fd, "photo", "player-photos", "players", existing?.photo_url);
   const { error } = await supabase.from("players").update(p).eq("player_id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/players");

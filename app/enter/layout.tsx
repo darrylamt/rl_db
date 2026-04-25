@@ -20,7 +20,7 @@ export default function EnterLayout({
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="flex items-baseline gap-2">
             <span className="font-display text-ghanaYellow-500 text-sm tracking-widest">
-              GRLF
+              RLFG
             </span>
             <span className="text-slate-300 text-xs">Match Day Entry</span>
           </Link>

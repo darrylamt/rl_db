@@ -8,6 +8,7 @@ const navItems = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/teams", label: "Teams" },
   { href: "/admin/players", label: "Players" },
+  { href: "/admin/registrations", label: "Registrations" },
   { href: "/admin/officials", label: "Officials" },
   { href: "/admin/competitions", label: "Competitions" },
   { href: "/admin/venues", label: "Venues" },

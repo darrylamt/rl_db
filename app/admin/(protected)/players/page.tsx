@@ -7,56 +7,120 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { getPageParams } from "@/lib/pagination";
 import { deletePlayer } from "./actions";
 
+const CURRENT_YEAR = new Date().getFullYear();
+
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: { team?: string; page?: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const selectedTeam = searchParams.team || "";
+  const selectedTeam = first(searchParams?.team) || "";
+  const rawYear = first(searchParams?.year);
+  // "all" means no year filter; otherwise default to current year
+  const selectedYear =
+    rawYear === "all" ? null : rawYear ? parseInt(rawYear, 10) : CURRENT_YEAR;
+
   const { page, pageSize, from, to } = getPageParams(searchParams, 20);
 
+  // Year options
+  const yearOptions = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 + i);
+
   const teamsP = supabase.from("teams").select("team_id, name").order("name");
+
+  // When filtering by year we join through player_registrations
+  let playerIds: string[] | null = null;
+  if (selectedYear) {
+    let regQ = supabase
+      .from("player_registrations")
+      .select("player_id")
+      .eq("season_year", selectedYear);
+    if (selectedTeam) regQ = regQ.eq("team_id", selectedTeam);
+    const { data: regs } = await regQ;
+    playerIds = (regs ?? []).map((r: any) => r.player_id as string);
+  }
 
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, jersey_number, position, is_captain, playing_status, photo_url, team:team_id(name)",
+      "player_id, first_name, last_name, jersey_number, position, is_captain, playing_status, photo_url, team:team_id(team_id, name)",
       { count: "exact" }
     )
     .order("last_name")
     .range(from, to);
-  if (selectedTeam) query = query.eq("team_id", selectedTeam);
+
+  if (selectedYear && playerIds !== null) {
+    if (playerIds.length === 0) {
+      // No registrations: force empty result
+      query = query.eq("player_id", "00000000-0000-0000-0000-000000000000");
+    } else {
+      query = query.in("player_id", playerIds);
+    }
+  } else if (!selectedYear && selectedTeam) {
+    query = query.eq("team_id", selectedTeam);
+  }
 
   const [{ data: teams }, { data: players, error, count }] = await Promise.all([
     teamsP,
     query,
   ]);
 
+  const isFiltered = selectedYear || selectedTeam;
+
   return (
     <div className="p-4 md:p-8">
-      <LiveRefresh tables={["players"]} />
+      <LiveRefresh tables={["players", "player_registrations"]} />
       <ListHeader title="Players" addHref="/admin/players/new" addLabel="Add Player" />
 
-      <form className="mb-4 flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-slate-500">Team</span>
-        <select
-          name="team"
-          defaultValue={selectedTeam}
-          className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
-        >
-          <option value="">All teams</option>
-          {(teams ?? []).map((t: any) => (
-            <option key={t.team_id} value={t.team_id}>{t.name}</option>
-          ))}
-        </select>
+      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Season Year</span>
+          <select
+            name="year"
+            defaultValue={rawYear === "all" ? "all" : (selectedYear ?? CURRENT_YEAR)}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[8rem]"
+          >
+            <option value="all">All years</option>
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Team</span>
+          <select
+            name="team"
+            defaultValue={selectedTeam}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[10rem]"
+          >
+            <option value="">All teams</option>
+            {(teams ?? []).map((t: any) => (
+              <option key={t.team_id} value={t.team_id}>{t.name}</option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
           Filter
         </button>
-        {selectedTeam && (
-          <Link href="/admin/players" className="text-xs text-slate-500 hover:underline">clear</Link>
+        {isFiltered && (
+          <Link href="/admin/players" className="text-xs text-slate-500 hover:underline">
+            clear
+          </Link>
         )}
       </form>
+
+      {selectedYear && (
+        <p className="text-xs text-slate-500 mb-3">
+          Showing players registered for <span className="font-semibold">{selectedYear}</span>.{" "}
+          <Link href={`/admin/registrations?year=${selectedYear}`} className="text-navy-700 hover:underline">
+            Manage registrations →
+          </Link>
+        </p>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">
@@ -81,10 +145,18 @@ export default async function PlayersPage({
             {(players ?? []).length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                  No players yet.{" "}
-                  <Link href="/admin/players/new" className="text-navy-700 hover:underline">
-                    Add the first one →
-                  </Link>
+                  {selectedYear
+                    ? `No players registered for ${selectedYear}.`
+                    : "No players yet."}{" "}
+                  {selectedYear ? (
+                    <Link href={`/admin/registrations?year=${selectedYear}`} className="text-navy-700 hover:underline">
+                      Register players →
+                    </Link>
+                  ) : (
+                    <Link href="/admin/players/new" className="text-navy-700 hover:underline">
+                      Add the first one →
+                    </Link>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -101,14 +173,22 @@ export default async function PlayersPage({
                     )}
                   </td>
                   <td className="px-4 py-2.5 font-medium text-navy-900">
-                    {p.first_name} {p.last_name}
+                    <Link href={`/admin/players/${p.player_id}/view`} className="hover:underline">
+                      {p.first_name} {p.last_name}
+                    </Link>
                     {p.is_captain && (
                       <span className="ml-2 bg-gold-100 text-gold-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">
                         Capt
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{p.team?.name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-600">
+                    {p.team?.team_id ? (
+                      <Link href={`/admin/teams/${p.team.team_id}/view`} className="hover:underline">
+                        {p.team.name}
+                      </Link>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-2.5 text-slate-600">{p.jersey_number ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">{p.position ?? "—"}</td>
                   <td className="px-4 py-2.5">
