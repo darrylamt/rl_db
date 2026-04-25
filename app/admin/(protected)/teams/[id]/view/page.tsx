@@ -110,14 +110,14 @@ export default async function TeamDetailPage({
   const womenRoster   = (allRoster ?? []).filter((p: any) => p.category === "senior_women");
   const youthRoster   = (allRoster ?? []).filter((p: any) => p.category === "youth");
 
-  // All fixtures involving this team, with results.
+  // All fixtures involving this team, with results + competition division.
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(
       `fixture_id, scheduled_date, status, home_team_id, away_team_id,
        home:home_team_id(name),
        away:away_team_id(name),
-       competition:competition_id(name, season),
+       competition:competition_id(name, season, division),
        result:match_results(home_score, away_score)`
     )
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
@@ -134,6 +134,7 @@ export default async function TeamDetailPage({
     fixture_id: string;
     date: string | null;
     competition: string | null;
+    division: string;
     opponent_id: string | null;
     opponent: string;
     homeAway: "H" | "A";
@@ -149,18 +150,20 @@ export default async function TeamDetailPage({
     const theirScore = isHome ? r.away_score : r.home_score;
     if (ourScore == null || theirScore == null) continue;
 
-    // Supabase types embedded FK joins as arrays — normalise.
     const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
     const home: any = Array.isArray(f.home) ? f.home[0] : f.home;
     const away: any = Array.isArray(f.away) ? f.away[0] : f.away;
+    const division: string = comp?.division ?? "men";
 
-    overall = applyMatch(overall, ourScore, theirScore);
+    // Only include in overall tally for men's fixtures
+    if (division === "men") overall = applyMatch(overall, ourScore, theirScore);
     matchRows.push({
       fixture_id: f.fixture_id,
       date: f.scheduled_date,
       competition: comp?.name
         ? `${comp.name}${comp.season ? ` · ${comp.season}` : ""}`
         : null,
+      division,
       opponent_id: isHome ? f.away_team_id : f.home_team_id,
       opponent: (isHome ? away?.name : home?.name) ?? "?",
       homeAway: isHome ? "H" : "A",
@@ -384,71 +387,59 @@ export default async function TeamDetailPage({
         </section>
       ))}
 
-      {/* Matches played */}
-      <section>
-        <h2 className="font-display text-xl font-bold text-navy-900 mb-2">
-          Matches ({matchRows.length})
-        </h2>
-        <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-slate-700 text-left">
-              <tr>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Competition</th>
-                <th className="px-3 py-2 font-medium">H/A</th>
-                <th className="px-3 py-2 font-medium">Opponent</th>
-                <th className="px-3 py-2 font-medium">Score</th>
-                <th className="px-3 py-2 font-medium">Result</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {matchRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-5 text-center text-slate-500">
-                    No completed matches yet.
-                  </td>
-                </tr>
-              ) : (
-                matchRows.map((m) => (
-                  <tr key={m.fixture_id} className="hover:bg-slate-50">
-                    <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                      {fmt(m.date)}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600">
-                      {m.competition ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600">{m.homeAway}</td>
-                    <td className="px-3 py-2 text-navy-900">
-                      {m.opponent_id ? (
-                        <Link
-                          href={`/admin/teams/${m.opponent_id}/view`}
-                          className="hover:underline"
-                        >
-                          {m.opponent}
-                        </Link>
-                      ) : (
-                        m.opponent
-                      )}
-                    </td>
-                    <td className="px-3 py-2 font-display font-bold text-navy-900 tabular-nums">
-                      {m.score}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                        m.result === "W" ? "bg-emerald-100 text-emerald-800" :
-                        m.result === "L" ? "bg-red-100 text-red-800" :
-                        "bg-slate-100 text-slate-700"
-                      }`}>
-                        {m.result}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* Matches — split by division */}
+      {(["men", "women", "youth"] as const)
+        .map((div) => ({ div, rows: matchRows.filter((m) => m.division === div) }))
+        .filter(({ rows }) => rows.length > 0)
+        .map(({ div, rows }) => {
+          const divLabel = div === "men" ? "Senior Men" : div === "women" ? "Senior Women" : "Youth";
+          const divBadge = div === "men" ? "bg-navy-100 text-navy-800" : div === "women" ? "bg-pink-100 text-pink-800" : "bg-amber-100 text-amber-800";
+          return (
+            <section key={div} className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="font-display text-lg font-bold text-navy-900">Matches — {divLabel}</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${divBadge}`}>{rows.length}</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-slate-700 text-left">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Date</th>
+                      <th className="hidden sm:table-cell px-3 py-2 font-medium">Competition</th>
+                      <th className="px-3 py-2 font-medium">H/A</th>
+                      <th className="px-3 py-2 font-medium">Opponent</th>
+                      <th className="px-3 py-2 font-medium">Score</th>
+                      <th className="px-3 py-2 font-medium">W/D/L</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {rows.map((m) => (
+                      <tr key={m.fixture_id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap text-xs">{fmt(m.date)}</td>
+                        <td className="hidden sm:table-cell px-3 py-2 text-slate-600 text-xs">{m.competition ?? "—"}</td>
+                        <td className="px-3 py-2 text-slate-500 text-xs">{m.homeAway}</td>
+                        <td className="px-3 py-2 text-navy-900">
+                          {m.opponent_id ? (
+                            <Link href={`/admin/teams/${m.opponent_id}/view`} className="hover:underline">{m.opponent}</Link>
+                          ) : m.opponent}
+                        </td>
+                        <td className="px-3 py-2 font-display font-bold text-navy-900 tabular-nums">{m.score}</td>
+                        <td className="px-3 py-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                            m.result === "W" ? "bg-emerald-100 text-emerald-800" :
+                            m.result === "L" ? "bg-red-100 text-red-800" :
+                            "bg-slate-100 text-slate-700"
+                          }`}>{m.result}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })
+      }
     </div>
   );
 }
