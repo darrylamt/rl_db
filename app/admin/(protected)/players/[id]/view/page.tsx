@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Breadcrumb } from "@/components/admin/Breadcrumb";
 import { createAdminClient } from "@/lib/supabase/server";
 
 function fmt(d: string | null) {
@@ -158,18 +159,10 @@ export default async function PlayerDetailPage({
 
   return (
     <div className="p-4 md:p-8 w-full">
-      <div className="mb-4 flex items-center gap-3 text-sm">
-        <Link href="/admin/players" className="text-slate-500 hover:underline">
-          ← Players
-        </Link>
-        <span className="text-slate-300">/</span>
-        <Link
-          href={`/admin/players/${playerId}`}
-          className="text-slate-500 hover:underline"
-        >
-          Edit
-        </Link>
-      </div>
+      <Breadcrumb crumbs={[
+        { label: "Players", href: "/admin/players" },
+        { label: "Edit", href: `/admin/players/${playerId}` },
+      ]} />
 
       {/* Player header */}
       <div className="flex items-start gap-4 mb-6">

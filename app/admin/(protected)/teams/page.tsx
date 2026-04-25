@@ -94,29 +94,25 @@ export default async function TeamsPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">Type</th>
-              <th className="px-4 py-2.5 font-medium">Region</th>
-              <th className="px-4 py-2.5 font-medium">City</th>
-              <th className="px-4 py-2.5 font-medium">Home venue</th>
-              <th className="px-4 py-2.5 font-medium">Manager</th>
-              <th className="px-4 py-2.5 font-medium">Coach</th>
-              <th className="px-4 py-2.5 font-medium">Founded</th>
-              <th className="px-4 py-2.5 text-right"></th>
+              <th className="px-3 py-2.5 font-medium">Name</th>
+              <th className="hidden sm:table-cell px-3 py-2.5 font-medium">Type</th>
+              <th className="hidden md:table-cell px-3 py-2.5 font-medium">Region / City</th>
+              <th className="hidden lg:table-cell px-3 py-2.5 font-medium">Venue</th>
+              <th className="hidden lg:table-cell px-3 py-2.5 font-medium">Manager</th>
+              <th className="hidden lg:table-cell px-3 py-2.5 font-medium">Coach</th>
+              <th className="px-3 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(teams ?? []).length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   No teams{typeFilter !== "all" ? ` in ${TYPE_LABEL[typeFilter]}` : ""} yet.{" "}
-                  <Link href="/admin/teams/new" className="text-navy-700 hover:underline">
-                    Add one →
-                  </Link>
+                  <Link href="/admin/teams/new" className="text-navy-700 hover:underline">Add one →</Link>
                 </td>
               </tr>
             ) : (
@@ -124,35 +120,36 @@ export default async function TeamsPage({
                 const tt = (t.team_type ?? "club") as Exclude<TypeFilter, "all">;
                 return (
                   <tr key={t.team_id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 font-medium text-navy-900">
-                      <Link
-                        href={`/admin/teams/${t.team_id}/view`}
-                        className="hover:underline"
-                      >
+                    <td className="px-3 py-2.5 font-medium text-navy-900">
+                      <Link href={`/admin/teams/${t.team_id}/view`} className="hover:underline">
                         {t.name}
                       </Link>
+                      {/* Mobile: show type badge + location below name */}
+                      <div className="sm:hidden mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${TYPE_BADGE[tt]}`}>{TYPE_LABEL[tt]}</span>
+                        {(t.city || t.region) && (
+                          <span className="text-xs text-slate-500">{[t.city, t.region].filter(Boolean).join(", ")}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_BADGE[tt]}`}>
-                        {TYPE_LABEL[tt]}
-                      </span>
+                    <td className="hidden sm:table-cell px-3 py-2.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_BADGE[tt]}`}>{TYPE_LABEL[tt]}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-600">{t.region ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{t.city ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">
-                      {t.home_venue?.name ?? "—"}
+                    <td className="hidden md:table-cell px-3 py-2.5 text-slate-600">
+                      {[t.city, t.region].filter(Boolean).join(", ") || "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-600">{t.manager_name ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{t.coach_name ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{t.founded_year ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                      <Link
-                        href={`/admin/teams/${t.team_id}`}
-                        className="text-navy-700 hover:underline text-sm"
-                      >
-                        Edit
+                    <td className="hidden lg:table-cell px-3 py-2.5 text-slate-600">{t.home_venue?.name ?? "—"}</td>
+                    <td className="hidden lg:table-cell px-3 py-2.5 text-slate-600">{t.manager_name ?? "—"}</td>
+                    <td className="hidden lg:table-cell px-3 py-2.5 text-slate-600">{t.coach_name ?? "—"}</td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <Link href={`/admin/teams/${t.team_id}/view`} className="md:hidden inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700">
+                        View
                       </Link>
-                      <DeleteRowButton id={t.team_id} action={deleteTeam} />
+                      <span className="hidden md:inline-flex items-center gap-3">
+                        <Link href={`/admin/teams/${t.team_id}/view`} className="text-slate-600 hover:underline text-sm">View</Link>
+                        <Link href={`/admin/teams/${t.team_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                        <DeleteRowButton id={t.team_id} action={deleteTeam} />
+                      </span>
                     </td>
                   </tr>
                 );

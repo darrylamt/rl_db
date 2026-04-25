@@ -130,16 +130,16 @@ export default async function ResultsPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Date</th>
-              <th className="px-4 py-2.5 font-medium">Competition</th>
-              <th className="px-4 py-2.5 font-medium">Match</th>
-              <th className="px-4 py-2.5 font-medium">Score</th>
-              <th className="px-4 py-2.5 font-medium">Attendance</th>
-              <th className="px-4 py-2.5 text-right"></th>
+              <th className="px-3 py-2.5 font-medium">Match</th>
+              <th className="px-3 py-2.5 font-medium">Score</th>
+              <th className="hidden sm:table-cell px-3 py-2.5 font-medium">Date</th>
+              <th className="hidden md:table-cell px-3 py-2.5 font-medium">Competition</th>
+              <th className="hidden lg:table-cell px-3 py-2.5 font-medium">Attendance</th>
+              <th className="px-3 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -152,27 +152,32 @@ export default async function ResultsPage({
             ) : (
               (results ?? []).map((r: any) => (
                 <tr key={r.result_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
-                    {fmt(r.fixture?.scheduled_date)}
+                  <td className="px-3 py-2.5 font-medium text-navy-900">
+                    {r.fixture?.home?.name ?? "?"} <span className="text-slate-400 font-normal">vs</span> {r.fixture?.away?.name ?? "?"}
+                    <div className="sm:hidden mt-0.5 text-xs text-slate-500">
+                      {fmt(r.fixture?.scheduled_date)}
+                      {r.fixture?.competition?.name && <span> · {r.fixture.competition.name}</span>}
+                    </div>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">
+                  <td className="px-3 py-2.5 font-display font-bold text-navy-900 text-base tabular-nums">
+                    {r.home_score} – {r.away_score}
+                  </td>
+                  <td className="hidden sm:table-cell px-3 py-2.5 text-slate-600 whitespace-nowrap">{fmt(r.fixture?.scheduled_date)}</td>
+                  <td className="hidden md:table-cell px-3 py-2.5 text-slate-600">
                     {r.fixture?.competition?.name ?? "—"}
                     {r.fixture?.competition?.season && <span className="text-slate-400"> · {r.fixture.competition.season}</span>}
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-navy-900">
-                    {r.fixture?.home?.name ?? "?"} <span className="text-slate-400">vs</span> {r.fixture?.away?.name ?? "?"}
-                  </td>
-                  <td className="px-4 py-2.5 font-display font-bold text-navy-900 text-base">
-                    {r.home_score} – {r.away_score}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-600">{r.attendance?.toLocaleString() ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
+                  <td className="hidden lg:table-cell px-3 py-2.5 text-slate-600">{r.attendance?.toLocaleString() ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
                     {r.fixture?.fixture_id && (
-                      <Link href={`/admin/results/${r.fixture.fixture_id}`} className="text-navy-700 hover:underline text-sm">
-                        Edit
-                      </Link>
+                      <>
+                        <Link href={`/admin/results/${r.fixture.fixture_id}`} className="md:hidden inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700">Edit</Link>
+                        <span className="hidden md:inline-flex items-center gap-3">
+                          <Link href={`/admin/results/${r.fixture.fixture_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                          <DeleteRowButton id={r.result_id} action={deleteResult} />
+                        </span>
+                      </>
                     )}
-                    <DeleteRowButton id={r.result_id} action={deleteResult} />
                   </td>
                 </tr>
               ))

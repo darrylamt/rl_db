@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Breadcrumb } from "@/components/admin/Breadcrumb";
 import { createAdminClient } from "@/lib/supabase/server";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
 import { addToLineup, removeFromLineup } from "./actions";
@@ -196,11 +197,10 @@ export default async function LineupPage({ params }: { params: { id: string } })
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-4 flex items-center gap-3 text-sm">
-        <Link href="/admin/fixtures" className="text-slate-500 hover:underline">← Fixtures</Link>
-        <span className="text-slate-300">/</span>
-        <Link href={`/admin/results/${fixtureId}`} className="text-slate-500 hover:underline">Result</Link>
-      </div>
+      <Breadcrumb crumbs={[
+        { label: "Fixtures", href: "/admin/fixtures" },
+        { label: "Result", href: `/admin/results/${fixtureId}` },
+      ]} />
 
       <div className="mb-6">
         <h1 className="font-display text-2xl md:text-3xl font-bold text-navy-900">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
+import { Breadcrumb } from "@/components/admin/Breadcrumb";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -197,18 +198,10 @@ export default async function TeamDetailPage({
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-4 flex items-center gap-3 text-sm">
-        <Link href="/admin/teams" className="text-slate-500 hover:underline">
-          ← Teams
-        </Link>
-        <span className="text-slate-300">/</span>
-        <Link
-          href={`/admin/teams/${teamId}`}
-          className="text-slate-500 hover:underline"
-        >
-          Edit
-        </Link>
-      </div>
+      <Breadcrumb crumbs={[
+        { label: "Teams", href: "/admin/teams" },
+        { label: "Edit", href: `/admin/teams/${teamId}` },
+      ]} />
 
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>

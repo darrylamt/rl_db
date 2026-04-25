@@ -114,63 +114,72 @@ export default async function FixturesPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Date</th>
-              <th className="px-4 py-2.5 font-medium">Time</th>
-              <th className="px-4 py-2.5 font-medium">Match</th>
-              <th className="px-4 py-2.5 font-medium">Venue</th>
-              <th className="px-4 py-2.5 font-medium">Competition</th>
-              <th className="px-4 py-2.5 font-medium">Round</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 text-right"></th>
+              <th className="px-3 py-2.5 font-medium">Match</th>
+              <th className="hidden sm:table-cell px-3 py-2.5 font-medium">Date</th>
+              <th className="hidden md:table-cell px-3 py-2.5 font-medium">Competition</th>
+              <th className="hidden md:table-cell px-3 py-2.5 font-medium">Venue</th>
+              <th className="hidden lg:table-cell px-3 py-2.5 font-medium">Round</th>
+              <th className="hidden sm:table-cell px-3 py-2.5 font-medium">Status</th>
+              <th className="px-3 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(fixtures ?? []).length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  {selectedYear
-                    ? `No fixtures in ${selectedYear}.`
-                    : "No fixtures yet."}{" "}
-                  {!selectedYear && (
-                    <Link href="/admin/fixtures/new" className="text-navy-700 hover:underline">
-                      Add the first one →
-                    </Link>
-                  )}
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                  {selectedYear ? `No fixtures in ${selectedYear}.` : "No fixtures yet."}{" "}
+                  {!selectedYear && <Link href="/admin/fixtures/new" className="text-navy-700 hover:underline">Add the first one →</Link>}
                 </td>
               </tr>
             ) : (
               (fixtures ?? []).map((f: any) => (
                 <tr key={f.fixture_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">{fmt(f.scheduled_date)}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{f.scheduled_time?.slice(0,5) ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-medium text-navy-900">
-                    {f.home?.name ?? "?"} <span className="text-slate-400">vs</span> {f.away?.name ?? "?"}
+                  <td className="px-3 py-2.5 font-medium text-navy-900">
+                    {f.home?.name ?? "?"} <span className="text-slate-400 font-normal">vs</span> {f.away?.name ?? "?"}
+                    {/* Mobile: date + status + competition below match */}
+                    <div className="sm:hidden mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                      <span>{fmt(f.scheduled_date)}{f.scheduled_time ? ` ${f.scheduled_time.slice(0,5)}` : ""}</span>
+                      {f.competition?.name && <span>· {f.competition.name}</span>}
+                      <span className={`px-1.5 py-0.5 rounded-full ${
+                        f.status === "completed" ? "bg-emerald-50 text-emerald-700" :
+                        f.status === "live" ? "bg-red-50 text-red-700" : "bg-navy-50 text-navy-700"
+                      }`}>{f.status ?? "—"}</span>
+                    </div>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{f.venue?.name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">
+                  <td className="hidden sm:table-cell px-3 py-2.5 text-slate-600 whitespace-nowrap">
+                    {fmt(f.scheduled_date)}
+                    {f.scheduled_time && <span className="block text-xs text-slate-400">{f.scheduled_time.slice(0,5)}</span>}
+                  </td>
+                  <td className="hidden md:table-cell px-3 py-2.5 text-slate-600">
                     {f.competition?.name ?? "—"}
                     {f.competition?.season && <span className="text-slate-400"> · {f.competition.season}</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{f.round ?? "—"}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="hidden md:table-cell px-3 py-2.5 text-slate-600">{f.venue?.name ?? "—"}</td>
+                  <td className="hidden lg:table-cell px-3 py-2.5 text-slate-600">{f.round ?? "—"}</td>
+                  <td className="hidden sm:table-cell px-3 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       f.status === "completed" ? "bg-emerald-50 text-emerald-700" :
                       f.status === "live" ? "bg-red-50 text-red-700" :
-                      f.status === "scheduled" ? "bg-navy-50 text-navy-700" :
-                      "bg-slate-100 text-slate-600"
-                    }`}>
-                      {f.status ?? "—"}
-                    </span>
+                      f.status === "scheduled" ? "bg-navy-50 text-navy-700" : "bg-slate-100 text-slate-600"
+                    }`}>{f.status ?? "—"}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                    <Link href={`/admin/fixtures/${f.fixture_id}/lineup`} className="text-emerald-700 hover:underline text-sm">Lineup</Link>
-                    <Link href={`/admin/results/${f.fixture_id}`} className="text-gold-700 hover:underline text-sm">Result</Link>
-                    <Link href={`/admin/fixtures/${f.fixture_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
-                    <DeleteRowButton id={f.fixture_id} action={deleteFixture} />
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    {/* Mobile: primary action */}
+                    <div className="sm:hidden flex items-center justify-end gap-1.5">
+                      <Link href={`/admin/fixtures/${f.fixture_id}/lineup`} className="bg-emerald-700 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-emerald-800">Lineup</Link>
+                      <Link href={`/admin/results/${f.fixture_id}`} className="bg-gold-600 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-gold-700">Result</Link>
+                    </div>
+                    {/* Desktop: all actions */}
+                    <span className="hidden sm:inline-flex items-center gap-2">
+                      <Link href={`/admin/fixtures/${f.fixture_id}/lineup`} className="text-emerald-700 hover:underline text-sm">Lineup</Link>
+                      <Link href={`/admin/results/${f.fixture_id}`} className="text-gold-700 hover:underline text-sm">Result</Link>
+                      <Link href={`/admin/fixtures/${f.fixture_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                      <DeleteRowButton id={f.fixture_id} action={deleteFixture} />
+                    </span>
                   </td>
                 </tr>
               ))

@@ -108,10 +108,10 @@ export function FormShell({
 
   return (
     <div className="p-4 md:p-8 max-w-2xl">
-      <nav className="mb-4">
+      <nav className="mb-6">
         <Link
           href={backHref}
-          className="text-navy-700 text-sm hover:underline"
+          className="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:border-navy-300 hover:bg-slate-50 text-slate-700 hover:text-navy-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition-colors"
         >
           ← Back
         </Link>
