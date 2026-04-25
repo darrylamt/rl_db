@@ -13,7 +13,7 @@ export default async function OfficialsPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
   const { data: officials, error, count } = await supabase
     .from("officials")
     .select("official_id, first_name, last_name, role, region, status, photo_url", { count: "exact" })

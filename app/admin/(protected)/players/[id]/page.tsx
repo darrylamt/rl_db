@@ -74,6 +74,13 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
             <option value="other">Other</option>
           </Select>
         </Field>
+        <Field label="Category">
+          <Select name="category" defaultValue={p.category ?? "senior_men"}>
+            <option value="senior_men">Senior Men</option>
+            <option value="senior_women">Senior Women</option>
+            <option value="youth">Youth</option>
+          </Select>
+        </Field>
         <Field label="Status">
           <Select name="playing_status" defaultValue={p.playing_status ?? "inactive"}>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

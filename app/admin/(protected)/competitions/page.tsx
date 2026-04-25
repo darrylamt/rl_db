@@ -22,7 +22,7 @@ export default async function CompetitionsPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
   // Filter option sources — competitions is a small table, one unfiltered scan
   // is fine and avoids a second round trip for distinct values.

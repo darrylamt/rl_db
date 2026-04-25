@@ -25,7 +25,7 @@ export default async function PlayersPage({
   const selectedYear =
     rawYear === "all" ? null : rawYear ? parseInt(rawYear, 10) : CURRENT_YEAR;
 
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
   const yearOptions = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 + i);
 

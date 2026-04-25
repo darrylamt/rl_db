@@ -22,7 +22,7 @@ export default async function ResultsPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
   // Year filter: pull distinct seasons from competitions, default to
   // current year, narrow match_results via fixture_id.

@@ -19,7 +19,7 @@ export default async function SuspensionsPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
   const [{ data: suspensions, error, count }, { count: activeCount }] =
     await Promise.all([

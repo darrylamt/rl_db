@@ -22,7 +22,7 @@ export default async function FixturesPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 20);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
   // Seasons + competition-id lookup (for the year filter).
   const { data: allComps } = await supabase

@@ -99,12 +99,16 @@ export default async function TeamDetailPage({
   // Supabase types embedded FK joins as arrays — normalise.
   const homeVenue: any = Array.isArray(team.home_venue) ? team.home_venue[0] : team.home_venue;
 
-  // Roster.
-  const { data: roster } = await supabase
+  // Roster — grouped by category.
+  const { data: allRoster } = await supabase
     .from("players")
-    .select("player_id, first_name, last_name, jersey_number, position, playing_status, is_captain")
+    .select("player_id, first_name, last_name, jersey_number, position, playing_status, is_captain, gender, category")
     .eq("team_id", teamId)
     .order("jersey_number", { ascending: true, nullsFirst: false });
+
+  const roster        = (allRoster ?? []).filter((p: any) => !p.category || p.category === "senior_men");
+  const womenRoster   = (allRoster ?? []).filter((p: any) => p.category === "senior_women");
+  const youthRoster   = (allRoster ?? []).filter((p: any) => p.category === "youth");
 
   // All fixtures involving this team, with results.
   const { data: fixtures } = await supabase
@@ -333,56 +337,52 @@ export default async function TeamDetailPage({
         )}
       </section>
 
-      {/* Roster */}
-      <section className="mb-8">
-        <h2 className="font-display text-xl font-bold text-navy-900 mb-2">
-          Roster ({(roster ?? []).length})
-        </h2>
-        <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-slate-700 text-left">
-              <tr>
-                <th className="px-3 py-2 font-medium w-12">#</th>
-                <th className="px-3 py-2 font-medium">Player</th>
-                <th className="px-3 py-2 font-medium">Position</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(roster ?? []).length === 0 ? (
+      {/* Roster sections by category */}
+      {[
+        { label: "Senior Men", players: roster, badge: "bg-navy-100 text-navy-800" },
+        { label: "Senior Women", players: womenRoster, badge: "bg-pink-100 text-pink-800" },
+        { label: "Youth", players: youthRoster, badge: "bg-amber-100 text-amber-800" },
+      ].filter(({ players }) => players.length > 0).map(({ label, players, badge }) => (
+        <section key={label} className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="font-display text-lg font-bold text-navy-900">{label}</h2>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge}`}>{players.length}</span>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-slate-700 text-left">
                 <tr>
-                  <td colSpan={4} className="px-3 py-5 text-center text-slate-500">
-                    No players linked to this team.
-                  </td>
+                  <th className="px-3 py-2 font-medium w-12">#</th>
+                  <th className="px-3 py-2 font-medium">Player</th>
+                  <th className="hidden sm:table-cell px-3 py-2 font-medium">Position</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
                 </tr>
-              ) : (
-                (roster ?? []).map((p: any) => (
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {players.map((p: any) => (
                   <tr key={p.player_id} className="hover:bg-slate-50">
-                    <td className="px-3 py-2 text-slate-500 tabular-nums">
-                      {p.jersey_number ?? "—"}
-                    </td>
+                    <td className="px-3 py-2 text-slate-500 tabular-nums">{p.jersey_number ?? "—"}</td>
                     <td className="px-3 py-2 font-medium text-navy-900">
-                      <Link
-                        href={`/admin/players/${p.player_id}/view`}
-                        className="hover:underline"
-                      >
+                      <Link href={`/admin/players/${p.player_id}/view`} className="hover:underline">
                         {p.first_name} {p.last_name}
                       </Link>
                       {p.is_captain && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-gold-50 text-gold-700">
-                          C
-                        </span>
+                        <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-gold-50 text-gold-700">C</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{p.position ?? "—"}</td>
-                    <td className="px-3 py-2 text-slate-600">{p.playing_status ?? "—"}</td>
+                    <td className="hidden sm:table-cell px-3 py-2 text-slate-600">{p.position ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        p.playing_status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      }`}>{p.playing_status ?? "—"}</span>
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
 
       {/* Matches played */}
       <section>
