@@ -32,6 +32,7 @@ function payload(fd: FormData) {
     position: str(fd, "position"),
     is_captain: boolVal(fd, "is_captain"),
     playing_status: str(fd, "playing_status") ?? "inactive",
+    gender: str(fd, "gender") ?? "male",
     photo_url: null as string | null,
     phone: str(fd, "phone"),
     email: str(fd, "email"),

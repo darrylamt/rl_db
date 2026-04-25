@@ -57,7 +57,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} defaultValue={p.jersey_number ?? ""} />
         </Field>
@@ -65,6 +65,13 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           <Select name="position" defaultValue={p.position ?? ""}>
             <option value="">—</option>
             {POSITIONS.map(x => <option key={x} value={x}>{x}</option>)}
+          </Select>
+        </Field>
+        <Field label="Gender">
+          <Select name="gender" defaultValue={p.gender ?? "male"}>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
           </Select>
         </Field>
         <Field label="Status">

@@ -47,7 +47,7 @@ export default async function PlayersPage({
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, jersey_number, position, is_captain, playing_status, photo_url, team:team_id(team_id, name)",
+      "player_id, first_name, last_name, jersey_number, position, gender, is_captain, playing_status, photo_url, team:team_id(team_id, name)",
       { count: "exact" }
     )
     .order("last_name")
@@ -137,6 +137,7 @@ export default async function PlayersPage({
               <th className="px-4 py-2.5 font-medium">Team</th>
               <th className="px-4 py-2.5 font-medium">#</th>
               <th className="px-4 py-2.5 font-medium">Position</th>
+              <th className="px-4 py-2.5 font-medium">Gender</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5 text-right"></th>
             </tr>
@@ -144,7 +145,7 @@ export default async function PlayersPage({
           <tbody className="divide-y divide-slate-100">
             {(players ?? []).length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   {selectedYear
                     ? `No players registered for ${selectedYear}.`
                     : "No players yet."}{" "}
@@ -191,6 +192,7 @@ export default async function PlayersPage({
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{p.jersey_number ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">{p.position ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-600 capitalize">{p.gender ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       p.playing_status === "active" ? "bg-emerald-50 text-emerald-700" :

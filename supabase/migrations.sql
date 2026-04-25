@@ -3,6 +3,9 @@
 -- Safe to re-run (idempotent where possible)
 -- ============================================================
 
+-- 0. ADD GENDER COLUMN TO PLAYERS
+alter table players add column if not exists gender text default 'male';
+
 -- 1. PLAYER REGISTRATIONS
 -- Tracks which players are officially registered for each season year.
 create table if not exists player_registrations (

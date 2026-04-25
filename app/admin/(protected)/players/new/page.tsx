@@ -35,7 +35,7 @@ export default async function NewPlayerPage() {
           ))}
         </Select>
       </Field>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} />
         </Field>
@@ -43,6 +43,13 @@ export default async function NewPlayerPage() {
           <Select name="position" defaultValue="">
             <option value="">—</option>
             {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+          </Select>
+        </Field>
+        <Field label="Gender">
+          <Select name="gender" defaultValue="male">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
           </Select>
         </Field>
         <Field label="Status">
