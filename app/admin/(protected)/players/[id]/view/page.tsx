@@ -100,6 +100,9 @@ export default async function PlayerDetailPage({
   ]);
   if (!player) notFound();
 
+  // Supabase types embedded FK joins as T[] — normalise to plain object.
+  const team: any = Array.isArray(player.team) ? player.team[0] : player.team;
+
   // All career events (for stats + matches played).
   const { data: events } = await supabase
     .from("match_events")
@@ -151,7 +154,7 @@ export default async function PlayerDetailPage({
     vsStats = tallyEvents(vpEvents ?? []);
   }
 
-  const teamLabel = player.team?.name ?? "—";
+  const teamLabel = team?.name ?? "—";
 
   return (
     <div className="p-4 md:p-8">
@@ -188,12 +191,12 @@ export default async function PlayerDetailPage({
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {player.jersey_number != null && <span className="font-mono">#{player.jersey_number}</span>}
-            {player.jersey_number != null && (player.position || player.team) && <span className="mx-2">·</span>}
+            {player.jersey_number != null && (player.position || team) && <span className="mx-2">·</span>}
             {player.position && <span>{player.position}</span>}
-            {player.position && player.team && <span className="mx-2">·</span>}
-            {player.team && (
+            {player.position && team && <span className="mx-2">·</span>}
+            {team && (
               <Link
-                href={`/admin/teams/${player.team.team_id}/view`}
+                href={`/admin/teams/${team.team_id}/view`}
                 className="hover:underline text-navy-700"
               >
                 {teamLabel}
@@ -290,7 +293,7 @@ export default async function PlayerDetailPage({
                   {player.first_name} {player.last_name}
                 </div>
                 <div className="text-xs text-slate-500">
-                  {player.team?.name ?? "—"}
+                  {team?.name ?? "—"}
                 </div>
               </div>
               <div className="px-6 text-xs uppercase tracking-wider text-slate-500">
