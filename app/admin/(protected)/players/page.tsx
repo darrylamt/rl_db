@@ -37,7 +37,7 @@ export default async function PlayersPage({
       .from("player_registrations")
       .select("team_id")
       .eq("season_year", selectedYear);
-    const teamIdsWithRegs = [...new Set((regTeams ?? []).map((r: any) => r.team_id as string).filter(Boolean))];
+    const teamIdsWithRegs = Array.from(new Set((regTeams ?? []).map((r: any) => r.team_id as string).filter(Boolean)));
     teamsP = teamIdsWithRegs.length > 0
       ? supabase.from("teams").select("team_id, name").in("team_id", teamIdsWithRegs).order("name")
       : supabase.from("teams").select("team_id, name").eq("team_id", "00000000-0000-0000-0000-000000000000");
