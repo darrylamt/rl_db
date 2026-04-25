@@ -112,8 +112,10 @@ end$$;
 update players set playing_status = 'inactive' where playing_status = 'active';
 
 -- 5. REBUILD STANDINGS VIEW
--- Ensures win=2pts, draw=1pt, ordered highest first.
-create or replace view standings as
+-- Drop and recreate so the new `season` column is included.
+-- (PostgreSQL's CREATE OR REPLACE VIEW cannot change existing column positions.)
+drop view if exists standings;
+create view standings as
 select
   t.team_id,
   t.name           as team_name,

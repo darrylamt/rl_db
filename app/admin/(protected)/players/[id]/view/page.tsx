@@ -110,14 +110,17 @@ export default async function PlayerDetailPage({
 
   const stats = tallyEvents(events ?? []);
   const matchesPlayedIds = new Set(
-    (events ?? []).map((e: any) => e.fixture?.fixture_id).filter(Boolean)
+    (events ?? []).map((e: any) => {
+      const f = Array.isArray(e.fixture) ? e.fixture[0] : e.fixture;
+      return f?.fixture_id;
+    }).filter(Boolean)
   );
   const matchesPlayed = matchesPlayedIds.size;
 
   // Build a flat match-appearances list (one row per distinct fixture).
   const perMatch = new Map<string, any>();
   for (const e of events ?? []) {
-    const f = e.fixture;
+    const f: any = Array.isArray(e.fixture) ? e.fixture[0] : e.fixture;
     if (!f?.fixture_id) continue;
     if (!perMatch.has(f.fixture_id)) perMatch.set(f.fixture_id, { fixture: f, stats: {} as StatMap });
     const bucket = perMatch.get(f.fixture_id);
