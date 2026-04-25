@@ -27,12 +27,25 @@ export default async function PlayersPage({
 
   const { page, pageSize, from, to } = getPageParams(searchParams, 20);
 
-  // Year options
   const yearOptions = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 + i);
 
-  const teamsP = supabase.from("teams").select("team_id, name").order("name");
+  // When a year is selected, only show teams that have registrations for that year.
+  // Otherwise show all teams.
+  let teamsP;
+  if (selectedYear) {
+    const { data: regTeams } = await supabase
+      .from("player_registrations")
+      .select("team_id")
+      .eq("season_year", selectedYear);
+    const teamIdsWithRegs = [...new Set((regTeams ?? []).map((r: any) => r.team_id as string).filter(Boolean))];
+    teamsP = teamIdsWithRegs.length > 0
+      ? supabase.from("teams").select("team_id, name").in("team_id", teamIdsWithRegs).order("name")
+      : supabase.from("teams").select("team_id, name").eq("team_id", "00000000-0000-0000-0000-000000000000");
+  } else {
+    teamsP = supabase.from("teams").select("team_id, name").order("name");
+  }
 
-  // When filtering by year we join through player_registrations
+  // Collect player IDs for the selected year (+ optional team filter)
   let playerIds: string[] | null = null;
   if (selectedYear) {
     let regQ = supabase
@@ -68,6 +81,7 @@ export default async function PlayersPage({
     teamsP,
     query,
   ]);
+
 
   const isFiltered = selectedYear || selectedTeam;
 

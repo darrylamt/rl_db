@@ -11,11 +11,11 @@ html,
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  font-family: var(--font-poppins), "Poppins", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Browsers reset font on form controls to OS default — force them to inherit Inter. */
+/* Force form controls to inherit Poppins (browsers reset them to OS default). */
 input,
 select,
 textarea,
@@ -24,13 +24,13 @@ option,
 label,
 th,
 td {
-  font-family: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  font-family: inherit;
   font-feature-settings: inherit;
 }
 
-/* Headings / Oswald display font (only where we explicitly ask for it) */
+/* Anton display font — only where .font-display is applied */
 .font-display {
-  font-family: var(--font-oswald), Impact, "Arial Narrow Bold", system-ui, sans-serif !important;
+  font-family: var(--font-anton), Impact, "Arial Narrow Bold", system-ui, sans-serif;
 }
 
 @layer utilities {
