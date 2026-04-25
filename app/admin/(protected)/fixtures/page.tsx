@@ -66,7 +66,7 @@ export default async function FixturesPage({
   }
 
   const { data: fixtures, error, count } = await q
-    .order("scheduled_date", { ascending: false })
+    .order("scheduled_date", { ascending: true })
     .range(from, to);
 
   const nonDefaultYear =
