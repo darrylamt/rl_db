@@ -95,6 +95,9 @@ export default async function TeamDetailPage({
   ]);
   if (!team) notFound();
 
+  // Supabase types embedded FK joins as arrays — normalise.
+  const homeVenue: any = Array.isArray(team.home_venue) ? team.home_venue[0] : team.home_venue;
+
   // Roster.
   const { data: roster } = await supabase
     .from("players")
@@ -141,15 +144,20 @@ export default async function TeamDetailPage({
     const theirScore = isHome ? r.away_score : r.home_score;
     if (ourScore == null || theirScore == null) continue;
 
+    // Supabase types embedded FK joins as arrays — normalise.
+    const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
+    const home: any = Array.isArray(f.home) ? f.home[0] : f.home;
+    const away: any = Array.isArray(f.away) ? f.away[0] : f.away;
+
     overall = applyMatch(overall, ourScore, theirScore);
     matchRows.push({
       fixture_id: f.fixture_id,
       date: f.scheduled_date,
-      competition: f.competition?.name
-        ? `${f.competition.name}${f.competition.season ? ` · ${f.competition.season}` : ""}`
+      competition: comp?.name
+        ? `${comp.name}${comp.season ? ` · ${comp.season}` : ""}`
         : null,
       opponent_id: isHome ? f.away_team_id : f.home_team_id,
-      opponent: (isHome ? f.away?.name : f.home?.name) ?? "?",
+      opponent: (isHome ? away?.name : home?.name) ?? "?",
       homeAway: isHome ? "H" : "A",
       score: `${ourScore} – ${theirScore}`,
       result: ourScore > theirScore ? "W" : ourScore < theirScore ? "L" : "D",
@@ -227,9 +235,9 @@ export default async function TeamDetailPage({
           </div>
           <p className="text-slate-500 text-sm mt-1">
             {[team.city, team.region].filter(Boolean).join(", ") || "—"}
-            {team.home_venue?.name && (
+            {homeVenue?.name && (
               <>
-                <span className="mx-2">·</span>Home: {team.home_venue.name}
+                <span className="mx-2">·</span>Home: {homeVenue.name}
               </>
             )}
           </p>
