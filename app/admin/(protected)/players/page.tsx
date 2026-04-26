@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
-import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
 import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -88,7 +87,26 @@ export default async function PlayersPage({
   return (
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["players", "player_registrations"]} />
-      <ListHeader title="Players" addHref="/admin/players/new" addLabel="Add Player" />
+      <header className="flex flex-wrap justify-between items-end gap-3 mb-6">
+        <div className="min-w-0">
+          <p className="text-gold-600 font-display tracking-widest text-xs">ADMIN</p>
+          <h1 className="font-display text-3xl md:text-4xl font-bold text-navy-900">Players</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/players/bulk"
+            className="border border-navy-900 text-navy-900 hover:bg-navy-50 px-4 py-2.5 rounded font-medium text-sm whitespace-nowrap"
+          >
+            Bulk Upload
+          </Link>
+          <Link
+            href="/admin/players/new"
+            className="bg-navy-900 hover:bg-navy-800 text-white px-4 py-2.5 rounded font-medium text-sm whitespace-nowrap"
+          >
+            + Add Player
+          </Link>
+        </div>
+      </header>
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
         <label className="text-sm">

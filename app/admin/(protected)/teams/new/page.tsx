@@ -3,12 +3,20 @@ import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createTeam } from "../actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewTeamPage() {
   const supabase = createAdminClient();
-  const { data: venues } = await supabase
-    .from("venues")
-    .select("venue_id, name")
-    .order("name");
+  let venues: any[] = [];
+  try {
+    const { data } = await supabase
+      .from("venues")
+      .select("venue_id, name")
+      .order("name");
+    venues = data ?? [];
+  } catch {
+    // form still renders
+  }
 
   return (
     <FormShell title="Add Team" backHref="/admin/teams" onSubmit={createTeam} submitLabel="Create team">
@@ -35,7 +43,7 @@ export default async function NewTeamPage() {
       <Field label="Home venue">
         <Select name="home_venue_id" defaultValue="">
           <option value="">— select —</option>
-          {(venues ?? []).map((v: any) => (
+          {venues.map((v: any) => (
             <option key={v.venue_id} value={v.venue_id}>{v.name}</option>
           ))}
         </Select>

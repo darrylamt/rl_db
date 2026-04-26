@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -37,10 +38,8 @@ export function AdminSidebar({
     <>
       {/* Mobile top bar — visible below md */}
       <div className="md:hidden sticky top-0 z-30 bg-navy-900 text-white border-b border-navy-700 flex items-center justify-between px-4 h-14">
-        <Link href="/admin/dashboard" className="flex items-baseline gap-2">
-          <span className="text-gold-400 font-display tracking-[0.15em] text-xs">
-            RLFG
-          </span>
+        <Link href="/admin/dashboard" className="flex items-center gap-2">
+          <Image src="/federationlogo.png" alt="RLFG" width={32} height={32} className="rounded" />
           <span className="font-display text-sm font-bold">Admin</span>
         </Link>
         <button
@@ -103,20 +102,19 @@ export function AdminSidebar({
           "md:static md:w-60 md:transform-none md:transition-none",
         ].join(" ")}
       >
-        <div className="px-6 py-6 border-b border-navy-700 hidden md:block">
-          <p className="text-gold-400 font-display tracking-[0.15em] text-xs">
-            RLFG
-          </p>
-          <h2 className="font-display text-lg font-bold mt-1">Admin</h2>
+        <div className="px-6 py-5 border-b border-navy-700 hidden md:flex items-center gap-3">
+          <Image src="/federationlogo.png" alt="RLFG" width={40} height={40} className="rounded shrink-0" />
+          <div>
+            <p className="text-gold-400 font-display tracking-[0.15em] text-xs leading-none">RLFG</p>
+            <h2 className="font-display text-base font-bold mt-0.5">Admin</h2>
+          </div>
         </div>
 
         {/* Mobile-only top of drawer (aligns with the sticky 56px bar) */}
         <div className="px-6 py-4 border-b border-navy-700 md:hidden flex items-center justify-between">
-          <div>
-            <p className="text-gold-400 font-display tracking-[0.15em] text-xs">
-              GRLF
-            </p>
-            <h2 className="font-display text-lg font-bold mt-0.5">Admin</h2>
+          <div className="flex items-center gap-2">
+            <Image src="/federationlogo.png" alt="RLFG" width={32} height={32} className="rounded" />
+            <h2 className="font-display text-lg font-bold">Admin</h2>
           </div>
           <button
             type="button"

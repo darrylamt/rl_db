@@ -3,6 +3,8 @@ import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/Fo
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createPlayer } from "../actions";
 
+export const dynamic = "force-dynamic";
+
 const POSITIONS = [
   "Fullback","Wing","Centre","Stand-off","Scrum-half",
   "Prop","Hooker","Second-row","Loose forward","Utility",
@@ -11,11 +13,16 @@ const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function NewPlayerPage() {
   const supabase = createAdminClient();
-  const { data: teams } = await supabase
-    .from("teams")
-    .select("team_id, name")
-    .eq("team_type", "club")
-    .order("name");
+  let teams: any[] = [];
+  try {
+    const { data } = await supabase
+      .from("teams")
+      .select("team_id, name")
+      .order("name");
+    teams = data ?? [];
+  } catch {
+    // form still renders
+  }
 
   return (
     <FormShell title="Add Player" backHref="/admin/players" onSubmit={createPlayer} submitLabel="Create player">
@@ -30,7 +37,7 @@ export default async function NewPlayerPage() {
       <Field label="Club">
         <Select name="team_id" defaultValue="">
           <option value="">— unassigned —</option>
-          {(teams ?? []).map((t: any) => (
+          {teams.map((t: any) => (
             <option key={t.team_id} value={t.team_id}>{t.name}</option>
           ))}
         </Select>

@@ -20,6 +20,10 @@ const anton = Anton({
 export const metadata: Metadata = {
   title: "RLFG — Rugby League Federation Ghana",
   description: "Official management platform for the Rugby League Federation Ghana",
+  icons: {
+    icon: "/federationlogo.png",
+    apple: "/federationlogo.png",
+  },
 };
 
 export default function RootLayout({

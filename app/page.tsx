@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -12,9 +13,12 @@ export default function Home() {
 
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-16">
         <header className="border-b border-white/10 pb-6 md:pb-8 mb-8 md:mb-12">
-          <p className="text-ghanaYellow-500 font-display tracking-[0.2em] text-xs md:text-sm mb-2">
-            RUGBY LEAGUE FEDERATION GHANA
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <Image src="/federationlogo.png" alt="RLFG" width={64} height={64} className="rounded-lg" />
+            <p className="text-ghanaYellow-500 font-display tracking-[0.2em] text-xs md:text-sm">
+              RUGBY LEAGUE FEDERATION GHANA
+            </p>
+          </div>
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-tight">
             RLFG Management Platform
           </h1>

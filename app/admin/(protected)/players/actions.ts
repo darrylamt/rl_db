@@ -73,3 +73,58 @@ export async function deletePlayer(id: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/admin/players");
 }
+
+export type BulkPlayerRow = {
+  first_name: string;
+  last_name: string;
+  team_id?: string | null;
+  jersey_number?: number | null;
+  position?: string | null;
+  gender?: string;
+  category?: string;
+  playing_status?: string;
+  date_of_birth?: string | null;
+  nationality?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  photo_url?: string | null;
+};
+
+export async function bulkCreatePlayers(
+  rows: BulkPlayerRow[]
+): Promise<{ inserted: number; errors: string[] }> {
+  const supabase = createAdminClient();
+  const errors: string[] = [];
+  let inserted = 0;
+
+  for (const row of rows) {
+    if (!row.first_name || !row.last_name) {
+      errors.push(`Skipped row — missing first or last name`);
+      continue;
+    }
+    const { error } = await supabase.from("players").insert({
+      first_name: row.first_name,
+      last_name: row.last_name,
+      team_id: row.team_id || null,
+      jersey_number: row.jersey_number ?? null,
+      position: row.position || null,
+      gender: row.gender || "male",
+      category: row.category || "senior_men",
+      playing_status: row.playing_status || "inactive",
+      date_of_birth: row.date_of_birth || null,
+      nationality: row.nationality || null,
+      phone: row.phone || null,
+      email: row.email || null,
+      photo_url: row.photo_url || null,
+    });
+    if (error) {
+      errors.push(`${row.first_name} ${row.last_name}: ${error.message}`);
+    } else {
+      inserted++;
+    }
+  }
+
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { inserted, errors };
+}

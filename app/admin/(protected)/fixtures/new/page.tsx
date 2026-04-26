@@ -2,22 +2,34 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { createFixture } from "../actions";
 
+export const dynamic = "force-dynamic";
+
 const STATUSES = ["scheduled","live","completed","postponed","cancelled"];
 
 export default async function NewFixturePage() {
   const supabase = createAdminClient();
-  const [{ data: teams }, { data: comps }, { data: venues }] = await Promise.all([
-    supabase.from("teams").select("team_id, name").order("name"),
-    supabase.from("competitions").select("competition_id, name, season").order("name"),
-    supabase.from("venues").select("venue_id, name").order("name"),
-  ]);
+  let teams: any[] = [];
+  let comps: any[] = [];
+  let venues: any[] = [];
+  try {
+    const [t, c, v] = await Promise.all([
+      supabase.from("teams").select("team_id, name").order("name"),
+      supabase.from("competitions").select("competition_id, name, season").order("name"),
+      supabase.from("venues").select("venue_id, name").order("name"),
+    ]);
+    teams = t.data ?? [];
+    comps = c.data ?? [];
+    venues = v.data ?? [];
+  } catch {
+    // data stays as empty arrays — form still renders
+  }
 
   return (
     <FormShell title="Add Fixture" backHref="/admin/fixtures" onSubmit={createFixture} submitLabel="Create fixture">
       <Field label="Competition">
         <Select name="competition_id" defaultValue="">
           <option value="">—</option>
-          {(comps ?? []).map((c: any) => (
+          {comps.map((c: any) => (
             <option key={c.competition_id} value={c.competition_id}>
               {c.name}{c.season ? ` · ${c.season}` : ""}
             </option>
@@ -28,7 +40,7 @@ export default async function NewFixturePage() {
         <Field label="Home team">
           <Select name="home_team_id" required defaultValue="">
             <option value="">— select —</option>
-            {(teams ?? []).map((t: any) => (
+            {teams.map((t: any) => (
               <option key={t.team_id} value={t.team_id}>{t.name}</option>
             ))}
           </Select>
@@ -36,7 +48,7 @@ export default async function NewFixturePage() {
         <Field label="Away team">
           <Select name="away_team_id" required defaultValue="">
             <option value="">— select —</option>
-            {(teams ?? []).map((t: any) => (
+            {teams.map((t: any) => (
               <option key={t.team_id} value={t.team_id}>{t.name}</option>
             ))}
           </Select>
@@ -45,7 +57,7 @@ export default async function NewFixturePage() {
       <Field label="Venue">
         <Select name="venue_id" defaultValue="">
           <option value="">—</option>
-          {(venues ?? []).map((v: any) => (
+          {venues.map((v: any) => (
             <option key={v.venue_id} value={v.venue_id}>{v.name}</option>
           ))}
         </Select>

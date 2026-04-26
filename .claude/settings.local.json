@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(mkdir \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/public\")",
+      "Bash(cp \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/federationlogo.png\" \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/public/federationlogo.png\")"
     ]
   }
 }
