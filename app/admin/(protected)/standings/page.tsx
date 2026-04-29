@@ -24,7 +24,9 @@ function tally(events: any[], type: string, top = 10): Tally[] {
       m.set(key, {
         player_id: key,
         name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—",
-        team: p.team?.name ?? null,
+        team: Array.isArray(p.team)
+          ? (p.team[0]?.name ?? null)
+          : (p.team?.name ?? null),
         count: 1,
       });
   }
@@ -61,7 +63,9 @@ function Leaderboard({
                 <td className="px-3 py-2 w-8 text-slate-500 font-medium">
                   {i + 1}
                 </td>
-                <td className="px-3 py-2 font-medium text-navy-900">{r.name}</td>
+                <td className="px-3 py-2 font-medium text-navy-900">
+                  {r.name}
+                </td>
                 <td className="px-3 py-2 text-slate-500 text-xs">
                   {r.team ?? "—"}
                 </td>
@@ -93,8 +97,8 @@ export default async function StandingsPage({
 
   const seasons = Array.from(
     new Set(
-      (comps ?? []).map((c: any) => c.season).filter(Boolean) as string[]
-    )
+      (comps ?? []).map((c: any) => c.season).filter(Boolean) as string[],
+    ),
   ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 
   const currentYear = String(new Date().getFullYear());
@@ -103,12 +107,12 @@ export default async function StandingsPage({
     requestedSeason && seasons.includes(requestedSeason)
       ? requestedSeason
       : seasons.includes(currentYear)
-      ? currentYear
-      : seasons[0] ?? "";
+        ? currentYear
+        : (seasons[0] ?? "");
 
   const compMap = new Map<string, { name: string; season: string | null }>();
   (comps ?? []).forEach((c: any) =>
-    compMap.set(c.competition_id, { name: c.name, season: c.season ?? null })
+    compMap.set(c.competition_id, { name: c.name, season: c.season ?? null }),
   );
 
   const compIdsInSeason = (comps ?? [])
@@ -138,7 +142,7 @@ export default async function StandingsPage({
     .select(
       `event_type,
        player:player_id(player_id, first_name, last_name, team:team_id(name)),
-       fixture:fixture_id(competition_id)`
+       fixture:fixture_id(competition_id)`,
     )
     .in("event_type", ["try", "conversion"]);
 
@@ -172,7 +176,7 @@ export default async function StandingsPage({
   });
 
   const sortedGroups = Array.from(groups.entries()).sort((a, b) =>
-    a[1].name.localeCompare(b[1].name)
+    a[1].name.localeCompare(b[1].name),
   );
 
   return (
@@ -252,9 +256,15 @@ export default async function StandingsPage({
                       <th className="px-2 py-2.5 font-medium text-center">W</th>
                       <th className="px-2 py-2.5 font-medium text-center">D</th>
                       <th className="px-2 py-2.5 font-medium text-center">L</th>
-                      <th className="px-2 py-2.5 font-medium text-center">PF</th>
-                      <th className="px-2 py-2.5 font-medium text-center">PA</th>
-                      <th className="px-2 py-2.5 font-medium text-center">+/-</th>
+                      <th className="px-2 py-2.5 font-medium text-center">
+                        PF
+                      </th>
+                      <th className="px-2 py-2.5 font-medium text-center">
+                        PA
+                      </th>
+                      <th className="px-2 py-2.5 font-medium text-center">
+                        +/-
+                      </th>
                       <th className="px-2 py-2.5 font-medium text-center bg-gold-50">
                         Pts
                       </th>
@@ -273,7 +283,11 @@ export default async function StandingsPage({
                           <div className="flex items-center gap-2">
                             {r.logo_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={r.logo_url} alt="" className="h-6 w-6 rounded object-cover border border-slate-200 shrink-0" />
+                              <img
+                                src={r.logo_url}
+                                alt=""
+                                className="h-6 w-6 rounded object-cover border border-slate-200 shrink-0"
+                              />
                             ) : (
                               <div className="h-6 w-6 rounded bg-slate-200 shrink-0" />
                             )}

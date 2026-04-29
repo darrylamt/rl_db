@@ -2,7 +2,12 @@
 
 import { useState, useTransition, useRef, useMemo } from "react";
 import Link from "next/link";
-import { FormShell, Field, Input, Textarea } from "@/components/admin/FormShell";
+import {
+  FormShell,
+  Field,
+  Input,
+  Textarea,
+} from "@/components/admin/FormShell";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +58,7 @@ const EVENT_CATEGORIES = [
   {
     label: "Scoring",
     color: "emerald",
-    events: ["Try", "Conversion", "Penalty Goal", "Drop Goal"],
+    events: ["try", "conversion", "penalty Goal", "drop Goal"],
   },
   {
     label: "Discipline",
@@ -97,14 +102,32 @@ function eventColor(type: string) {
 }
 
 const COLOR_CLASSES: Record<string, { badge: string; dot: string }> = {
-  emerald: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  emerald: {
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-500",
+  },
   red: { badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
-  blue: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
-  purple: { badge: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" },
-  orange: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  blue: {
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
+  },
+  purple: {
+    badge: "bg-purple-50 text-purple-700 border-purple-200",
+    dot: "bg-purple-500",
+  },
+  orange: {
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+    dot: "bg-orange-500",
+  },
   sky: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500" },
-  teal: { badge: "bg-teal-50 text-teal-700 border-teal-200", dot: "bg-teal-500" },
-  slate: { badge: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
+  teal: {
+    badge: "bg-teal-50 text-teal-700 border-teal-200",
+    dot: "bg-teal-500",
+  },
+  slate: {
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    dot: "bg-slate-400",
+  },
 };
 
 // ─── Player search combobox ──────────────────────────────────────────────────
@@ -133,7 +156,7 @@ function PlayerSearch({
         (p) =>
           p.first_name.toLowerCase().includes(q) ||
           p.last_name.toLowerCase().includes(q) ||
-          String(p.jersey_number ?? "").includes(q)
+          String(p.jersey_number ?? "").includes(q),
       )
       .slice(0, 20);
   }, [query, players]);
@@ -143,9 +166,22 @@ function PlayerSearch({
       <input
         type="text"
         className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
-        placeholder={selected ? `${selected.first_name} ${selected.last_name}` : placeholder}
-        value={open ? query : selected ? `${selected.first_name} ${selected.last_name}` : ""}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        placeholder={
+          selected
+            ? `${selected.first_name} ${selected.last_name}`
+            : placeholder
+        }
+        value={
+          open
+            ? query
+            : selected
+              ? `${selected.first_name} ${selected.last_name}`
+              : ""
+        }
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
@@ -153,7 +189,11 @@ function PlayerSearch({
         <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
           <li
             className="px-3 py-2 text-sm text-slate-400 hover:bg-slate-50 cursor-pointer"
-            onMouseDown={() => { onChange(""); setQuery(""); setOpen(false); }}
+            onMouseDown={() => {
+              onChange("");
+              setQuery("");
+              setOpen(false);
+            }}
           >
             — None —
           </li>
@@ -161,15 +201,23 @@ function PlayerSearch({
             <li
               key={p.player_id}
               className="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer flex items-center gap-2"
-              onMouseDown={() => { onChange(p.player_id); setQuery(""); setOpen(false); }}
+              onMouseDown={() => {
+                onChange(p.player_id);
+                setQuery("");
+                setOpen(false);
+              }}
             >
               {p.jersey_number && (
                 <span className="w-6 h-6 rounded-full bg-navy-100 text-navy-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
                   {p.jersey_number}
                 </span>
               )}
-              <span className="font-medium">{p.first_name} {p.last_name}</span>
-              {p.position && <span className="text-slate-400 text-xs">{p.position}</span>}
+              <span className="font-medium">
+                {p.first_name} {p.last_name}
+              </span>
+              {p.position && (
+                <span className="text-slate-400 text-xs">{p.position}</span>
+              )}
             </li>
           ))}
         </ul>
@@ -261,7 +309,10 @@ function EventsTab({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => { setTeamId(homeTeam.team_id); setPlayerId(""); }}
+              onClick={() => {
+                setTeamId(homeTeam.team_id);
+                setPlayerId("");
+              }}
               className={`py-2 px-3 rounded border text-sm font-medium transition-colors ${
                 teamId === homeTeam.team_id
                   ? "bg-navy-900 text-white border-navy-900"
@@ -272,7 +323,10 @@ function EventsTab({
             </button>
             <button
               type="button"
-              onClick={() => { setTeamId(awayTeam.team_id); setPlayerId(""); }}
+              onClick={() => {
+                setTeamId(awayTeam.team_id);
+                setPlayerId("");
+              }}
               className={`py-2 px-3 rounded border text-sm font-medium transition-colors ${
                 teamId === awayTeam.team_id
                   ? "bg-navy-900 text-white border-navy-900"
@@ -286,7 +340,8 @@ function EventsTab({
           {/* Player search */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-              Player <span className="text-slate-400 font-normal">(optional)</span>
+              Player{" "}
+              <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <PlayerSearch
               players={activePlayers}
@@ -297,7 +352,9 @@ function EventsTab({
 
           {/* Event type */}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Event Type</label>
+            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+              Event Type
+            </label>
             <div className="space-y-2">
               {EVENT_CATEGORIES.map((cat) => (
                 <div key={cat.label}>
@@ -330,7 +387,9 @@ function EventsTab({
           {/* Minute + Half */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Minute</label>
+              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Minute
+              </label>
               <input
                 type="number"
                 min={1}
@@ -342,7 +401,9 @@ function EventsTab({
               />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Half</label>
+              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Half
+              </label>
               <select
                 value={half}
                 onChange={(e) => setHalf(e.target.value)}
@@ -357,7 +418,9 @@ function EventsTab({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Notes</label>
+            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+              Notes
+            </label>
             <input
               type="text"
               value={notes}
@@ -380,29 +443,40 @@ function EventsTab({
       {/* Events list */}
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-700">Recorded Events</h3>
+          <h3 className="text-sm font-semibold text-slate-700">
+            Recorded Events
+          </h3>
           <span className="text-xs text-slate-400">{events.length} events</span>
         </div>
         {events.length === 0 ? (
-          <div className="px-4 py-8 text-center text-slate-400 text-sm">No events recorded yet.</div>
+          <div className="px-4 py-8 text-center text-slate-400 text-sm">
+            No events recorded yet.
+          </div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {events.map((ev) => {
               const color = eventColor(ev.event_type);
               const col = COLOR_CLASSES[color];
               return (
-                <li key={ev.event_id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                <li
+                  key={ev.event_id}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
+                >
                   {/* Minute badge */}
                   <div className="flex-shrink-0 w-10 text-center">
                     {ev.minute ? (
-                      <span className="text-sm font-bold text-navy-900">{ev.minute}'</span>
+                      <span className="text-sm font-bold text-navy-900">
+                        {ev.minute}'
+                      </span>
                     ) : (
                       <span className="text-slate-300 text-xs">—</span>
                     )}
                   </div>
 
                   {/* Event type badge */}
-                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium border ${col.badge}`}>
+                  <span
+                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium border ${col.badge}`}
+                  >
                     {ev.event_type}
                   </span>
 
@@ -453,7 +527,13 @@ function LineupTab({
   const home = lineup.filter((l) => one(l.team)?.team_id === homeTeam.team_id);
   const away = lineup.filter((l) => one(l.team)?.team_id === awayTeam.team_id);
 
-  function PlayerList({ entries, label }: { entries: LineupEntry[]; label: string }) {
+  function PlayerList({
+    entries,
+    label,
+  }: {
+    entries: LineupEntry[];
+    label: string;
+  }) {
     const starters = entries.filter((e) => e.is_starter);
     const subs = entries.filter((e) => !e.is_starter);
     return (
@@ -465,10 +545,15 @@ function LineupTab({
           <div className="space-y-3">
             {starters.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Starters</p>
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                  Starters
+                </p>
                 <ul className="space-y-1">
                   {starters.map((e) => (
-                    <li key={e.lineup_id} className="flex items-center gap-2 text-sm">
+                    <li
+                      key={e.lineup_id}
+                      className="flex items-center gap-2 text-sm"
+                    >
                       {e.jersey_number && (
                         <span className="w-6 h-6 rounded-full bg-navy-100 text-navy-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
                           {e.jersey_number}
@@ -477,7 +562,11 @@ function LineupTab({
                       <span className="font-medium text-navy-900">
                         {one(e.player)?.first_name} {one(e.player)?.last_name}
                       </span>
-                      {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
+                      {e.position && (
+                        <span className="text-slate-400 text-xs">
+                          {e.position}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -485,17 +574,28 @@ function LineupTab({
             )}
             {subs.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Substitutes</p>
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                  Substitutes
+                </p>
                 <ul className="space-y-1">
                   {subs.map((e) => (
-                    <li key={e.lineup_id} className="flex items-center gap-2 text-sm text-slate-600">
+                    <li
+                      key={e.lineup_id}
+                      className="flex items-center gap-2 text-sm text-slate-600"
+                    >
                       {e.jersey_number && (
                         <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
                           {e.jersey_number}
                         </span>
                       )}
-                      <span>{one(e.player)?.first_name} {one(e.player)?.last_name}</span>
-                      {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
+                      <span>
+                        {one(e.player)?.first_name} {one(e.player)?.last_name}
+                      </span>
+                      {e.position && (
+                        <span className="text-slate-400 text-xs">
+                          {e.position}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -547,29 +647,112 @@ function ScoreTab({
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={`${one(fixture.home)?.name ?? "Home"} score`}>
-          <Input name="home_score" type="number" min={0} defaultValue={r.home_score ?? 0} required />
+          <Input
+            name="home_score"
+            type="number"
+            min={0}
+            defaultValue={r.home_score ?? 0}
+            required
+          />
         </Field>
         <Field label={`${one(fixture.away)?.name ?? "Away"} score`}>
-          <Input name="away_score" type="number" min={0} defaultValue={r.away_score ?? 0} required />
+          <Input
+            name="away_score"
+            type="number"
+            min={0}
+            defaultValue={r.away_score ?? 0}
+            required
+          />
         </Field>
       </div>
       <div className="grid grid-cols-4 gap-3">
-        <Field label="Home tries"><Input name="home_tries" type="number" min={0} defaultValue={r.home_tries ?? 0} /></Field>
-        <Field label="Home conv."><Input name="home_conversions" type="number" min={0} defaultValue={r.home_conversions ?? 0} /></Field>
-        <Field label="Home pens."><Input name="home_penalties" type="number" min={0} defaultValue={r.home_penalties ?? 0} /></Field>
-        <Field label="Home drop"><Input name="home_drop_goals" type="number" min={0} defaultValue={r.home_drop_goals ?? 0} /></Field>
+        <Field label="Home tries">
+          <Input
+            name="home_tries"
+            type="number"
+            min={0}
+            defaultValue={r.home_tries ?? 0}
+          />
+        </Field>
+        <Field label="Home conv.">
+          <Input
+            name="home_conversions"
+            type="number"
+            min={0}
+            defaultValue={r.home_conversions ?? 0}
+          />
+        </Field>
+        <Field label="Home pens.">
+          <Input
+            name="home_penalties"
+            type="number"
+            min={0}
+            defaultValue={r.home_penalties ?? 0}
+          />
+        </Field>
+        <Field label="Home drop">
+          <Input
+            name="home_drop_goals"
+            type="number"
+            min={0}
+            defaultValue={r.home_drop_goals ?? 0}
+          />
+        </Field>
       </div>
       <div className="grid grid-cols-4 gap-3">
-        <Field label="Away tries"><Input name="away_tries" type="number" min={0} defaultValue={r.away_tries ?? 0} /></Field>
-        <Field label="Away conv."><Input name="away_conversions" type="number" min={0} defaultValue={r.away_conversions ?? 0} /></Field>
-        <Field label="Away pens."><Input name="away_penalties" type="number" min={0} defaultValue={r.away_penalties ?? 0} /></Field>
-        <Field label="Away drop"><Input name="away_drop_goals" type="number" min={0} defaultValue={r.away_drop_goals ?? 0} /></Field>
+        <Field label="Away tries">
+          <Input
+            name="away_tries"
+            type="number"
+            min={0}
+            defaultValue={r.away_tries ?? 0}
+          />
+        </Field>
+        <Field label="Away conv.">
+          <Input
+            name="away_conversions"
+            type="number"
+            min={0}
+            defaultValue={r.away_conversions ?? 0}
+          />
+        </Field>
+        <Field label="Away pens.">
+          <Input
+            name="away_penalties"
+            type="number"
+            min={0}
+            defaultValue={r.away_penalties ?? 0}
+          />
+        </Field>
+        <Field label="Away drop">
+          <Input
+            name="away_drop_goals"
+            type="number"
+            min={0}
+            defaultValue={r.away_drop_goals ?? 0}
+          />
+        </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Attendance"><Input name="attendance" type="number" min={0} defaultValue={r.attendance ?? ""} /></Field>
-        <Field label="Recorded by"><Input name="recorded_by" defaultValue={r.recorded_by ?? ""} placeholder="Your name" /></Field>
+        <Field label="Attendance">
+          <Input
+            name="attendance"
+            type="number"
+            min={0}
+            defaultValue={r.attendance ?? ""}
+          />
+        </Field>
+        <Field label="Recorded by">
+          <Input
+            name="recorded_by"
+            defaultValue={r.recorded_by ?? ""}
+            placeholder="Your name"
+          />
+        </Field>
       </div>
-      <Field label="Notes"><Textarea name="notes" defaultValue={r.notes ?? ""} /></Field>
+      <Field label="Notes">
+        <Textarea name="notes" defaultValue={r.notes ?? ""} />
+      </Field>
     </FormShell>
   );
 }
@@ -577,7 +760,7 @@ function ScoreTab({
 // ─── Main tabs shell ─────────────────────────────────────────────────────────
 
 const TABS = ["Score", "Events", "Lineup"] as const;
-type Tab = typeof TABS[number];
+type Tab = (typeof TABS)[number];
 
 export function ResultTabs({
   fixtureId,
@@ -611,17 +794,24 @@ export function ResultTabs({
     <div className="p-4 md:p-8 max-w-3xl">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/admin/results" className="text-xs text-slate-500 hover:underline mb-2 inline-block">
+        <Link
+          href="/admin/results"
+          className="text-xs text-slate-500 hover:underline mb-2 inline-block"
+        >
           ← Results
         </Link>
         <h1 className="text-xl font-bold text-navy-900">
-          {homeTeam?.name ?? "?"} <span className="text-slate-400 font-normal">vs</span> {awayTeam?.name ?? "?"}
+          {homeTeam?.name ?? "?"}{" "}
+          <span className="text-slate-400 font-normal">vs</span>{" "}
+          {awayTeam?.name ?? "?"}
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
           {fixture.competition?.name && `${fixture.competition.name} · `}
           {fixture.scheduled_date
             ? new Date(fixture.scheduled_date).toLocaleDateString("en-GB", {
-                day: "2-digit", month: "short", year: "numeric",
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
               })
             : "Date unknown"}
         </p>
@@ -651,7 +841,11 @@ export function ResultTabs({
 
       {/* Tab content */}
       {activeTab === "Score" && (
-        <ScoreTab fixture={fixture} result={result} upsertResult={upsertResult} />
+        <ScoreTab
+          fixture={fixture}
+          result={result}
+          upsertResult={upsertResult}
+        />
       )}
       {activeTab === "Events" && (
         <EventsTab
