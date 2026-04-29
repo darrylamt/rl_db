@@ -3,6 +3,8 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
   if (typeof v !== "string") return null;
@@ -21,7 +23,9 @@ function intOrNull(fd: FormData, k: string) {
   return Number.isNaN(n) ? null : n;
 }
 
-function payload(fd: FormData, fixture_id: string) {
+// ─── Result actions ───────────────────────────────────────────────────────────
+
+function resultPayload(fd: FormData, fixture_id: string) {
   return {
     fixture_id,
     home_score: intOrZero(fd, "home_score"),
@@ -42,11 +46,15 @@ function payload(fd: FormData, fixture_id: string) {
 
 export async function upsertResult(fixture_id: string, fd: FormData) {
   const supabase = createAdminClient();
-  const p = payload(fd, fixture_id);
-  const { error } = await supabase.from("match_results").upsert(p, { onConflict: "fixture_id" });
+  const p = resultPayload(fd, fixture_id);
+  const { error } = await supabase
+    .from("match_results")
+    .upsert(p, { onConflict: "fixture_id" });
   if (error) throw new Error(error.message);
-  // Mark fixture completed
-  await supabase.from("fixtures").update({ status: "completed" }).eq("fixture_id", fixture_id);
+  await supabase
+    .from("fixtures")
+    .update({ status: "completed" })
+    .eq("fixture_id", fixture_id);
   revalidatePath("/admin/results");
   revalidatePath("/admin/fixtures");
   revalidatePath("/admin/standings");
@@ -55,8 +63,48 @@ export async function upsertResult(fixture_id: string, fd: FormData) {
 
 export async function deleteResult(result_id: string) {
   const supabase = createAdminClient();
-  const { error } = await supabase.from("match_results").delete().eq("result_id", result_id);
+  const { error } = await supabase
+    .from("match_results")
+    .delete()
+    .eq("result_id", result_id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/results");
   revalidatePath("/admin/standings");
+}
+
+// ─── Event actions ────────────────────────────────────────────────────────────
+
+export async function addEvent(fixture_id: string, fd: FormData) {
+  const supabase = createAdminClient();
+
+  const team_id = str(fd, "team_id");
+  const player_id = str(fd, "player_id");
+  const event_type = str(fd, "event_type");
+
+  if (!event_type) throw new Error("`event_type` is required");
+  if (!team_id) throw new Error("`team_id` is required");
+
+  const { error } = await supabase.from("match_events").insert({
+    fixture_id,
+    team_id,
+    player_id: player_id || null,
+    event_type,
+    minute: intOrNull(fd, "minute"),
+    half: intOrNull(fd, "half"),
+    notes: str(fd, "notes"),
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/results/${fixture_id}`);
+}
+
+export async function deleteEvent(event_id: string) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("match_events")
+    .delete()
+    .eq("event_id", event_id);
+  if (error) throw new Error(error.message);
+  // We don't know the fixture_id here so revalidate broadly
+  revalidatePath("/admin/results", "layout");
 }
