@@ -199,7 +199,7 @@ export default async function PlayersPage({
                   <td className="px-3 py-2 w-10">
                     {p.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.photo_url} alt="" className="h-9 w-9 rounded-full object-cover border border-slate-200" />
+                      <img src={p.photo_url} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-full object-cover border border-slate-200" />
                     ) : (
                       <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-500 text-xs flex items-center justify-center font-medium">
                         {p.first_name?.[0]}{p.last_name?.[0]}

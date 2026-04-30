@@ -52,7 +52,7 @@ export default async function OfficialsPage({
                   <td className="px-3 py-2 w-10">
                     {o.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={o.photo_url} alt="" className="h-9 w-9 rounded-full object-cover border border-slate-200" />
+                      <img src={o.photo_url} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-full object-cover border border-slate-200" />
                     ) : (
                       <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-500 text-xs font-medium flex items-center justify-center">
                         {o.first_name?.[0]}{o.last_name?.[0]}

@@ -298,6 +298,7 @@ export default async function StandingsPage({
                               <img
                                 src={r.logo_url}
                                 alt=""
+                                referrerPolicy="no-referrer"
                                 className="h-6 w-6 rounded object-cover border border-slate-200 shrink-0"
                               />
                             ) : (

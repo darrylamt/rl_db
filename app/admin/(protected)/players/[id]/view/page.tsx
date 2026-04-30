@@ -168,7 +168,7 @@ export default async function PlayerDetailPage({
       <div className="flex items-start gap-4 mb-6">
         {player.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={player.photo_url} alt="" className="w-16 h-16 rounded-full object-cover border border-slate-200 shrink-0" />
+          <img src={player.photo_url} alt="" referrerPolicy="no-referrer" className="w-16 h-16 rounded-full object-cover border border-slate-200 shrink-0" />
         ) : (
           <div className="w-16 h-16 rounded-full bg-slate-200 text-slate-500 text-xl font-bold flex items-center justify-center shrink-0">
             {player.first_name?.[0]}{player.last_name?.[0]}
