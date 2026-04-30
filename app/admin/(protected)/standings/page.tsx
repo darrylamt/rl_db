@@ -65,7 +65,7 @@ function Leaderboard({
                   {i + 1}
                 </td>
                 <td className="px-3 py-2 font-medium text-navy-900">
-                  <Link href={`/admin/players/${r.player_id}`} className="hover:underline">
+                  <Link href={`/admin/players/${r.player_id}/view`} className="hover:underline">
                     {r.name}
                   </Link>
                 </td>
@@ -130,8 +130,16 @@ export default async function StandingsPage({
       .from("standings")
       .select("*")
       .in("competition_id", compIdsInSeason)
-      .order("league_points", { ascending: false })
-      .order("goal_difference", { ascending: false });
+      .order("league_points", { ascending: false });
+    // Sort client-side by goal difference as tiebreaker (goal_difference col may not exist yet in DB)
+    if (res.data) {
+      res.data.sort((a: any, b: any) => {
+        if (b.league_points !== a.league_points) return b.league_points - a.league_points;
+        const gdA = (a.goal_difference ?? ((a.points_for ?? 0) - (a.points_against ?? 0)));
+        const gdB = (b.goal_difference ?? ((b.points_for ?? 0) - (b.points_against ?? 0)));
+        return gdB - gdA;
+      });
+    }
     rows = res.data;
     error = res.error;
   } else {

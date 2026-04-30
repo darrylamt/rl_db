@@ -432,7 +432,7 @@ function EventsTab({
                     {player && (
                       <p className="text-sm font-medium text-navy-900 truncate">
                         <Link
-                          href={`/admin/players/${player.player_id}`}
+                          href={`/admin/players/${player.player_id}/view`}
                           className="hover:underline"
                         >
                           {player.first_name} {player.last_name}
@@ -515,7 +515,7 @@ function LineupTab({
                         )}
                         <span className="font-medium text-navy-900">
                           {player ? (
-                            <Link href={`/admin/players/${player.player_id}`} className="hover:underline">
+                            <Link href={`/admin/players/${player.player_id}/view`} className="hover:underline">
                               {player.first_name} {player.last_name}
                             </Link>
                           ) : "—"}
@@ -542,7 +542,7 @@ function LineupTab({
                         )}
                         <span>
                           {player ? (
-                            <Link href={`/admin/players/${player.player_id}`} className="hover:underline">
+                            <Link href={`/admin/players/${player.player_id}/view`} className="hover:underline">
                               {player.first_name} {player.last_name}
                             </Link>
                           ) : "—"}

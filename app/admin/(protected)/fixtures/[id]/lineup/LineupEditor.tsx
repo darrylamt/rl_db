@@ -189,7 +189,7 @@ function TeamLineupEditor({
                     {/* Player name */}
                     <td className="px-3 py-2.5">
                       <Link
-                        href={`/admin/players/${player.player_id}`}
+                        href={`/admin/players/${player.player_id}/view`}
                         className="font-medium text-navy-900 hover:underline"
                       >
                         {player.first_name} {player.last_name}
