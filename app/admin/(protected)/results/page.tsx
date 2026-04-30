@@ -65,7 +65,7 @@ export default async function ResultsPage({
   let q = supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season))",
+      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season))",
       { count: "exact" }
     );
 
@@ -153,13 +153,23 @@ export default async function ResultsPage({
               (results ?? []).map((r: any) => (
                 <tr key={r.result_id} className="hover:bg-slate-50">
                   <td className="px-3 py-2.5 font-medium text-navy-900">
-                    {r.fixture?.home?.name ?? "?"} <span className="text-slate-400 font-normal">vs</span> {r.fixture?.away?.name ?? "?"}
+                    {r.fixture?.home?.team_id ? (
+                      <Link href={`/admin/teams/${r.fixture.home.team_id}/view`} className="hover:underline">
+                        {r.fixture.home.name ?? "?"}
+                      </Link>
+                    ) : (r.fixture?.home?.name ?? "?")}
+                    {" "}<span className="text-slate-400 font-normal">vs</span>{" "}
+                    {r.fixture?.away?.team_id ? (
+                      <Link href={`/admin/teams/${r.fixture.away.team_id}/view`} className="hover:underline">
+                        {r.fixture.away.name ?? "?"}
+                      </Link>
+                    ) : (r.fixture?.away?.name ?? "?")}
                     <div className="sm:hidden mt-0.5 text-xs text-slate-500">
                       {fmt(r.fixture?.scheduled_date)}
                       {r.fixture?.competition?.name && <span> · {r.fixture.competition.name}</span>}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 font-display font-bold text-navy-900 text-base tabular-nums">
+                  <td className="px-3 py-2.5 font-display font-bold text-navy-900 text-base tabular-nums whitespace-nowrap">
                     {r.home_score} – {r.away_score}
                   </td>
                   <td className="hidden sm:table-cell px-3 py-2.5 text-slate-600 whitespace-nowrap">{fmt(r.fixture?.scheduled_date)}</td>

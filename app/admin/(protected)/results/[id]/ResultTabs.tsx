@@ -47,51 +47,69 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-// ─── Event config ───────────────────────────────────────────────────────────
+// ─── Event config ────────────────────────────────────────────────────────────
+// Event types are stored as lowercase slugs in the DB for consistency.
+// Display labels are shown in the UI.
 
 const EVENT_CATEGORIES = [
   {
     label: "Scoring",
     color: "emerald",
-    events: ["Try", "Conversion", "Penalty Goal", "Drop Goal"],
+    events: [
+      { value: "try", label: "Try" },
+      { value: "conversion", label: "Conversion" },
+      { value: "missed_conversion", label: "Missed Conversion" },
+      { value: "penalty_goal", label: "Penalty Goal" },
+      { value: "drop_goal", label: "Drop Goal" },
+    ],
   },
   {
     label: "Discipline",
     color: "red",
-    events: ["Yellow Card", "Red Card", "Sin Bin"],
+    events: [
+      { value: "yellow_card", label: "Yellow Card" },
+      { value: "red_card", label: "Red Card" },
+    ],
   },
   {
     label: "Attacking",
     color: "blue",
-    events: ["Tackle Break", "Offload", "Clean Break", "Metres Gained"],
+    events: [
+      { value: "tackle_break", label: "Tackle Break" },
+      { value: "offload", label: "Offload" },
+      { value: "clean_break", label: "Clean Break" },
+      { value: "metres_gained", label: "Metres Gained" },
+    ],
   },
   {
     label: "Defending",
     color: "purple",
-    events: ["Tackle", "Missed Tackle", "Turnover Won"],
-  },
-  {
-    label: "Set Piece",
-    color: "orange",
-    events: ["Scrum Won", "Scrum Lost", "Lineout Won", "Lineout Lost"],
-  },
-  {
-    label: "Kicking",
-    color: "sky",
-    events: ["Kick from Hand", "Box Kick", "Grubber"],
+    events: [
+      { value: "tackle", label: "Tackle" },
+      { value: "missed_tackle", label: "Missed Tackle" },
+      { value: "turnover_won", label: "Turnover Won" },
+    ],
   },
   {
     label: "Completed Sets",
     color: "teal",
-    events: ["Completed Set"],
+    events: [{ value: "completed_set", label: "Completed Set" }],
   },
 ];
+
+// Map DB value → display label
+const EVENT_LABEL: Record<string, string> = {};
+for (const cat of EVENT_CATEGORIES) {
+  for (const ev of cat.events) {
+    EVENT_LABEL[ev.value] = ev.label;
+  }
+}
 
 const ALL_EVENT_TYPES = EVENT_CATEGORIES.flatMap((c) => c.events);
 
 function eventColor(type: string) {
   for (const cat of EVENT_CATEGORIES) {
-    if (cat.events.includes(type)) return cat.color;
+    if (cat.events.some((e) => e.value === type)) return cat.color;
   }
   return "slate";
 }
@@ -101,8 +119,6 @@ const COLOR_CLASSES: Record<string, { badge: string; dot: string }> = {
   red: { badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
   blue: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
   purple: { badge: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" },
-  orange: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
-  sky: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500" },
   teal: { badge: "bg-teal-50 text-teal-700 border-teal-200", dot: "bg-teal-500" },
   slate: { badge: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
 };
@@ -149,7 +165,7 @@ function PlayerSearch({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {open && filtered.length > 0 && (
+      {open && (
         <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
           <li
             className="px-3 py-2 text-sm text-slate-400 hover:bg-slate-50 cursor-pointer"
@@ -201,7 +217,7 @@ function EventsTab({
 }) {
   const [teamId, setTeamId] = useState(homeTeam.team_id);
   const [playerId, setPlayerId] = useState("");
-  const [eventType, setEventType] = useState(ALL_EVENT_TYPES[0]);
+  const [eventType, setEventType] = useState(ALL_EVENT_TYPES[0].value);
   const [minute, setMinute] = useState("");
   const [half, setHalf] = useState("1");
   const [notes, setNotes] = useState("");
@@ -217,6 +233,7 @@ function EventsTab({
     const fd = new FormData();
     fd.append("team_id", teamId);
     if (playerId) fd.append("player_id", playerId);
+    // Store as lowercase slug for consistency with standings tally
     fd.append("event_type", eventType);
     if (minute) fd.append("minute", minute);
     fd.append("half", half);
@@ -295,7 +312,7 @@ function EventsTab({
             />
           </div>
 
-          {/* Event type */}
+          {/* Event type pills */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Event Type</label>
             <div className="space-y-2">
@@ -305,19 +322,19 @@ function EventsTab({
                   <div className="flex flex-wrap gap-1.5">
                     {cat.events.map((ev) => {
                       const col = COLOR_CLASSES[cat.color];
-                      const active = eventType === ev;
+                      const active = eventType === ev.value;
                       return (
                         <button
-                          key={ev}
+                          key={ev.value}
                           type="button"
-                          onClick={() => setEventType(ev)}
+                          onClick={() => setEventType(ev.value)}
                           className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
                             active
                               ? `${col.badge} border-current ring-2 ring-offset-1 ring-current`
                               : "bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400"
                           }`}
                         >
-                          {ev}
+                          {ev.label}
                         </button>
                       );
                     })}
@@ -390,6 +407,10 @@ function EventsTab({
             {events.map((ev) => {
               const color = eventColor(ev.event_type);
               const col = COLOR_CLASSES[color];
+              const player = one(ev.player);
+              const team = one(ev.team);
+              // Display label: use mapped label or fallback to stored value
+              const displayLabel = EVENT_LABEL[ev.event_type] ?? ev.event_type;
               return (
                 <li key={ev.event_id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
                   {/* Minute badge */}
@@ -403,18 +424,32 @@ function EventsTab({
 
                   {/* Event type badge */}
                   <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium border ${col.badge}`}>
-                    {ev.event_type}
+                    {displayLabel}
                   </span>
 
                   {/* Player + team */}
                   <div className="flex-1 min-w-0">
-                    {one(ev.player) && (
+                    {player && (
                       <p className="text-sm font-medium text-navy-900 truncate">
-                        {one(ev.player)!.first_name} {one(ev.player)!.last_name}
+                        <Link
+                          href={`/admin/players/${player.player_id}`}
+                          className="hover:underline"
+                        >
+                          {player.first_name} {player.last_name}
+                        </Link>
                       </p>
                     )}
                     <p className="text-xs text-slate-400">
-                      {one(ev.team)?.name ?? "—"}
+                      {team ? (
+                        <Link
+                          href={`/admin/teams/${team.team_id}/view`}
+                          className="hover:underline"
+                        >
+                          {team.name}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
                       {ev.half && ` · H${ev.half}`}
                       {ev.notes && ` · ${ev.notes}`}
                     </p>
@@ -469,19 +504,26 @@ function LineupTab({
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Starters</p>
                 <ul className="space-y-1">
-                  {starters.map((e) => (
-                    <li key={e.lineup_id} className="flex items-center gap-2 text-sm">
-                      {e.jersey_number && (
-                        <span className="w-6 h-6 rounded-full bg-navy-100 text-navy-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                          {e.jersey_number}
+                  {starters.map((e) => {
+                    const player = one(e.player);
+                    return (
+                      <li key={e.lineup_id} className="flex items-center gap-2 text-sm">
+                        {e.jersey_number && (
+                          <span className="w-6 h-6 rounded-full bg-navy-100 text-navy-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {e.jersey_number}
+                          </span>
+                        )}
+                        <span className="font-medium text-navy-900">
+                          {player ? (
+                            <Link href={`/admin/players/${player.player_id}`} className="hover:underline">
+                              {player.first_name} {player.last_name}
+                            </Link>
+                          ) : "—"}
                         </span>
-                      )}
-                      <span className="font-medium text-navy-900">
-                        {one(e.player)?.first_name} {one(e.player)?.last_name}
-                      </span>
-                      {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
-                    </li>
-                  ))}
+                        {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -489,17 +531,26 @@ function LineupTab({
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Substitutes</p>
                 <ul className="space-y-1">
-                  {subs.map((e) => (
-                    <li key={e.lineup_id} className="flex items-center gap-2 text-sm text-slate-600">
-                      {e.jersey_number && (
-                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                          {e.jersey_number}
+                  {subs.map((e) => {
+                    const player = one(e.player);
+                    return (
+                      <li key={e.lineup_id} className="flex items-center gap-2 text-sm text-slate-600">
+                        {e.jersey_number && (
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {e.jersey_number}
+                          </span>
+                        )}
+                        <span>
+                          {player ? (
+                            <Link href={`/admin/players/${player.player_id}`} className="hover:underline">
+                              {player.first_name} {player.last_name}
+                            </Link>
+                          ) : "—"}
                         </span>
-                      )}
-                      <span>{one(e.player)?.first_name} {one(e.player)?.last_name}</span>
-                      {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
-                    </li>
-                  ))}
+                        {e.position && <span className="text-slate-400 text-xs">{e.position}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -529,6 +580,11 @@ function LineupTab({
 }
 
 // ─── Score Tab ───────────────────────────────────────────────────────────────
+// Rugby League scoring: Try=4, Conversion=2, Penalty=2, Drop Goal=1
+
+function calcScore(tries: number, conv: number, pens: number, drops: number): number {
+  return tries * 4 + conv * 2 + pens * 2 + drops;
+}
 
 function ScoreTab({
   fixture,
@@ -540,39 +596,108 @@ function ScoreTab({
   upsertResult: (fd: FormData) => Promise<void>;
 }) {
   const r = result ?? {};
+  const homeName = one(fixture.home)?.name ?? "Home";
+  const awayName = one(fixture.away)?.name ?? "Away";
+
+  const [homeTries, setHomeTries] = useState(r.home_tries ?? 0);
+  const [homeConv, setHomeConv] = useState(r.home_conversions ?? 0);
+  const [homePens, setHomePens] = useState(r.home_penalties ?? 0);
+  const [homeDrops, setHomeDrops] = useState(r.home_drop_goals ?? 0);
+  const [awayTries, setAwayTries] = useState(r.away_tries ?? 0);
+  const [awayConv, setAwayConv] = useState(r.away_conversions ?? 0);
+  const [awayPens, setAwayPens] = useState(r.away_penalties ?? 0);
+  const [awayDrops, setAwayDrops] = useState(r.away_drop_goals ?? 0);
+
+  const homeScore = calcScore(
+    Number(homeTries), Number(homeConv), Number(homePens), Number(homeDrops)
+  );
+  const awayScore = calcScore(
+    Number(awayTries), Number(awayConv), Number(awayPens), Number(awayDrops)
+  );
+
+  function numInput(
+    value: number | string,
+    setter: (v: number) => void,
+    name: string,
+  ) {
+    return (
+      <input
+        type="number"
+        name={name}
+        min={0}
+        value={value}
+        onChange={(e) => setter(Number(e.target.value) || 0)}
+        className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+      />
+    );
+  }
+
   return (
-    <FormShell
-      title=""
-      backHref="/admin/results"
-      onSubmit={upsertResult}
-      submitLabel={result ? "Update result" : "Record result"}
+    <form
+      action={async (fd: FormData) => {
+        // Inject calculated scores so the server action gets the right values
+        fd.set("home_score", String(homeScore));
+        fd.set("away_score", String(awayScore));
+        await upsertResult(fd);
+      }}
+      className="space-y-5"
     >
+      {/* Score display */}
+      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex items-center justify-center gap-4 text-center">
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">{homeName}</p>
+          <p className="text-4xl font-display font-bold text-navy-900 tabular-nums">{homeScore}</p>
+        </div>
+        <span className="text-2xl text-slate-300 font-light">–</span>
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">{awayName}</p>
+          <p className="text-4xl font-display font-bold text-navy-900 tabular-nums">{awayScore}</p>
+        </div>
+      </div>
+
+      {/* Hidden score fields (submitted via form action override above) */}
+      <input type="hidden" name="home_score" value={homeScore} />
+      <input type="hidden" name="away_score" value={awayScore} />
+
+      {/* Home breakdown */}
+      <div>
+        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2 font-medium">{homeName}</p>
+        <div className="grid grid-cols-4 gap-3">
+          <Field label="Tries">{numInput(homeTries, setHomeTries, "home_tries")}</Field>
+          <Field label="Conv.">{numInput(homeConv, setHomeConv, "home_conversions")}</Field>
+          <Field label="Pens.">{numInput(homePens, setHomePens, "home_penalties")}</Field>
+          <Field label="Drop">{numInput(homeDrops, setHomeDrops, "home_drop_goals")}</Field>
+        </div>
+      </div>
+
+      {/* Away breakdown */}
+      <div>
+        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2 font-medium">{awayName}</p>
+        <div className="grid grid-cols-4 gap-3">
+          <Field label="Tries">{numInput(awayTries, setAwayTries, "away_tries")}</Field>
+          <Field label="Conv.">{numInput(awayConv, setAwayConv, "away_conversions")}</Field>
+          <Field label="Pens.">{numInput(awayPens, setAwayPens, "away_penalties")}</Field>
+          <Field label="Drop">{numInput(awayDrops, setAwayDrops, "away_drop_goals")}</Field>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={`${one(fixture.home)?.name ?? "Home"} score`}>
-          <Input name="home_score" type="number" min={0} defaultValue={r.home_score ?? 0} required />
+        <Field label="Attendance">
+          <Input name="attendance" type="number" min={0} defaultValue={r.attendance ?? ""} />
         </Field>
-        <Field label={`${one(fixture.away)?.name ?? "Away"} score`}>
-          <Input name="away_score" type="number" min={0} defaultValue={r.away_score ?? 0} required />
+        <Field label="Recorded by">
+          <Input name="recorded_by" defaultValue={r.recorded_by ?? ""} placeholder="Your name" />
         </Field>
-      </div>
-      <div className="grid grid-cols-4 gap-3">
-        <Field label="Home tries"><Input name="home_tries" type="number" min={0} defaultValue={r.home_tries ?? 0} /></Field>
-        <Field label="Home conv."><Input name="home_conversions" type="number" min={0} defaultValue={r.home_conversions ?? 0} /></Field>
-        <Field label="Home pens."><Input name="home_penalties" type="number" min={0} defaultValue={r.home_penalties ?? 0} /></Field>
-        <Field label="Home drop"><Input name="home_drop_goals" type="number" min={0} defaultValue={r.home_drop_goals ?? 0} /></Field>
-      </div>
-      <div className="grid grid-cols-4 gap-3">
-        <Field label="Away tries"><Input name="away_tries" type="number" min={0} defaultValue={r.away_tries ?? 0} /></Field>
-        <Field label="Away conv."><Input name="away_conversions" type="number" min={0} defaultValue={r.away_conversions ?? 0} /></Field>
-        <Field label="Away pens."><Input name="away_penalties" type="number" min={0} defaultValue={r.away_penalties ?? 0} /></Field>
-        <Field label="Away drop"><Input name="away_drop_goals" type="number" min={0} defaultValue={r.away_drop_goals ?? 0} /></Field>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Attendance"><Input name="attendance" type="number" min={0} defaultValue={r.attendance ?? ""} /></Field>
-        <Field label="Recorded by"><Input name="recorded_by" defaultValue={r.recorded_by ?? ""} placeholder="Your name" /></Field>
       </div>
       <Field label="Notes"><Textarea name="notes" defaultValue={r.notes ?? ""} /></Field>
-    </FormShell>
+
+      <button
+        type="submit"
+        className="w-full py-2 rounded bg-navy-900 text-white text-sm font-medium hover:bg-navy-700 transition-colors"
+      >
+        {result ? "Update result" : "Record result"}
+      </button>
+    </form>
   );
 }
 
@@ -617,7 +742,13 @@ export function ResultTabs({
           ← Results
         </Link>
         <h1 className="text-xl font-bold text-navy-900">
-          {homeTeam?.name ?? "?"} <span className="text-slate-400 font-normal">vs</span> {awayTeam?.name ?? "?"}
+          <Link href={`/admin/teams/${homeTeam?.team_id}/view`} className="hover:underline">
+            {homeTeam?.name ?? "?"}
+          </Link>{" "}
+          <span className="text-slate-400 font-normal">vs</span>{" "}
+          <Link href={`/admin/teams/${awayTeam?.team_id}/view`} className="hover:underline">
+            {awayTeam?.name ?? "?"}
+          </Link>
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
           {fixture.competition?.name && `${fixture.competition.name} · `}

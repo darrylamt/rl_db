@@ -172,14 +172,16 @@ select
   count(case when r.home_score = r.away_score then 1 end) as drawn,
   sum(case when f.home_team_id = t.team_id then r.home_score else r.away_score end) as points_for,
   sum(case when f.home_team_id = t.team_id then r.away_score else r.home_score end) as points_against,
-  (count(case when (f.home_team_id = t.team_id and r.home_score > r.away_score) or (f.away_team_id = t.team_id and r.away_score > r.home_score) then 1 end) * 2) + (count(case when r.home_score = r.away_score then 1 end)) as league_points
+  sum(case when f.home_team_id = t.team_id then r.home_score else r.away_score end) -
+  sum(case when f.home_team_id = t.team_id then r.away_score else r.home_score end) as goal_difference,
+  (count(case when (f.home_team_id = t.team_id and r.home_score > r.away_score) or (f.away_team_id = t.team_id and r.away_score > r.home_score) then 1 end) * 3) + (count(case when r.home_score = r.away_score then 1 end)) as league_points
 from teams t
 join fixtures f on f.home_team_id = t.team_id or f.away_team_id = t.team_id
 join competitions c on c.competition_id = f.competition_id
 join match_results r on r.fixture_id = f.fixture_id
 where f.status = 'completed'
 group by t.team_id, t.name, t.logo_url, c.competition_id, c.name
-order by league_points desc;
+order by league_points desc, goal_difference desc;
 
 -- PUBLIC VIEWS (hide phone and email, compute age on read)
 drop view if exists public_players;

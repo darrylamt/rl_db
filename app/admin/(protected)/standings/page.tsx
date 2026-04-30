@@ -14,7 +14,8 @@ type Tally = {
 function tally(events: any[], type: string, top = 10): Tally[] {
   const m = new Map<string, Tally>();
   for (const e of events) {
-    if (e.event_type !== type) continue;
+    // Normalize case: compare lowercase for compatibility with both old (Title Case) and new (lowercase) events
+    if (e.event_type?.toLowerCase() !== type.toLowerCase()) continue;
     const p = e.player;
     if (!p?.player_id) continue;
     const key = p.player_id as string;
@@ -64,7 +65,9 @@ function Leaderboard({
                   {i + 1}
                 </td>
                 <td className="px-3 py-2 font-medium text-navy-900">
-                  {r.name}
+                  <Link href={`/admin/players/${r.player_id}`} className="hover:underline">
+                    {r.name}
+                  </Link>
                 </td>
                 <td className="px-3 py-2 text-slate-500 text-xs">
                   {r.team ?? "—"}
@@ -127,7 +130,8 @@ export default async function StandingsPage({
       .from("standings")
       .select("*")
       .in("competition_id", compIdsInSeason)
-      .order("league_points", { ascending: false });
+      .order("league_points", { ascending: false })
+      .order("goal_difference", { ascending: false });
     rows = res.data;
     error = res.error;
   } else {
@@ -144,7 +148,7 @@ export default async function StandingsPage({
        player:player_id(player_id, first_name, last_name, team:team_id(name)),
        fixture:fixture_id(competition_id)`,
     )
-    .in("event_type", ["try", "conversion"]);
+    .in("event_type", ["try", "conversion", "Try", "Conversion"]);
 
   const compIdSet = new Set(compIdsInSeason);
   const seasonEvents = (scoringEvents ?? []).filter((e: any) => {
@@ -280,7 +284,7 @@ export default async function StandingsPage({
                           {i + 1}
                         </td>
                         <td className="px-4 py-2.5 font-medium text-navy-900">
-                          <div className="flex items-center gap-2">
+                          <Link href={`/admin/teams/${r.team_id}/view`} className="flex items-center gap-2 hover:underline">
                             {r.logo_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
@@ -292,7 +296,7 @@ export default async function StandingsPage({
                               <div className="h-6 w-6 rounded bg-slate-200 shrink-0" />
                             )}
                             {r.team_name}
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-2 py-2.5 text-center text-slate-700">
                           {r.played}
