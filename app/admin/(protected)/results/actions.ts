@@ -72,6 +72,72 @@ export async function deleteResult(result_id: string) {
   revalidatePath("/admin/standings");
 }
 
+// ─── Score recalculation from events ─────────────────────────────────────────
+
+const SCORING_TYPES = ["try", "conversion", "penalty_goal", "drop_goal"];
+const POINTS: Record<string, number> = {
+  try: 4,
+  conversion: 2,
+  penalty_goal: 2,
+  drop_goal: 1,
+};
+
+async function recalcScoreFromEvents(supabase: any, fixture_id: string) {
+  const { data: fixture } = await supabase
+    .from("fixtures")
+    .select("home_team_id, away_team_id")
+    .eq("fixture_id", fixture_id)
+    .maybeSingle();
+  if (!fixture) return;
+
+  const { data: events } = await supabase
+    .from("match_events")
+    .select("event_type, team_id")
+    .eq("fixture_id", fixture_id)
+    .in("event_type", SCORING_TYPES);
+
+  const homeEvents = (events ?? []).filter((e: any) => e.team_id === fixture.home_team_id);
+  const awayEvents = (events ?? []).filter((e: any) => e.team_id === fixture.away_team_id);
+
+  function count(evs: any[], type: string) {
+    return evs.filter((e: any) => e.event_type === type).length;
+  }
+
+  const homeTries = count(homeEvents, "try");
+  const homeConv  = count(homeEvents, "conversion");
+  const homePens  = count(homeEvents, "penalty_goal");
+  const homeDrops = count(homeEvents, "drop_goal");
+  const awayTries = count(awayEvents, "try");
+  const awayConv  = count(awayEvents, "conversion");
+  const awayPens  = count(awayEvents, "penalty_goal");
+  const awayDrops = count(awayEvents, "drop_goal");
+
+  const homeScore = homeTries * 4 + homeConv * 2 + homePens * 2 + homeDrops;
+  const awayScore = awayTries * 4 + awayConv * 2 + awayPens * 2 + awayDrops;
+
+  await supabase.from("match_results").upsert(
+    {
+      fixture_id,
+      home_score: homeScore,
+      away_score: awayScore,
+      home_tries: homeTries,
+      home_conversions: homeConv,
+      home_penalties: homePens,
+      home_drop_goals: homeDrops,
+      away_tries: awayTries,
+      away_conversions: awayConv,
+      away_penalties: awayPens,
+      away_drop_goals: awayDrops,
+    },
+    { onConflict: "fixture_id" }
+  );
+
+  await supabase
+    .from("fixtures")
+    .update({ status: "completed" })
+    .eq("fixture_id", fixture_id);
+}
+
 // ─── Event actions ────────────────────────────────────────────────────────────
 
 export async function addEvent(fixture_id: string, fd: FormData) {
@@ -95,16 +161,41 @@ export async function addEvent(fixture_id: string, fd: FormData) {
   });
 
   if (error) throw new Error(error.message);
+
+  // Recalculate score if it's a scoring event
+  if (SCORING_TYPES.includes(event_type)) {
+    await recalcScoreFromEvents(supabase, fixture_id);
+    revalidatePath("/admin/standings");
+    revalidatePath("/admin/results");
+  }
+
   revalidatePath(`/admin/results/${fixture_id}`);
 }
 
 export async function deleteEvent(event_id: string) {
   const supabase = createAdminClient();
+
+  // Fetch first so we know fixture_id and whether it's a scoring event
+  const { data: ev } = await supabase
+    .from("match_events")
+    .select("fixture_id, event_type")
+    .eq("event_id", event_id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("match_events")
     .delete()
     .eq("event_id", event_id);
   if (error) throw new Error(error.message);
-  // We don't know the fixture_id here so revalidate broadly
-  revalidatePath("/admin/results", "layout");
+
+  if (ev?.fixture_id) {
+    if (SCORING_TYPES.includes(ev.event_type)) {
+      await recalcScoreFromEvents(supabase, ev.fixture_id);
+      revalidatePath("/admin/standings");
+      revalidatePath("/admin/results");
+    }
+    revalidatePath(`/admin/results/${ev.fixture_id}`);
+  } else {
+    revalidatePath("/admin/results", "layout");
+  }
 }

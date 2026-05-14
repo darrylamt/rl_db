@@ -24,8 +24,7 @@ export default async function ResultsPage({
   const supabase = createAdminClient();
   const { page, pageSize, from, to } = getPageParams(searchParams, 10);
 
-  // Year filter: pull distinct seasons from competitions, default to
-  // current year, narrow match_results via fixture_id.
+  // Seasons for year filter
   const { data: allComps } = await supabase
     .from("competitions")
     .select("competition_id, season");
@@ -35,8 +34,17 @@ export default async function ResultsPage({
     )
   ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 
+  // All clubs for team filter
+  const { data: allTeams } = await supabase
+    .from("teams")
+    .select("team_id, name")
+    .eq("team_type", "club")
+    .order("name");
+
   const rawYear = first(searchParams?.year);
+  const rawTeam = first(searchParams?.team) ?? "";
   const currentYear = String(new Date().getFullYear());
+
   const selectedYear =
     rawYear === "all"
       ? ""
@@ -46,20 +54,44 @@ export default async function ResultsPage({
       ? currentYear
       : "";
 
+  // Build fixture ID filter from year + team
   let fixtureIds: string[] | null = null;
+
+  // Year → fixture IDs
+  let yearFixtureIds: string[] | null = null;
   if (selectedYear) {
     const compIds = (allComps ?? [])
       .filter((c: any) => c.season === selectedYear)
       .map((c: any) => c.competition_id as string);
     if (compIds.length === 0) {
-      fixtureIds = [];
+      yearFixtureIds = [];
     } else {
-      const { data: fixturesInYear } = await supabase
+      const { data: fx } = await supabase
         .from("fixtures")
         .select("fixture_id")
         .in("competition_id", compIds);
-      fixtureIds = (fixturesInYear ?? []).map((f: any) => f.fixture_id as string);
+      yearFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
     }
+  }
+
+  // Team → fixture IDs
+  let teamFixtureIds: string[] | null = null;
+  if (rawTeam) {
+    const { data: fx } = await supabase
+      .from("fixtures")
+      .select("fixture_id")
+      .or(`home_team_id.eq.${rawTeam},away_team_id.eq.${rawTeam}`);
+    teamFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
+  }
+
+  // Intersect the two sets if both filters are active
+  if (yearFixtureIds !== null && teamFixtureIds !== null) {
+    const teamSet = new Set(teamFixtureIds);
+    fixtureIds = yearFixtureIds.filter((id) => teamSet.has(id));
+  } else if (yearFixtureIds !== null) {
+    fixtureIds = yearFixtureIds;
+  } else if (teamFixtureIds !== null) {
+    fixtureIds = teamFixtureIds;
   }
 
   let q = supabase
@@ -81,8 +113,10 @@ export default async function ResultsPage({
     .order("recorded_at", { ascending: false })
     .range(from, to);
 
-  const nonDefaultYear =
-    rawYear === "all" || (selectedYear && selectedYear !== currentYear);
+  const isFiltered =
+    rawYear === "all" ||
+    (selectedYear && selectedYear !== currentYear) ||
+    rawTeam;
 
   return (
     <div className="p-4 md:p-8">
@@ -93,11 +127,10 @@ export default async function ResultsPage({
         <Link href="/enter/result" className="text-navy-700 hover:underline">/enter/result</Link> form.
       </p>
 
+      {/* Filters */}
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
         <label className="text-sm">
-          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-            Year
-          </span>
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Year</span>
           <select
             name="year"
             defaultValue={rawYear === "all" ? "all" : selectedYear}
@@ -105,19 +138,32 @@ export default async function ResultsPage({
           >
             <option value="all">All years</option>
             {seasons.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
         </label>
+
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Team</span>
+          <select
+            name="team"
+            defaultValue={rawTeam}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[10rem]"
+          >
+            <option value="">All teams</option>
+            {(allTeams ?? []).map((t: any) => (
+              <option key={t.team_id} value={t.team_id}>{t.name}</option>
+            ))}
+          </select>
+        </label>
+
         <button
           type="submit"
           className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium"
         >
           Apply
         </button>
-        {nonDefaultYear && (
+        {isFiltered && (
           <Link href="/admin/results" className="text-xs text-slate-500 hover:underline">
             reset
           </Link>
@@ -146,7 +192,7 @@ export default async function ResultsPage({
             {(results ?? []).length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  {selectedYear ? `No results in ${selectedYear}.` : "No results yet."}
+                  No results found.
                 </td>
               </tr>
             ) : (
