@@ -140,29 +140,47 @@ async function recalcScoreFromEvents(supabase: any, fixture_id: string) {
 
 // ─── Event actions ────────────────────────────────────────────────────────────
 
+function detectHalf(minute: number, is9s: boolean): number {
+  const halfLen = is9s ? 20 : 40;
+  if (minute <= halfLen) return 1;
+  if (minute <= halfLen * 2) return 2;
+  return 3; // extra time
+}
+
 export async function addEvent(fixture_id: string, fd: FormData) {
   const supabase = createAdminClient();
 
-  const team_id = str(fd, "team_id");
+  const team_id   = str(fd, "team_id");
   const player_id = str(fd, "player_id");
   const event_type = str(fd, "event_type");
+  const minutesRaw = str(fd, "minutes"); // comma-separated e.g. "5, 23, 37"
+  const is9s = fd.get("is9s") === "true";
+  const notes = str(fd, "notes");
 
   if (!event_type) throw new Error("`event_type` is required");
-  if (!team_id) throw new Error("`team_id` is required");
+  if (!team_id)    throw new Error("`team_id` is required");
 
-  const { error } = await supabase.from("match_events").insert({
+  // Parse comma-separated minutes; empty string → [null] (one event, no minute)
+  const parsed: (number | null)[] = minutesRaw
+    ? minutesRaw
+        .split(",")
+        .map((s) => { const n = parseInt(s.trim(), 10); return isNaN(n) ? null : n; })
+        .filter((n, i, arr) => n !== null || arr.length === 1) // drop blanks unless only entry
+    : [null];
+
+  const rows = parsed.map((minute) => ({
     fixture_id,
     team_id,
     player_id: player_id || null,
     event_type,
-    minute: intOrNull(fd, "minute"),
-    half: intOrNull(fd, "half"),
-    notes: str(fd, "notes"),
-  });
+    minute: minute ?? null,
+    half: minute !== null ? detectHalf(minute, is9s) : null,
+    notes,
+  }));
 
+  const { error } = await supabase.from("match_events").insert(rows);
   if (error) throw new Error(error.message);
 
-  // Recalculate score if it's a scoring event
   if (SCORING_TYPES.includes(event_type)) {
     await recalcScoreFromEvents(supabase, fixture_id);
     revalidatePath("/admin/standings");

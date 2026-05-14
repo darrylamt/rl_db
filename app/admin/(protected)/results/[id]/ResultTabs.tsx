@@ -196,6 +196,18 @@ function PlayerSearch({
 
 // ─── Events Tab ─────────────────────────────────────────────────────────────
 
+// Detect which half a minute falls in based on game format
+function detectHalf(minute: number, is9s: boolean): number {
+  const halfLen = is9s ? 20 : 40;
+  if (minute <= halfLen) return 1;
+  if (minute <= halfLen * 2) return 2;
+  return 3;
+}
+
+function halfLabel(half: number): string {
+  return half === 1 ? "1st Half" : half === 2 ? "2nd Half" : "Extra Time";
+}
+
 function EventsTab({
   fixtureId,
   events,
@@ -203,6 +215,7 @@ function EventsTab({
   awayTeam,
   homePlayers,
   awayPlayers,
+  competitionName,
   addEvent,
   deleteEvent,
 }: {
@@ -212,14 +225,17 @@ function EventsTab({
   awayTeam: Team;
   homePlayers: Player[];
   awayPlayers: Player[];
+  competitionName?: string;
   addEvent: (fd: FormData) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
 }) {
+  // Detect game format from competition name/type
+  const is9s = /9s?/i.test(competitionName ?? "");
+
   const [teamId, setTeamId] = useState(homeTeam.team_id);
   const [playerId, setPlayerId] = useState("");
   const [eventType, setEventType] = useState(ALL_EVENT_TYPES[0].value);
-  const [minute, setMinute] = useState("");
-  const [half, setHalf] = useState("1");
+  const [minutes, setMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -227,23 +243,31 @@ function EventsTab({
 
   const activePlayers = teamId === homeTeam.team_id ? homePlayers : awayPlayers;
 
+  // Parse minute preview for display
+  const parsedMinutes = useMemo(() => {
+    if (!minutes.trim()) return [];
+    return minutes
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n));
+  }, [minutes]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     const fd = new FormData();
     fd.append("team_id", teamId);
     if (playerId) fd.append("player_id", playerId);
-    // Store as lowercase slug for consistency with standings tally
     fd.append("event_type", eventType);
-    if (minute) fd.append("minute", minute);
-    fd.append("half", half);
+    if (minutes.trim()) fd.append("minutes", minutes);
+    fd.append("is9s", String(is9s));
     if (notes) fd.append("notes", notes);
 
     startTransition(async () => {
       try {
         await addEvent(fd);
         setPlayerId("");
-        setMinute("");
+        setMinutes("");
         setNotes("");
       } catch (err: any) {
         setError(err.message ?? "Failed to save event");
@@ -344,32 +368,43 @@ function EventsTab({
             </div>
           </div>
 
-          {/* Minute + Half */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Minute</label>
-              <input
-                type="number"
-                min={1}
-                max={120}
-                value={minute}
-                onChange={(e) => setMinute(e.target.value)}
-                placeholder="e.g. 23"
-                className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Half</label>
-              <select
-                value={half}
-                onChange={(e) => setHalf(e.target.value)}
-                className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
-              >
-                <option value="1">1st Half</option>
-                <option value="2">2nd Half</option>
-                <option value="3">Extra Time</option>
-              </select>
-            </div>
+          {/* Minutes — comma-separated for bulk entry */}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+              Minute(s)
+              <span className="ml-1 text-slate-400 font-normal normal-case">
+                — separate multiple with commas
+              </span>
+            </label>
+            <input
+              type="text"
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              placeholder={`e.g. 5, 23, 37`}
+              className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+            />
+            {/* Preview halves */}
+            {parsedMinutes.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {parsedMinutes.map((m, i) => {
+                  const h = detectHalf(m, is9s);
+                  return (
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-xs text-slate-600">
+                      <span className="font-semibold">{m}'</span>
+                      <span className="text-slate-400">{halfLabel(h)}</span>
+                    </span>
+                  );
+                })}
+                {parsedMinutes.length > 1 && (
+                  <span className="text-xs text-slate-400 self-center">
+                    → {parsedMinutes.length} events will be created
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-400">
+              Half is auto-detected · {is9s ? "9s format: H1 = 1–20, H2 = 21–40" : "13s format: H1 = 1–40, H2 = 41–80"}
+            </p>
           </div>
 
           {/* Notes */}
@@ -728,7 +763,8 @@ export function ResultTabs({
   upsertResult: (fd: FormData) => Promise<void>;
   addEvent: (fd: FormData) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
-}) {
+})
+ {
   const [activeTab, setActiveTab] = useState<Tab>("Score");
 
   const homeTeam: Team = one(fixture.home) as Team;
@@ -794,6 +830,7 @@ export function ResultTabs({
           awayTeam={awayTeam}
           homePlayers={homePlayers}
           awayPlayers={awayPlayers}
+          competitionName={fixture.competition?.name ?? fixture.competition?.[0]?.name ?? ""}
           addEvent={addEvent}
           deleteEvent={deleteEvent}
         />
