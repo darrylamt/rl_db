@@ -45,6 +45,27 @@ export async function updateFixture(id: string, fd: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
+export async function bulkCreateFixtures(fd: FormData) {
+  const supabase = createAdminClient();
+  const raw = fd.get("fixtures_json");
+  if (typeof raw !== "string" || !raw) throw new Error("No fixture data received");
+
+  let rows: any[];
+  try { rows = JSON.parse(raw); } catch { throw new Error("Invalid fixture data"); }
+
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error("No fixtures to create");
+
+  const valid = rows.filter(
+    (r) => r.home_team_id && r.away_team_id && r.home_team_id !== r.away_team_id
+  );
+  if (valid.length === 0) throw new Error("No valid fixtures — check each row has different home and away teams");
+
+  const { error } = await supabase.from("fixtures").insert(valid);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/fixtures");
+  revalidatePath("/admin/dashboard");
+}
+
 export async function deleteFixture(id: string) {
   const supabase = createAdminClient();
   // Delete dependents first (no cascade on match_results/events/officials)

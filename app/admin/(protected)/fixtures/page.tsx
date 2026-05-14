@@ -76,6 +76,14 @@ export default async function FixturesPage({
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["fixtures", "match_results"]} />
       <ListHeader title="Fixtures" addHref="/admin/fixtures/new" addLabel="Add Fixture" />
+      <div className="-mt-3 mb-4">
+        <Link
+          href="/admin/fixtures/bulk"
+          className="text-xs text-navy-700 hover:underline font-medium"
+        >
+          + Bulk add fixtures
+        </Link>
+      </div>
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
         <label className="text-sm">
