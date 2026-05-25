@@ -1,8 +1,13 @@
 -- ── update_public_players_view ───────────────────────────────────────────────
 -- Adds `rating` to the public_players view so the public API exposes it.
 -- Run AFTER player_general_rating.sql (which adds the rating column to players).
+--
+-- Note: CREATE OR REPLACE VIEW cannot remove/reorder columns.
+-- We DROP and recreate so we can add `rating` in the right position.
 
-CREATE OR REPLACE VIEW public.public_players
+DROP VIEW IF EXISTS public.public_players;
+
+CREATE VIEW public.public_players
   WITH (security_invoker = true)
 AS
 SELECT
@@ -25,3 +30,6 @@ SELECT
   COALESCE(rating, 6.0) AS rating,
   created_at
 FROM public.players;
+
+-- Re-grant SELECT to anon and authenticated (dropped with the view)
+GRANT SELECT ON public.public_players TO anon, authenticated;
