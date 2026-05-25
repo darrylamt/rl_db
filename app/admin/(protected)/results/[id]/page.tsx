@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ResultTabs } from "./ResultTabs";
-import { upsertResult, addEvent, deleteEvent } from "../actions";
+import { upsertResult, addEvent, deleteEvent, saveRatings, deleteRating } from "../actions";
 
 export default async function EditResultPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
@@ -11,6 +11,7 @@ export default async function EditResultPage({ params }: { params: { id: string 
     { data: result },
     { data: events },
     { data: lineup },
+    { data: ratings },
   ] = await Promise.all([
     supabase
       .from("fixtures")
@@ -36,6 +37,10 @@ export default async function EditResultPage({ params }: { params: { id: string 
       .eq("fixture_id", params.id)
       .order("is_starter", { ascending: false })
       .order("jersey_number", { ascending: true }),
+    supabase
+      .from("match_player_ratings")
+      .select("rating_id, player_id, team_id, rating, notes")
+      .eq("fixture_id", params.id),
   ]);
 
   if (!fixture) notFound();
@@ -44,23 +49,24 @@ export default async function EditResultPage({ params }: { params: { id: string 
   const homeTeamId: string = f.home?.team_id;
   const awayTeamId: string = f.away?.team_id;
 
-  // Load all players for both teams for event/lineup selects
-  const { data: homePlayers } = await supabase
-    .from("players")
-    .select("player_id, first_name, last_name, jersey_number, position")
-    .eq("team_id", homeTeamId)
-    .eq("playing_status", "active")
-    .order("last_name");
+  const [{ data: homePlayers }, { data: awayPlayers }] = await Promise.all([
+    supabase
+      .from("players")
+      .select("player_id, first_name, last_name, jersey_number, position")
+      .eq("team_id", homeTeamId)
+      .eq("playing_status", "active")
+      .order("last_name"),
+    supabase
+      .from("players")
+      .select("player_id, first_name, last_name, jersey_number, position")
+      .eq("team_id", awayTeamId)
+      .eq("playing_status", "active")
+      .order("last_name"),
+  ]);
 
-  const { data: awayPlayers } = await supabase
-    .from("players")
-    .select("player_id, first_name, last_name, jersey_number, position")
-    .eq("team_id", awayTeamId)
-    .eq("playing_status", "active")
-    .order("last_name");
-
-  const boundUpsert = upsertResult.bind(null, params.id);
-  const boundAddEvent = addEvent.bind(null, params.id);
+  const boundUpsert     = upsertResult.bind(null, params.id);
+  const boundAddEvent   = addEvent.bind(null, params.id);
+  const boundSaveRatings = saveRatings.bind(null, params.id);
 
   return (
     <ResultTabs
@@ -69,11 +75,14 @@ export default async function EditResultPage({ params }: { params: { id: string 
       result={result}
       events={events ?? []}
       lineup={lineup ?? []}
+      ratings={ratings ?? []}
       homePlayers={homePlayers ?? []}
       awayPlayers={awayPlayers ?? []}
       upsertResult={boundUpsert}
       addEvent={boundAddEvent}
       deleteEvent={deleteEvent}
+      saveRatings={boundSaveRatings}
+      deleteRating={deleteRating}
     />
   );
 }

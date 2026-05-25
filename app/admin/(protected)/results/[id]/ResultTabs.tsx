@@ -41,6 +41,14 @@ interface LineupEntry {
   team?: TeamRef | TeamRef[] | null;
 }
 
+interface PlayerRating {
+  rating_id: string;
+  player_id: string;
+  team_id: string;
+  rating: number;
+  notes: string | null;
+}
+
 // Supabase returns joins as arrays; unwrap safely
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
@@ -122,6 +130,59 @@ const COLOR_CLASSES: Record<string, { badge: string; dot: string }> = {
   teal: { badge: "bg-teal-50 text-teal-700 border-teal-200", dot: "bg-teal-500" },
   slate: { badge: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
 };
+
+// ─── Rating formula ──────────────────────────────────────────────────────────
+
+const RATING_BASE = 6.0;
+const RATING_WEIGHTS: Record<string, number> = {
+  try:               1.5,
+  conversion:        0.25,
+  missed_conversion: -0.25,
+  penalty_goal:      0.5,
+  drop_goal:         0.75,
+  yellow_card:       -1.5,
+  red_card:          -3.0,
+  tackle_break:      0.5,
+  clean_break:       0.75,
+  offload:           0.3,
+  metres_gained:     0.2,
+  tackle:            0.1,
+  missed_tackle:     -0.3,
+  turnover_won:      0.5,
+  completed_set:     0.2,
+};
+
+// Stat labels shown in the rating row summary
+const STAT_LABELS: { key: string; label: string; sign: "pos" | "neg" | "neutral" }[] = [
+  { key: "try",               label: "Try",         sign: "pos"     },
+  { key: "conversion",        label: "Conv",        sign: "pos"     },
+  { key: "missed_conversion", label: "Miss. Conv",  sign: "neg"     },
+  { key: "penalty_goal",      label: "PG",          sign: "pos"     },
+  { key: "drop_goal",         label: "DG",          sign: "pos"     },
+  { key: "clean_break",       label: "Line Break",  sign: "pos"     },
+  { key: "tackle_break",      label: "Tkl Break",   sign: "pos"     },
+  { key: "offload",           label: "Offload",     sign: "pos"     },
+  { key: "tackle",            label: "Tackle",      sign: "neutral" },
+  { key: "missed_tackle",     label: "Miss. Tkl",   sign: "neg"     },
+  { key: "turnover_won",      label: "Turnover",    sign: "pos"     },
+  { key: "completed_set",     label: "Comp. Set",   sign: "pos"     },
+  { key: "metres_gained",     label: "Metres",      sign: "pos"     },
+  { key: "yellow_card",       label: "Yellow",      sign: "neg"     },
+  { key: "red_card",          label: "Red",         sign: "neg"     },
+];
+
+function calcAutoRating(playerEvents: MatchEvent[]): number {
+  let r = RATING_BASE;
+  for (const ev of playerEvents) r += RATING_WEIGHTS[ev.event_type] ?? 0;
+  return Math.max(1, Math.min(10, Math.round(r * 10) / 10));
+}
+
+function ratingColor(r: number) {
+  if (r >= 8)   return "text-emerald-700 bg-emerald-50 border-emerald-200";
+  if (r >= 6.5) return "text-navy-700 bg-navy-50 border-navy-200";
+  if (r >= 5)   return "text-amber-700 bg-amber-50 border-amber-200";
+  return "text-red-700 bg-red-50 border-red-200";
+}
 
 // ─── Player search combobox ──────────────────────────────────────────────────
 
@@ -736,9 +797,273 @@ function ScoreTab({
   );
 }
 
+// ─── Ratings Tab ─────────────────────────────────────────────────────────────
+
+function RatingsTab({
+  lineup,
+  events,
+  ratings,
+  homeTeam,
+  awayTeam,
+  saveRatings,
+  deleteRating,
+}: {
+  lineup: LineupEntry[];
+  events: MatchEvent[];
+  ratings: PlayerRating[];
+  homeTeam: Team;
+  awayTeam: Team;
+  saveRatings: (rows: { player_id: string; team_id: string; rating: number; notes: string | null }[]) => Promise<void>;
+  deleteRating: (ratingId: string, fixtureId: string) => Promise<void>;
+}) {
+  // Build list of unique players from lineup (prefer lineup; fall back to events)
+  const playerMap = new Map<string, { player: PlayerRef; team_id: string; jersey: number | null; position: string | null; is_starter: boolean }>();
+
+  for (const entry of lineup) {
+    const p = one(entry.player);
+    const t = one(entry.team);
+    if (p && t) {
+      playerMap.set(p.player_id, {
+        player: p,
+        team_id: t.team_id,
+        jersey: entry.jersey_number ?? null,
+        position: entry.position ?? null,
+        is_starter: entry.is_starter ?? false,
+      });
+    }
+  }
+  // Also include players who have events but aren't in the lineup
+  for (const ev of events) {
+    const p = one(ev.player);
+    const t = one(ev.team);
+    if (p && t && !playerMap.has(p.player_id)) {
+      playerMap.set(p.player_id, { player: p, team_id: t.team_id, jersey: null, position: null, is_starter: false });
+    }
+  }
+
+  const allPlayers = Array.from(playerMap.values());
+  const homePlayers = allPlayers.filter((p) => p.team_id === homeTeam.team_id);
+  const awayPlayers = allPlayers.filter((p) => p.team_id === awayTeam.team_id);
+
+  // savedRating map: player_id → rating row
+  const savedMap = new Map(ratings.map((r) => [r.player_id, r]));
+
+  // Local editable values: player_id → { rating, notes }
+  type RatingEdit = { rating: string; notes: string };
+  const initEdits = (): Map<string, RatingEdit> => {
+    const m = new Map<string, RatingEdit>();
+    for (const p of allPlayers) {
+      const saved = savedMap.get(p.player.player_id);
+      const auto  = calcAutoRating(events.filter((e) => one(e.player)?.player_id === p.player.player_id));
+      m.set(p.player.player_id, {
+        rating: saved ? String(saved.rating) : String(auto),
+        notes:  saved?.notes ?? "",
+      });
+    }
+    return m;
+  };
+
+  const [edits, setEdits] = useState<Map<string, RatingEdit>>(initEdits);
+  const [isPending, startTransition] = useTransition();
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+
+  function setEdit(playerId: string, patch: Partial<RatingEdit>) {
+    setEdits((prev) => {
+      const next = new Map(prev);
+      next.set(playerId, { ...prev.get(playerId)!, ...patch });
+      return next;
+    });
+  }
+
+  function autoFillAll() {
+    setEdits((prev) => {
+      const next = new Map(prev);
+      for (const p of allPlayers) {
+        const auto = calcAutoRating(events.filter((e) => one(e.player)?.player_id === p.player.player_id));
+        const cur  = next.get(p.player.player_id)!;
+        next.set(p.player.player_id, { ...cur, rating: String(auto) });
+      }
+      return next;
+    });
+  }
+
+  function handleSave() {
+    setError(""); setSuccess("");
+    const rows: { player_id: string; team_id: string; rating: number; notes: string | null }[] = [];
+    for (const p of allPlayers) {
+      const e = edits.get(p.player.player_id);
+      if (!e) continue;
+      const r = parseFloat(e.rating);
+      if (isNaN(r) || r < 1 || r > 10) {
+        setError(`Invalid rating for ${p.player.first_name} ${p.player.last_name} — must be 1–10`);
+        return;
+      }
+      rows.push({ player_id: p.player.player_id, team_id: p.team_id, rating: r, notes: e.notes.trim() || null });
+    }
+    startTransition(async () => {
+      try {
+        await saveRatings(rows);
+        setSuccess(`${rows.length} player rating${rows.length !== 1 ? "s" : ""} saved.`);
+      } catch (err: any) {
+        setError(err.message ?? "Failed to save ratings");
+      }
+    });
+  }
+
+  if (allPlayers.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
+        No players in the lineup yet. Add the lineup first, then come back to rate.
+      </div>
+    );
+  }
+
+  function TeamSection({ players, label }: { players: typeof homePlayers; label: string }) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-navy-900">{label}</h3>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {players.map(({ player, jersey, position, is_starter }) => {
+            const playerEvents = events.filter((e) => one(e.player)?.player_id === player.player_id);
+            const autoRating   = calcAutoRating(playerEvents);
+            const edit         = edits.get(player.player_id) ?? { rating: String(autoRating), notes: "" };
+            const rVal         = parseFloat(edit.rating);
+            const rDisplay     = isNaN(rVal) ? null : rVal;
+            const statCounts   = STAT_LABELS
+              .map((s) => ({ ...s, count: playerEvents.filter((e) => e.event_type === s.key).length }))
+              .filter((s) => s.count > 0);
+
+            return (
+              <div key={player.player_id} className="px-4 py-3 flex flex-wrap items-start gap-3">
+                {/* Jersey + name */}
+                <div className="flex items-center gap-2 min-w-[10rem] flex-1">
+                  {jersey != null && (
+                    <span className="w-7 h-7 rounded-full bg-navy-100 text-navy-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      {jersey}
+                    </span>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-navy-900">
+                      {player.first_name} {player.last_name}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {position ?? "—"}{!is_starter && " · Sub"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stat badges */}
+                <div className="flex flex-wrap gap-1 flex-1 items-center">
+                  {statCounts.length === 0 ? (
+                    <span className="text-xs text-slate-300">No events recorded</span>
+                  ) : statCounts.map((s) => (
+                    <span
+                      key={s.key}
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${
+                        s.sign === "pos"     ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        s.sign === "neg"     ? "bg-red-50 text-red-700 border-red-200" :
+                                               "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {s.count > 1 && <span>{s.count}×</span>}
+                      {s.label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Auto-rating hint + editable rating */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-slate-400 whitespace-nowrap">
+                    Auto: <span className="font-medium text-slate-500">{autoRating.toFixed(1)}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      step={0.5}
+                      value={edit.rating}
+                      onChange={(e) => setEdit(player.player_id, { rating: e.target.value })}
+                      className="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    />
+                    {rDisplay !== null && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${ratingColor(rDisplay)}`}>
+                        {rDisplay.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={edit.notes}
+                    onChange={(e) => setEdit(player.player_id, { notes: e.target.value })}
+                    placeholder="Note…"
+                    className="w-28 px-2 py-1 rounded border border-slate-300 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-navy-500 text-slate-600 placeholder:text-slate-300"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-slate-500">
+            Rate each player 1–10 based on their performance.{" "}
+            <span className="text-slate-400">Ratings are auto-calculated from events but can be overridden.</span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={autoFillAll}
+          className="text-xs text-navy-700 hover:underline font-medium"
+        >
+          ↺ Auto-fill all from stats
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">{error}</div>
+      )}
+      {success && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2 rounded">{success}</div>
+      )}
+
+      <TeamSection players={homePlayers} label={homeTeam.name} />
+      <TeamSection players={awayPlayers} label={awayTeam.name} />
+
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={isPending}
+        className="w-full py-2.5 rounded bg-navy-900 text-white text-sm font-medium hover:bg-navy-700 disabled:opacity-50 transition-colors"
+      >
+        {isPending ? "Saving…" : `Save All Ratings (${allPlayers.length} players)`}
+      </button>
+
+      {/* Rating legend */}
+      <div className="flex flex-wrap gap-3 text-xs text-slate-500 pt-1">
+        <span className="font-medium text-slate-600">Guide:</span>
+        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">8–10 Outstanding</span>
+        <span className="px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-200">6.5–7.9 Good</span>
+        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">5–6.4 Average</span>
+        <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">1–4.9 Poor</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main tabs shell ─────────────────────────────────────────────────────────
 
-const TABS = ["Score", "Events", "Lineup"] as const;
+const TABS = ["Score", "Events", "Lineup", "Ratings"] as const;
 type Tab = typeof TABS[number];
 
 export function ResultTabs({
@@ -747,22 +1072,28 @@ export function ResultTabs({
   result,
   events,
   lineup,
+  ratings,
   homePlayers,
   awayPlayers,
   upsertResult,
   addEvent,
   deleteEvent,
+  saveRatings,
+  deleteRating,
 }: {
   fixtureId: string;
   fixture: any;
   result: any;
   events: MatchEvent[];
   lineup: LineupEntry[];
+  ratings: PlayerRating[];
   homePlayers: Player[];
   awayPlayers: Player[];
   upsertResult: (fd: FormData) => Promise<void>;
   addEvent: (fd: FormData) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
+  saveRatings: (rows: { player_id: string; team_id: string; rating: number; notes: string | null }[]) => Promise<void>;
+  deleteRating: (ratingId: string, fixtureId: string) => Promise<void>;
 })
  {
   const [activeTab, setActiveTab] = useState<Tab>("Score");
@@ -814,6 +1145,11 @@ export function ResultTabs({
                 {events.length}
               </span>
             )}
+            {tab === "Ratings" && ratings.length > 0 && (
+              <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                {ratings.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -837,6 +1173,17 @@ export function ResultTabs({
       )}
       {activeTab === "Lineup" && (
         <LineupTab fixtureId={fixtureId} lineup={lineup} homeTeam={homeTeam} awayTeam={awayTeam} />
+      )}
+      {activeTab === "Ratings" && (
+        <RatingsTab
+          lineup={lineup}
+          events={events}
+          ratings={ratings}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          saveRatings={saveRatings}
+          deleteRating={deleteRating}
+        />
       )}
     </div>
   );

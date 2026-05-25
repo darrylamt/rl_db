@@ -190,6 +190,34 @@ export async function addEvent(fixture_id: string, fd: FormData) {
   revalidatePath(`/admin/results/${fixture_id}`);
 }
 
+// ─── Player rating actions ────────────────────────────────────────────────────
+
+export async function saveRatings(
+  fixture_id: string,
+  ratings: { player_id: string; team_id: string; rating: number; notes: string | null }[]
+) {
+  if (ratings.length === 0) return;
+  const supabase = createAdminClient();
+  const rows = ratings.map((r) => ({ ...r, fixture_id }));
+  const { error } = await supabase
+    .from("match_player_ratings")
+    .upsert(rows, { onConflict: "fixture_id,player_id" });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/results/${fixture_id}`);
+}
+
+export async function deleteRating(rating_id: string, fixture_id: string) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("match_player_ratings")
+    .delete()
+    .eq("rating_id", rating_id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/results/${fixture_id}`);
+}
+
+// ─── Event actions ────────────────────────────────────────────────────────────
+
 export async function deleteEvent(event_id: string) {
   const supabase = createAdminClient();
 

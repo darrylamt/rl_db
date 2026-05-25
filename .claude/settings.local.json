@@ -10,7 +10,9 @@
       "Bash(powershell -command \"Get-Content 'C:\\\\Users\\\\Darryl Amoatey\\\\.claude\\\\projects\\\\c--Users-Darryl-Amoatey-OneDrive---Smart-Workplace-Documents-rl-db\\\\aa352e82-d275-4be8-8e54-546fbcb115db\\\\tool-results\\\\brpn707y4.txt' | Select-Object -Last 200\")",
       "Bash(npx tsc *)",
       "Bash(git commit -m 'feat: add name search to all admin list pages *)",
-      "Bash(git commit -m 'feat: production-ready public API *)"
+      "Bash(git commit -m 'feat: production-ready public API *)",
+      "Bash(git commit -m 'fix: search bugs - tabs preserve q, competitions qs\\(\\) preserves q *)",
+      "Bash(npx supabase *)"
     ]
   }
 }
