@@ -69,11 +69,13 @@ export default async function CompetitionsPage({
     .order("start_date", { ascending: false })
     .range(from, to);
 
-  // Build hrefs for the "clear" links.
+  // Build hrefs for the "clear" links — preserves all active filters
+  // except the ones explicitly patched out.
   function qs(patch: Record<string, string | null>) {
     const sp = new URLSearchParams();
     if (selectedType && !("type" in patch)) sp.set("type", selectedType);
     if (selectedYear && !("year" in patch)) sp.set("year", selectedYear);
+    if (rawQ && !("q" in patch)) sp.set("q", rawQ);
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) sp.delete(k);
       else sp.set(k, v);

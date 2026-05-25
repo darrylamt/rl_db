@@ -65,8 +65,11 @@ export default async function TeamsPage({
   ];
 
   function tabHref(key: TypeFilter) {
-    if (key === "all") return "/admin/teams";
-    return `/admin/teams?type=${key}`;
+    const sp = new URLSearchParams();
+    if (key !== "all") sp.set("type", key);
+    if (q) sp.set("q", q);
+    const s = sp.toString();
+    return `/admin/teams${s ? `?${s}` : ""}`;
   }
 
   return (
