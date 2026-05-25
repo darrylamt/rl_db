@@ -43,6 +43,7 @@ export default async function ResultsPage({
 
   const rawYear = first(searchParams?.year);
   const rawTeam = first(searchParams?.team) ?? "";
+  const rawQ = (first(searchParams?.q) ?? "").trim();
   const currentYear = String(new Date().getFullYear());
 
   const selectedYear =
@@ -84,14 +85,36 @@ export default async function ResultsPage({
     teamFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
   }
 
-  // Intersect the two sets if both filters are active
-  if (yearFixtureIds !== null && teamFixtureIds !== null) {
-    const teamSet = new Set(teamFixtureIds);
-    fixtureIds = yearFixtureIds.filter((id) => teamSet.has(id));
-  } else if (yearFixtureIds !== null) {
-    fixtureIds = yearFixtureIds;
-  } else if (teamFixtureIds !== null) {
-    fixtureIds = teamFixtureIds;
+  // Name search → fixture IDs (matching home or away team name)
+  let searchFixtureIds: string[] | null = null;
+  if (rawQ) {
+    const { data: matchTeams } = await supabase
+      .from("teams")
+      .select("team_id")
+      .ilike("name", `%${rawQ}%`);
+    const matchIds = (matchTeams ?? []).map((t: any) => t.team_id as string);
+    if (matchIds.length === 0) {
+      searchFixtureIds = [];
+    } else {
+      const { data: fx } = await supabase
+        .from("fixtures")
+        .select("fixture_id")
+        .or(`home_team_id.in.(${matchIds.join(",")}),away_team_id.in.(${matchIds.join(",")})`);
+      searchFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
+    }
+  }
+
+  // Intersect all active filters
+  const allSets = [yearFixtureIds, teamFixtureIds, searchFixtureIds].filter(
+    (s): s is string[] => s !== null
+  );
+  if (allSets.length === 0) {
+    fixtureIds = null;
+  } else {
+    fixtureIds = allSets.reduce((acc, set) => {
+      const s = new Set(set);
+      return acc.filter((id) => s.has(id));
+    });
   }
 
   let q = supabase
@@ -116,7 +139,8 @@ export default async function ResultsPage({
   const isFiltered =
     rawYear === "all" ||
     (selectedYear && selectedYear !== currentYear) ||
-    rawTeam;
+    rawTeam ||
+    rawQ;
 
   return (
     <div className="p-4 md:p-8">
@@ -129,6 +153,16 @@ export default async function ResultsPage({
 
       {/* Filters */}
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search team</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={rawQ}
+            placeholder="Team name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
         <label className="text-sm">
           <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Year</span>
           <select

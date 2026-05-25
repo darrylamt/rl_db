@@ -20,6 +20,7 @@ export default async function PlayersPage({
   const supabase = createAdminClient();
   const selectedTeam = first(searchParams?.team) || "";
   const rawYear = first(searchParams?.year);
+  const q = (first(searchParams?.q) ?? "").trim();
   // "all" means no year filter; otherwise default to current year
   const selectedYear =
     rawYear === "all" ? null : rawYear ? parseInt(rawYear, 10) : CURRENT_YEAR;
@@ -65,6 +66,8 @@ export default async function PlayersPage({
     .order("last_name")
     .range(from, to);
 
+  if (q) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+
   if (selectedYear && playerIds !== null) {
     if (playerIds.length === 0) {
       // No registrations: force empty result
@@ -82,7 +85,7 @@ export default async function PlayersPage({
   ]);
 
 
-  const isFiltered = selectedYear || selectedTeam;
+  const isFiltered = selectedYear || selectedTeam || q;
 
   return (
     <div className="p-4 md:p-8">
@@ -109,6 +112,16 @@ export default async function PlayersPage({
       </header>
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
         <label className="text-sm">
           <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Season Year</span>
           <select

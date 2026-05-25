@@ -13,6 +13,10 @@ function fmt(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function SuspensionsPage({
   searchParams,
 }: {
@@ -20,17 +24,38 @@ export default async function SuspensionsPage({
 }) {
   const supabase = createAdminClient();
   const { page, pageSize, from, to } = getPageParams(searchParams, 10);
+  const q = (first(searchParams?.q) ?? "").trim();
+
+  // Pre-fetch matching player IDs for name search
+  let playerIdFilter: string[] | null = null;
+  if (q) {
+    const { data: matchPlayers } = await supabase
+      .from("players")
+      .select("player_id")
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+    playerIdFilter = (matchPlayers ?? []).map((p: any) => p.player_id as string);
+  }
+
+  let suspQuery = supabase
+    .from("suspensions")
+    .select(
+      "suspension_id, reason, matches_banned, start_date, end_date, status, player:player_id(first_name, last_name, team:team_id(name))",
+      { count: "exact" }
+    )
+    .order("start_date", { ascending: false })
+    .range(from, to);
+
+  if (playerIdFilter !== null) {
+    if (playerIdFilter.length === 0) {
+      suspQuery = suspQuery.eq("suspension_id", "00000000-0000-0000-0000-000000000000");
+    } else {
+      suspQuery = suspQuery.in("player_id", playerIdFilter);
+    }
+  }
 
   const [{ data: suspensions, error, count }, { count: activeCount }] =
     await Promise.all([
-      supabase
-        .from("suspensions")
-        .select(
-          "suspension_id, reason, matches_banned, start_date, end_date, status, player:player_id(first_name, last_name, team:team_id(name))",
-          { count: "exact" }
-        )
-        .order("start_date", { ascending: false })
-        .range(from, to),
+      suspQuery,
       supabase
         .from("suspensions")
         .select("*", { count: "exact", head: true })
@@ -47,6 +72,25 @@ export default async function SuspensionsPage({
           <strong>{activeCount}</strong> active suspension{activeCount === 1 ? "" : "s"}.
         </div>
       )}
+
+      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search player</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Player name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
+        <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
+          Search
+        </button>
+        {q && (
+          <Link href="/admin/suspensions" className="text-xs text-slate-500 hover:underline">clear</Link>
+        )}
+      </form>
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">

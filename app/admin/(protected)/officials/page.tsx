@@ -7,6 +7,10 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { getPageParams } from "@/lib/pagination";
 import { deleteOfficial } from "./actions";
 
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function OfficialsPage({
   searchParams,
 }: {
@@ -14,16 +18,42 @@ export default async function OfficialsPage({
 }) {
   const supabase = createAdminClient();
   const { page, pageSize, from, to } = getPageParams(searchParams, 10);
-  const { data: officials, error, count } = await supabase
+  const q = (first(searchParams?.q) ?? "").trim();
+
+  let query = supabase
     .from("officials")
     .select("official_id, first_name, last_name, role, region, status, photo_url", { count: "exact" })
     .order("last_name")
     .range(from, to);
 
+  if (q) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+
+  const { data: officials, error, count } = await query;
+
   return (
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["officials"]} />
       <ListHeader title="Officials" addHref="/admin/officials/new" addLabel="Add Official" />
+
+      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
+        <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
+          Search
+        </button>
+        {q && (
+          <Link href="/admin/officials" className="text-xs text-slate-500 hover:underline">clear</Link>
+        )}
+      </form>
+
       {error && <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">{error.message}</div>}
 
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">

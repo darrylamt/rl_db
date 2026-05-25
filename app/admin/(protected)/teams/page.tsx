@@ -29,6 +29,10 @@ function parseType(raw: string | string[] | undefined): TypeFilter {
     : "all";
 }
 
+function firstStr(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function TeamsPage({
   searchParams,
 }: {
@@ -37,6 +41,7 @@ export default async function TeamsPage({
   const supabase = createAdminClient();
   const { page, pageSize, from, to } = getPageParams(searchParams, 10);
   const typeFilter = parseType(searchParams?.type);
+  const q = (firstStr(searchParams?.q) ?? "").trim();
 
   let query = supabase
     .from("teams")
@@ -48,6 +53,7 @@ export default async function TeamsPage({
     .range(from, to);
 
   if (typeFilter !== "all") query = query.eq("team_type", typeFilter);
+  if (q) query = query.ilike("name", `%${q}%`);
 
   const { data: teams, error, count } = await query;
 
@@ -67,6 +73,29 @@ export default async function TeamsPage({
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["teams"]} />
       <ListHeader title="Teams" addHref="/admin/teams/new" addLabel="Add Team" />
+
+      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Team name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
+        {/* preserve type filter */}
+        {typeFilter !== "all" && <input type="hidden" name="type" value={typeFilter} />}
+        <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
+          Search
+        </button>
+        {q && (
+          <Link href={typeFilter !== "all" ? `/admin/teams?type=${typeFilter}` : "/admin/teams"} className="text-xs text-slate-500 hover:underline">
+            clear
+          </Link>
+        )}
+      </form>
 
       <div className="flex flex-wrap gap-1 mb-4 border-b border-slate-200">
         {tabs.map((t) => {

@@ -39,6 +39,7 @@ export default async function CompetitionsPage({
 
   const rawYear = first(searchParams?.year);
   const rawType = first(searchParams?.type);
+  const rawQ = (first(searchParams?.q) ?? "").trim();
   const currentYear = String(new Date().getFullYear());
 
   // Default year = current year if we have comps for it, else no filter.
@@ -62,6 +63,7 @@ export default async function CompetitionsPage({
     );
   if (selectedYear) q = q.eq("season", selectedYear);
   if (selectedType) q = q.eq("type", selectedType);
+  if (rawQ) q = q.ilike("name", `%${rawQ}%`);
 
   const { data: comps, error, count } = await q
     .order("start_date", { ascending: false })
@@ -81,10 +83,11 @@ export default async function CompetitionsPage({
     return s ? `?${s}` : "";
   }
 
-  const filtersActive = selectedYear !== "" || selectedType !== "";
+  const filtersActive = selectedYear !== "" || selectedType !== "" || !!rawQ;
   const nonDefaultFilters =
     (selectedYear && selectedYear !== currentYear) ||
     !!selectedType ||
+    !!rawQ ||
     rawYear === "all";
 
   return (
@@ -93,6 +96,16 @@ export default async function CompetitionsPage({
       <ListHeader title="Competitions" addHref="/admin/competitions/new" addLabel="Add Competition" />
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={rawQ}
+            placeholder="Competition name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
         <label className="text-sm">
           <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
             Year

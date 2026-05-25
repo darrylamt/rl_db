@@ -37,6 +37,7 @@ export default async function FixturesPage({
   ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 
   const rawYear = first(searchParams?.year);
+  const rawQ = (first(searchParams?.q) ?? "").trim();
   const currentYear = String(new Date().getFullYear());
   const selectedYear =
     rawYear === "all"
@@ -53,6 +54,16 @@ export default async function FixturesPage({
         .map((c: any) => c.competition_id as string)
     : [];
 
+  // If searching by team name, pre-fetch matching team IDs
+  let searchTeamIds: string[] | null = null;
+  if (rawQ) {
+    const { data: matchTeams } = await supabase
+      .from("teams")
+      .select("team_id")
+      .ilike("name", `%${rawQ}%`);
+    searchTeamIds = (matchTeams ?? []).map((t: any) => t.team_id as string);
+  }
+
   let q = supabase
     .from("fixtures")
     .select(
@@ -65,12 +76,20 @@ export default async function FixturesPage({
     else q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000"); // empty
   }
 
+  if (searchTeamIds !== null) {
+    if (searchTeamIds.length === 0) {
+      q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000"); // no match
+    } else {
+      q = q.or(`home_team_id.in.(${searchTeamIds.join(",")}),away_team_id.in.(${searchTeamIds.join(",")})`);
+    }
+  }
+
   const { data: fixtures, error, count } = await q
     .order("scheduled_date", { ascending: true })
     .range(from, to);
 
   const nonDefaultYear =
-    rawYear === "all" || (selectedYear && selectedYear !== currentYear);
+    rawYear === "all" || (selectedYear && selectedYear !== currentYear) || !!rawQ;
 
   return (
     <div className="p-4 md:p-8">
@@ -86,6 +105,16 @@ export default async function FixturesPage({
       </div>
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search team</span>
+          <input
+            type="text"
+            name="q"
+            defaultValue={rawQ}
+            placeholder="Team name…"
+            className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+        </label>
         <label className="text-sm">
           <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
             Year
