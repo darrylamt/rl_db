@@ -89,7 +89,7 @@ export default async function PlayerDetailPage({
     supabase
       .from("players")
       .select(
-        "player_id, first_name, last_name, jersey_number, position, playing_status, date_of_birth, height_cm, weight_kg, nationality, is_captain, photo_url, team:team_id(team_id, name, team_type)"
+        "player_id, first_name, last_name, jersey_number, position, playing_status, date_of_birth, height_cm, weight_kg, nationality, is_captain, photo_url, rating, team:team_id(team_id, name, team_type)"
       )
       .eq("player_id", playerId)
       .maybeSingle(),
@@ -204,6 +204,36 @@ export default async function PlayerDetailPage({
               }`}>{player.playing_status}</span>
             )}
           </p>
+
+          {/* General rating */}
+          {(() => {
+            const r = player.rating != null ? Number(player.rating) : 6.0;
+            const color =
+              r >= 8   ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+              r >= 6.5 ? "bg-navy-50 text-navy-700 border-navy-200" :
+              r >= 5   ? "bg-amber-50 text-amber-700 border-amber-200" :
+                         "bg-red-50 text-red-700 border-red-200";
+            const label =
+              r >= 8   ? "Outstanding" :
+              r >= 6.5 ? "Good" :
+              r >= 5   ? "Average" : "Poor";
+            return (
+              <div className="mt-3 flex items-center gap-2">
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${color}`}>
+                  <span className="font-display text-2xl font-bold leading-none tabular-nums">
+                    {r.toFixed(1)}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold leading-none opacity-70">
+                      General Rating
+                    </p>
+                    <p className="text-xs font-medium mt-0.5 leading-none">{label}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">avg. of all match ratings</p>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -217,6 +247,20 @@ export default async function PlayerDetailPage({
             <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">Matches</div>
             <div className="font-display text-2xl text-navy-900 mt-1">{matchesPlayed}</div>
           </div>
+          {(() => {
+            const r = player.rating != null ? Number(player.rating) : 6.0;
+            const color =
+              r >= 8   ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+              r >= 6.5 ? "border-navy-200 bg-navy-50 text-navy-700" :
+              r >= 5   ? "border-amber-200 bg-amber-50 text-amber-700" :
+                         "border-red-200 bg-red-50 text-red-700";
+            return (
+              <div className={`border rounded-lg p-3 text-center ${color}`}>
+                <div className="text-[10px] uppercase tracking-wider leading-tight opacity-70 font-semibold">Rating</div>
+                <div className="font-display text-2xl font-bold mt-1 tabular-nums">{r.toFixed(1)}</div>
+              </div>
+            );
+          })()}
           {STAT_DEFS.map((def) => (
             <div key={def.key} className="bg-white border border-slate-200 rounded-lg p-3 text-center">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">{def.label}</div>
