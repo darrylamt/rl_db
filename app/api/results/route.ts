@@ -1,40 +1,88 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS() {
+  return preflight();
+}
 
 // GET /api/results
 // GET /api/results?competition=<uuid>
 // GET /api/results?team=<uuid>
+// GET /api/results?season=2025
+// GET /api/results?limit=50&offset=0
 export async function GET(req: Request) {
-  const supabase = createClient();
+  const supabase = createPublicClient();
   const url = new URL(req.url);
   const competitionId = url.searchParams.get("competition");
   const teamId = url.searchParams.get("team");
+  const season = url.searchParams.get("season");
+  const { from, to } = parsePagination(url);
 
-  // We select match_results nested with fixture; filters reach through the
-  // nested fixture join via pgrst's filter syntax.
+  // Resolve season → fixture IDs
+  let seasonFixtureIds: string[] | null = null;
+  if (season) {
+    const { data: comps } = await supabase
+      .from("competitions")
+      .select("competition_id")
+      .eq("season", season);
+    const compIds = (comps ?? []).map((c: any) => c.competition_id as string);
+    if (compIds.length === 0) {
+      seasonFixtureIds = [];
+    } else {
+      const { data: fx } = await supabase
+        .from("fixtures")
+        .select("fixture_id")
+        .in("competition_id", compIds);
+      seasonFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
+    }
+  }
+
+  // Resolve team → fixture IDs
+  let teamFixtureIds: string[] | null = null;
+  if (teamId) {
+    const { data: fx } = await supabase
+      .from("fixtures")
+      .select("fixture_id")
+      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`);
+    teamFixtureIds = (fx ?? []).map((f: any) => f.fixture_id as string);
+  }
+
+  // Intersect filters
+  const allSets = [seasonFixtureIds, teamFixtureIds].filter(
+    (s): s is string[] => s !== null
+  );
+  let filteredFixtureIds: string[] | null = null;
+  if (allSets.length > 0) {
+    filteredFixtureIds = allSets.reduce((acc, set) => {
+      const s = new Set(set);
+      return acc.filter((id) => s.has(id));
+    });
+  }
+
   let q = supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, recorded_by, recorded_at, fixture:fixture_id!inner(fixture_id, scheduled_date, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(competition_id, name, season))"
+      "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, recorded_at, fixture:fixture_id!inner(fixture_id, scheduled_date, round, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(competition_id, name, season))",
+      { count: "exact" }
     )
-    .or("home_score.gt.0,away_score.gt.0")
-    .order("recorded_at", { ascending: false });
+    .order("recorded_at", { ascending: false })
+    .range(from, to);
 
-  if (competitionId) {
-    q = q.eq("fixture.competition_id", competitionId);
-  }
-  if (teamId) {
-    q = q.or(
-      `home_team_id.eq.${teamId},away_team_id.eq.${teamId}`,
-      { foreignTable: "fixture" }
-    );
+  if (competitionId) q = q.eq("fixture.competition_id", competitionId);
+
+  if (filteredFixtureIds !== null) {
+    if (filteredFixtureIds.length === 0) {
+      q = q.eq("result_id", "00000000-0000-0000-0000-000000000000");
+    } else {
+      q = q.in("fixture_id", filteredFixtureIds);
+    }
   }
 
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 }, { cache: "short" });
 }
 
 export async function POST(req: Request) {
@@ -77,5 +125,5 @@ export async function POST(req: Request) {
     .update({ status: "completed" })
     .eq("fixture_id", body.fixture_id);
 
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

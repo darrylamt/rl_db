@@ -1,28 +1,38 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/players             — all public players
-// GET /api/players?team=<uuid> — filtered by team
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/players
+// GET /api/players?team=<uuid>
+// GET /api/players?status=active|injured|retired
+// GET /api/players?limit=50&offset=0
 export async function GET(req: Request) {
-  const supabase = createClient();
+  const supabase = createPublicClient();
   const url = new URL(req.url);
   const teamId = url.searchParams.get("team");
+  const status = url.searchParams.get("status");
+  const { from, to } = parsePagination(url);
 
-  // Use the public_players view (hides phone/email, exposes age).
   let q = supabase
     .from("public_players")
     .select(
-      "player_id, team_id, first_name, last_name, date_of_birth, age, height_cm, weight_kg, nationality, jersey_number, position, is_captain, playing_status, photo_url"
+      "player_id, team_id, first_name, last_name, date_of_birth, age, height_cm, weight_kg, nationality, jersey_number, position, is_captain, playing_status, photo_url",
+      { count: "exact" }
     )
-    .order("last_name");
+    .order("last_name")
+    .range(from, to);
 
   if (teamId) q = q.eq("team_id", teamId);
+  if (status) q = q.eq("playing_status", status);
 
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
@@ -58,5 +68,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

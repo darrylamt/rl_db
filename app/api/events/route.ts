@@ -1,33 +1,48 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/events?fixture=<uuid>     — match events for one fixture (chrono)
-// GET /api/events?player=<uuid>      — events for one player across fixtures
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/events?fixture=<uuid>    — match events for one fixture (chrono)
+// GET /api/events?player=<uuid>     — events for one player across fixtures
+// GET /api/events?team=<uuid>       — events for a team
+// GET /api/events?type=try|conversion|...
+// GET /api/events?limit=100&offset=0
 export async function GET(req: Request) {
-  const supabase = createClient();
+  const supabase = createPublicClient();
   const url = new URL(req.url);
   const fixtureId = url.searchParams.get("fixture");
   const playerId = url.searchParams.get("player");
+  const teamId = url.searchParams.get("team");
+  const eventType = url.searchParams.get("type");
+  const { from, to } = parsePagination(url, { limit: 100 });
 
-  if (!fixtureId && !playerId) {
-    return fail("Provide `fixture` or `player` query param");
+  if (!fixtureId && !playerId && !teamId) {
+    return fail("Provide at least one of: `fixture`, `player`, or `team` query param");
   }
 
   let q = supabase
     .from("match_events")
     .select(
-      "event_id, event_type, minute, half, notes, created_at, fixture_id, player:player_id(player_id, first_name, last_name), team:team_id(team_id, name)"
+      "event_id, fixture_id, event_type, minute, half, notes, created_at, player:player_id(player_id, first_name, last_name), team:team_id(team_id, name)",
+      { count: "exact" }
     )
-    .order("minute", { ascending: true });
+    .order("half", { ascending: true })
+    .order("minute", { ascending: true })
+    .range(from, to);
 
   if (fixtureId) q = q.eq("fixture_id", fixtureId);
   if (playerId) q = q.eq("player_id", playerId);
+  if (teamId) q = q.eq("team_id", teamId);
+  if (eventType) q = q.eq("event_type", eventType);
 
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 }, { cache: "short" });
 }
 
 export async function POST(req: Request) {
@@ -36,8 +51,8 @@ export async function POST(req: Request) {
 
   const body = await readJson(req);
   if (!body) return fail("Invalid JSON body");
-  if (!body.fixture_id || !body.player_id || !body.event_type) {
-    return fail("`fixture_id`, `player_id`, `event_type` are required");
+  if (!body.fixture_id || !body.event_type) {
+    return fail("`fixture_id` and `event_type` are required");
   }
 
   const supabase = createAdminClient();
@@ -45,7 +60,7 @@ export async function POST(req: Request) {
     .from("match_events")
     .insert({
       fixture_id: body.fixture_id,
-      player_id: body.player_id,
+      player_id: body.player_id ?? null,
       team_id: body.team_id ?? null,
       event_type: body.event_type,
       minute: body.minute ?? null,
@@ -56,5 +71,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

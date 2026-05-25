@@ -1,19 +1,35 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = createClient();
-  // public_officials view — hides phone/email.
-  const { data, error } = await supabase
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/officials
+// GET /api/officials?status=active|inactive
+// GET /api/officials?limit=50&offset=0
+export async function GET(req: Request) {
+  const supabase = createPublicClient();
+  const url = new URL(req.url);
+  const status = url.searchParams.get("status");
+  const { from, to } = parsePagination(url);
+
+  let q = supabase
     .from("public_officials")
     .select(
-      "official_id, first_name, last_name, role, region, nationality, date_of_birth, age, photo_url, status"
+      "official_id, first_name, last_name, role, region, nationality, date_of_birth, age, photo_url, status",
+      { count: "exact" }
     )
-    .order("last_name");
+    .order("last_name")
+    .range(from, to);
+
+  if (status) q = q.eq("status", status);
+
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
@@ -45,5 +61,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

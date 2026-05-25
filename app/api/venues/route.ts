@@ -1,16 +1,27 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = createClient();
-  const { data, error } = await supabase
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/venues
+// GET /api/venues?limit=50&offset=0
+export async function GET(req: Request) {
+  const supabase = createPublicClient();
+  const url = new URL(req.url);
+  const { from, to } = parsePagination(url);
+
+  const { data, error, count } = await supabase
     .from("venues")
-    .select("venue_id, name, region, city, capacity")
-    .order("name");
+    .select("venue_id, name, region, city, capacity", { count: "exact" })
+    .order("name")
+    .range(from, to);
+
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
@@ -34,5 +45,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

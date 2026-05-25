@@ -5,7 +5,12 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(mkdir \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/public\")",
-      "Bash(cp \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/federationlogo.png\" \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/public/federationlogo.png\")"
+      "Bash(cp \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/federationlogo.png\" \"c:/Users/Darryl Amoatey/OneDrive - Smart Workplace/Documents/rl_db/public/federationlogo.png\")",
+      "Bash(powershell -command \"Get-Content 'C:\\\\Users\\\\Darryl Amoatey\\\\.claude\\\\projects\\\\c--Users-Darryl-Amoatey-OneDrive---Smart-Workplace-Documents-rl-db\\\\aa352e82-d275-4be8-8e54-546fbcb115db.jsonl' | Select-Object -Last 100\")",
+      "Bash(powershell -command \"Get-Content 'C:\\\\Users\\\\Darryl Amoatey\\\\.claude\\\\projects\\\\c--Users-Darryl-Amoatey-OneDrive---Smart-Workplace-Documents-rl-db\\\\aa352e82-d275-4be8-8e54-546fbcb115db\\\\tool-results\\\\brpn707y4.txt' | Select-Object -Last 200\")",
+      "Bash(npx tsc *)",
+      "Bash(git commit -m 'feat: add name search to all admin list pages *)",
+      "Bash(git commit -m 'feat: production-ready public API *)"
     ]
   }
 }

@@ -1,19 +1,39 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = createClient();
-  const { data, error } = await supabase
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/competitions
+// GET /api/competitions?season=2025
+// GET /api/competitions?status=active|upcoming|completed
+// GET /api/competitions?limit=50&offset=0
+export async function GET(req: Request) {
+  const supabase = createPublicClient();
+  const url = new URL(req.url);
+  const season = url.searchParams.get("season");
+  const status = url.searchParams.get("status");
+  const { from, to } = parsePagination(url);
+
+  let q = supabase
     .from("competitions")
     .select(
-      "competition_id, name, season, type, start_date, end_date, status"
+      "competition_id, name, season, type, start_date, end_date, status",
+      { count: "exact" }
     )
+    .order("season", { ascending: false })
     .order("name")
-    .order("season", { ascending: false });
+    .range(from, to);
+
+  if (season) q = q.eq("season", season);
+  if (status) q = q.eq("status", status);
+
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
@@ -39,5 +59,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

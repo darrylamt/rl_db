@@ -1,18 +1,35 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { ok, fail, requireAdmin, readJson } from "@/lib/api";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = createClient();
-  const { data, error } = await supabase
+export async function OPTIONS() {
+  return preflight();
+}
+
+// GET /api/teams
+// GET /api/teams?type=club|national|president_xv
+// GET /api/teams?limit=50&offset=0
+export async function GET(req: Request) {
+  const supabase = createPublicClient();
+  const url = new URL(req.url);
+  const type = url.searchParams.get("type");
+  const { from, to } = parsePagination(url);
+
+  let q = supabase
     .from("teams")
     .select(
-      "team_id, name, region, city, logo_url, founded_year, manager_name, coach_name, home_venue:home_venue_id(name)"
+      "team_id, name, team_type, region, city, logo_url, founded_year, manager_name, coach_name, home_venue:home_venue_id(name)",
+      { count: "exact" }
     )
-    .order("name");
+    .order("name")
+    .range(from, to);
+
+  if (type) q = q.eq("team_type", type);
+
+  const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  return ok({ items: data ?? [], total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
@@ -30,6 +47,7 @@ export async function POST(req: Request) {
     .from("teams")
     .insert({
       name: body.name,
+      team_type: body.team_type ?? "club",
       region: body.region ?? null,
       city: body.city ?? null,
       logo_url: body.logo_url ?? null,
@@ -42,5 +60,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return fail(error.message, 500);
-  return ok(data, { status: 201 });
+  return ok(data, { status: 201, cache: "none" });
 }

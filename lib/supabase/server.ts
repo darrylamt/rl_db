@@ -41,3 +41,14 @@ export function createAdminClient() {
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
 }
+
+// Public client — uses the anon key, no cookies.
+// Safe for use in public API routes: doesn't force a dynamic render and
+// can be cached at the CDN edge. RLS policies control what data is visible.
+export function createPublicClient() {
+  return createAdminClient_(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_ANON,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+}
