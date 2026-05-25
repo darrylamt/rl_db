@@ -166,23 +166,22 @@ export default async function CompetitionsPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">Season</th>
-              <th className="px-4 py-2.5 font-medium">Type</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Start</th>
-              <th className="px-4 py-2.5 font-medium">End</th>
+              <th className="px-4 py-2.5 font-medium">Competition</th>
+              <th className="hidden sm:table-cell px-4 py-2.5 font-medium">Type</th>
+              <th className="hidden sm:table-cell px-4 py-2.5 font-medium">Status</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Start</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">End</th>
               <th className="px-4 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(comps ?? []).length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                   {filtersActive
                     ? "No competitions match the current filters."
                     : "No competitions yet."}{" "}
@@ -196,10 +195,24 @@ export default async function CompetitionsPage({
             ) : (
               (comps ?? []).map((c: any) => (
                 <tr key={c.competition_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-medium text-navy-900">{c.name}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{c.season ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{c.type ?? "—"}</td>
-                  <td className="px-4 py-2.5">
+                  {/* Name — on mobile shows season, type, status below */}
+                  <td className="px-4 py-2.5 font-medium text-navy-900">
+                    {c.name}
+                    <div className="sm:hidden mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                      {c.season && <span>{c.season}</span>}
+                      {c.type && <span>· {c.type}</span>}
+                      <span className={`px-1.5 py-0.5 rounded-full ${
+                        c.status === "active" ? "bg-emerald-50 text-emerald-700" :
+                        c.status === "upcoming" ? "bg-navy-50 text-navy-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>{c.status ?? "—"}</span>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell px-4 py-2.5 text-slate-600">
+                    {c.type ?? "—"}
+                    {c.season && <span className="block text-xs text-slate-400">{c.season}</span>}
+                  </td>
+                  <td className="hidden sm:table-cell px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       c.status === "active" ? "bg-emerald-50 text-emerald-700" :
                       c.status === "completed" ? "bg-slate-100 text-slate-600" :
@@ -209,11 +222,19 @@ export default async function CompetitionsPage({
                       {c.status ?? "—"}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">{fmt(c.start_date)}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{fmt(c.end_date)}</td>
-                  <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                    <Link href={`/admin/competitions/${c.competition_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
-                    <DeleteRowButton id={c.competition_id} action={deleteCompetition} />
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{fmt(c.start_date)}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{fmt(c.end_date)}</td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <Link
+                      href={`/admin/competitions/${c.competition_id}`}
+                      className="inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700 sm:hidden"
+                    >
+                      Edit
+                    </Link>
+                    <span className="hidden sm:inline-flex items-center gap-3">
+                      <Link href={`/admin/competitions/${c.competition_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                      <DeleteRowButton id={c.competition_id} action={deleteCompetition} />
+                    </span>
                   </td>
                 </tr>
               ))

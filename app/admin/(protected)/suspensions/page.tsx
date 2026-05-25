@@ -98,24 +98,23 @@ export default async function SuspensionsPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-700 text-left">
             <tr>
               <th className="px-4 py-2.5 font-medium">Player</th>
-              <th className="px-4 py-2.5 font-medium">Team</th>
-              <th className="px-4 py-2.5 font-medium">Reason</th>
-              <th className="px-4 py-2.5 font-medium">Matches</th>
-              <th className="px-4 py-2.5 font-medium">Start</th>
-              <th className="px-4 py-2.5 font-medium">End</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="hidden sm:table-cell px-4 py-2.5 font-medium">Reason</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Matches</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Start</th>
+              <th className="hidden md:table-cell px-4 py-2.5 font-medium">End</th>
+              <th className="hidden sm:table-cell px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(suspensions ?? []).length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   No suspensions recorded.{" "}
                   <Link href="/admin/suspensions/new" className="text-navy-700 hover:underline">
                     Record one →
@@ -125,15 +124,36 @@ export default async function SuspensionsPage({
             ) : (
               (suspensions ?? []).map((s: any) => (
                 <tr key={s.suspension_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-medium text-navy-900">
-                    {s.player ? `${s.player.first_name} ${s.player.last_name}` : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-600">{s.player?.team?.name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600 max-w-[240px] truncate">{s.reason ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{s.matches_banned ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{fmt(s.start_date)}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{fmt(s.end_date)}</td>
+                  {/* Player — mobile shows team, status, dates below */}
                   <td className="px-4 py-2.5">
+                    <p className="font-medium text-navy-900">
+                      {s.player ? `${s.player.first_name} ${s.player.last_name}` : "—"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {s.player?.team?.name ?? "—"}
+                    </p>
+                    {/* Mobile-only detail row */}
+                    <div className="sm:hidden mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                      <span className={`px-1.5 py-0.5 rounded-full ${
+                        s.status === "active" ? "bg-red-100 text-red-800" :
+                        s.status === "served" ? "bg-emerald-50 text-emerald-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>{s.status ?? "—"}</span>
+                      {s.matches_banned && <span>· {s.matches_banned} match{s.matches_banned !== 1 ? "es" : ""}</span>}
+                      {s.start_date && <span>· {fmt(s.start_date)}</span>}
+                    </div>
+                    {s.reason && (
+                      <p className="sm:hidden text-xs text-slate-400 mt-0.5 truncate max-w-[200px]">{s.reason}</p>
+                    )}
+                  </td>
+
+                  <td className="hidden sm:table-cell px-4 py-2.5 text-slate-600 max-w-[200px]">
+                    <span className="line-clamp-2">{s.reason ?? "—"}</span>
+                  </td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 text-center">{s.matches_banned ?? "—"}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmt(s.start_date)}</td>
+                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmt(s.end_date)}</td>
+                  <td className="hidden sm:table-cell px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       s.status === "active" ? "bg-red-100 text-red-800" :
                       s.status === "served" ? "bg-emerald-50 text-emerald-700" :
@@ -143,10 +163,22 @@ export default async function SuspensionsPage({
                       {s.status ?? "—"}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                    <SuspensionStatusButtons id={s.suspension_id} status={s.status} action={markSuspensionStatus} />
-                    <Link href={`/admin/suspensions/${s.suspension_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
-                    <DeleteRowButton id={s.suspension_id} action={deleteSuspension} />
+
+                  {/* Actions */}
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {/* Mobile: just Edit */}
+                    <Link
+                      href={`/admin/suspensions/${s.suspension_id}`}
+                      className="sm:hidden inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700"
+                    >
+                      Edit
+                    </Link>
+                    {/* Desktop: status buttons + Edit + Delete */}
+                    <span className="hidden sm:inline-flex items-center gap-2">
+                      <SuspensionStatusButtons id={s.suspension_id} status={s.status} action={markSuspensionStatus} />
+                      <Link href={`/admin/suspensions/${s.suspension_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
+                      <DeleteRowButton id={s.suspension_id} action={deleteSuspension} />
+                    </span>
                   </td>
                 </tr>
               ))

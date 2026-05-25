@@ -258,8 +258,8 @@ export default async function StandingsPage({
                   </span>
                 )}
               </h2>
-              <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto max-w-full">
+                <table className="w-full text-sm min-w-[480px]">
                   <thead className="bg-slate-100 text-slate-700 text-left">
                     <tr>
                       <th className="px-3 py-2.5 font-medium w-10">#</th>

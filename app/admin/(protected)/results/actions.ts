@@ -203,7 +203,23 @@ export async function saveRatings(
     .from("match_player_ratings")
     .upsert(rows, { onConflict: "fixture_id,player_id" });
   if (error) throw new Error(error.message);
+
+  // Recalculate each player's general rating as the average across all their match ratings
+  const playerIds = Array.from(new Set(ratings.map((r) => r.player_id)));
+  for (const player_id of playerIds) {
+    const { data: allRatings } = await supabase
+      .from("match_player_ratings")
+      .select("rating")
+      .eq("player_id", player_id);
+    if (allRatings && allRatings.length > 0) {
+      const avg = allRatings.reduce((sum, r: any) => sum + Number(r.rating), 0) / allRatings.length;
+      const rounded = Math.round(avg * 10) / 10;
+      await supabase.from("players").update({ rating: rounded }).eq("player_id", player_id);
+    }
+  }
+
   revalidatePath(`/admin/results/${fixture_id}`);
+  revalidatePath("/admin/players");
 }
 
 export async function deleteRating(rating_id: string, fixture_id: string) {

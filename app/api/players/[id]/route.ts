@@ -21,7 +21,7 @@ export async function GET(
       supabase
         .from("public_players")
         .select(
-          "player_id, team_id, first_name, last_name, date_of_birth, age, height_cm, weight_kg, nationality, jersey_number, position, is_captain, playing_status, photo_url"
+          "player_id, team_id, first_name, last_name, date_of_birth, age, height_cm, weight_kg, nationality, jersey_number, position, is_captain, playing_status, photo_url, rating"
         )
         .eq("player_id", id)
         .maybeSingle(),

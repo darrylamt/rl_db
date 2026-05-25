@@ -31,7 +31,7 @@ export default async function ProtectedAdminLayout({
   return (
     <div className="min-h-screen md:flex bg-slate-50">
       <AdminSidebar items={navItems} email={user?.email} />
-      <main className="flex-1 md:overflow-auto">{children}</main>
+      <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
     </div>
   );
 }

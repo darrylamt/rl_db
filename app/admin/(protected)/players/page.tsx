@@ -60,7 +60,7 @@ export default async function PlayersPage({
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, jersey_number, position, gender, is_captain, playing_status, photo_url, team:team_id(team_id, name)",
+      "player_id, first_name, last_name, jersey_number, position, gender, is_captain, playing_status, photo_url, rating, team:team_id(team_id, name)",
       { count: "exact" }
     )
     .order("last_name")
@@ -184,13 +184,14 @@ export default async function PlayersPage({
               <th className="hidden md:table-cell px-4 py-2.5 font-medium">Position</th>
               <th className="hidden md:table-cell px-4 py-2.5 font-medium">Gender</th>
               <th className="hidden md:table-cell px-4 py-2.5 font-medium">Status</th>
+              <th className="hidden lg:table-cell px-4 py-2.5 font-medium">Rating</th>
               <th className="px-4 py-2.5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {(players ?? []).length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   {selectedYear
                     ? `No players registered for ${selectedYear}.`
                     : "No players yet."}{" "}
@@ -266,6 +267,20 @@ export default async function PlayersPage({
                     }`}>
                       {p.playing_status ?? "—"}
                     </span>
+                  </td>
+                  <td className="hidden lg:table-cell px-4 py-2.5">
+                    {p.rating != null ? (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                        p.rating >= 8   ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        p.rating >= 6.5 ? "bg-navy-50 text-navy-700 border-navy-200" :
+                        p.rating >= 5   ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                          "bg-red-50 text-red-700 border-red-200"
+                      }`}>
+                        {Number(p.rating).toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
                   </td>
 
                   {/* Actions — View on mobile, View+Edit+Delete on desktop */}

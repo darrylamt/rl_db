@@ -8,6 +8,7 @@ export async function GET() {
     name: "RLFG Public API",
     version: "1.0",
     description: "Public read API for the Rugby League Federation of Ghana. All GET endpoints are open. POST endpoints require an admin session.",
+    docs: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/docs`,
     notes: [
       "Responses are wrapped: { ok: true, data: ... } or { ok: false, error: '...' }",
       "List endpoints return { items: [...], total: N }",
