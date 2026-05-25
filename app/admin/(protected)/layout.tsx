@@ -16,6 +16,7 @@ const navItems = [
   { href: "/admin/results", label: "Results" },
   { href: "/admin/standings", label: "Standings" },
   { href: "/admin/suspensions", label: "Suspensions" },
+  { href: "/docs", label: "API Docs", divider: true, external: true },
 ];
 
 export default async function ProtectedAdminLayout({

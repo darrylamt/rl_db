@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-type NavItem = { href: string; label: string };
+type NavItem = { href: string; label: string; divider?: boolean; external?: boolean };
 
 export function AdminSidebar({
   items,
@@ -144,18 +144,27 @@ export function AdminSidebar({
             const active =
               pathname === item.href || pathname?.startsWith(item.href + "/");
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={[
-                  "block px-6 py-2.5 text-sm border-l-2 transition",
-                  active
-                    ? "bg-navy-800 text-gold-400 border-gold-400"
-                    : "text-navy-100 border-transparent hover:bg-navy-800 hover:text-gold-400 hover:border-gold-400",
-                ].join(" ")}
-              >
-                {item.label}
-              </Link>
+              <div key={item.href}>
+                {item.divider && (
+                  <div className="mx-6 my-2 border-t border-navy-700" />
+                )}
+                <Link
+                  href={item.href}
+                  className={[
+                    "flex items-center justify-between px-6 py-2.5 text-sm border-l-2 transition",
+                    active
+                      ? "bg-navy-800 text-gold-400 border-gold-400"
+                      : "text-navy-100 border-transparent hover:bg-navy-800 hover:text-gold-400 hover:border-gold-400",
+                  ].join(" ")}
+                >
+                  {item.label}
+                  {item.external && (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" className="w-3 h-3 opacity-50">
+                      <path d="M3.5 3a.5.5 0 0 0 0 1H7.29L2.15 9.15a.5.5 0 1 0 .7.7L8 4.71V8.5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5h-5Z" />
+                    </svg>
+                  )}
+                </Link>
+              </div>
             );
           })}
         </nav>
