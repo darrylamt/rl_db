@@ -136,6 +136,42 @@ export default async function PlayerDetailPage({
     return ad < bd ? 1 : ad > bd ? -1 : 0;
   });
 
+  // ── Career rating ─────────────────────────────────────────────────────────
+  // Compute per-match auto-ratings from events, then average them.
+  // Only shown when the player has at least one event.
+  // Players with zero events → no computed rating (show default 6.0 as "No data yet").
+  const RATING_WEIGHTS: Record<string, number> = {
+    try: 1.5, conversion: 0.25, missed_conversion: -0.25,
+    penalty_goal: 0.5, drop_goal: 0.75,
+    yellow_card: -1.5, red_card: -3.0,
+    tackle_break: 0.5, clean_break: 0.75, offload: 0.3,
+    metres_gained: 0.2, tackle: 0.1, missed_tackle: -0.3,
+    turnover_won: 0.5, completed_set: 0.2,
+  };
+
+  // Group raw events by fixture_id for per-match rating calculation
+  const eventsByFixture = new Map<string, string[]>();
+  for (const e of events ?? []) {
+    const f: any = Array.isArray(e.fixture) ? e.fixture[0] : e.fixture;
+    const fid = f?.fixture_id;
+    if (!fid) continue;
+    if (!eventsByFixture.has(fid)) eventsByFixture.set(fid, []);
+    eventsByFixture.get(fid)!.push(e.event_type);
+  }
+
+  const hasEvents = eventsByFixture.size > 0;
+  let careerRating: number | null = null;
+
+  if (hasEvents) {
+    const matchRatings = Array.from(eventsByFixture.values()).map((evTypes) => {
+      let r = 6.0;
+      for (const t of evTypes) r += RATING_WEIGHTS[t] ?? 0;
+      return Math.max(1, Math.min(10, r));
+    });
+    const avg = matchRatings.reduce((s, r) => s + r, 0) / matchRatings.length;
+    careerRating = Math.round(avg * 10) / 10;
+  }
+
   // Opponent H2H (player vs player).
   let vsPlayer: any = null;
   let vsStats: StatMap | null = null;
@@ -205,20 +241,20 @@ export default async function PlayerDetailPage({
             )}
           </p>
 
-          {/* General rating */}
-          {(() => {
-            const r = player.rating != null ? Number(player.rating) : 6.0;
-            const color =
-              r >= 8   ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-              r >= 6.5 ? "bg-navy-50 text-navy-700 border-navy-200" :
-              r >= 5   ? "bg-amber-50 text-amber-700 border-amber-200" :
-                         "bg-red-50 text-red-700 border-red-200";
-            const label =
-              r >= 8   ? "Outstanding" :
-              r >= 6.5 ? "Good" :
-              r >= 5   ? "Average" : "Poor";
-            return (
-              <div className="mt-3 flex items-center gap-2">
+          {/* General rating — shown for all players; "No data yet" if no events */}
+          <div className="mt-3 flex items-center gap-2">
+            {careerRating !== null ? (() => {
+              const r = careerRating!;
+              const color =
+                r >= 8   ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                r >= 6.5 ? "bg-navy-50 text-navy-700 border-navy-200" :
+                r >= 5   ? "bg-amber-50 text-amber-700 border-amber-200" :
+                           "bg-red-50 text-red-700 border-red-200";
+              const label =
+                r >= 8   ? "Outstanding" :
+                r >= 6.5 ? "Good" :
+                r >= 5   ? "Average" : "Poor";
+              return (
                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${color}`}>
                   <span className="font-display text-2xl font-bold leading-none tabular-nums">
                     {r.toFixed(1)}
@@ -230,10 +266,22 @@ export default async function PlayerDetailPage({
                     <p className="text-xs font-medium mt-0.5 leading-none">{label}</p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400">avg. of all match ratings</p>
+              );
+            })() : (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-50 text-slate-400 border-slate-200">
+                <span className="font-display text-2xl font-bold leading-none tabular-nums">6.0</span>
+                <div className="text-left">
+                  <p className="text-[10px] uppercase tracking-wider font-semibold leading-none opacity-70">General Rating</p>
+                  <p className="text-xs mt-0.5 leading-none">No data yet</p>
+                </div>
               </div>
-            );
-          })()}
+            )}
+            <p className="text-xs text-slate-400">
+              {careerRating !== null
+                ? `avg. across ${eventsByFixture.size} match${eventsByFixture.size !== 1 ? "es" : ""}`
+                : "record events to generate a rating"}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -247,8 +295,8 @@ export default async function PlayerDetailPage({
             <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">Matches</div>
             <div className="font-display text-2xl text-navy-900 mt-1">{matchesPlayed}</div>
           </div>
-          {(() => {
-            const r = player.rating != null ? Number(player.rating) : 6.0;
+          {careerRating !== null ? (() => {
+            const r = careerRating!;
             const color =
               r >= 8   ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
               r >= 6.5 ? "border-navy-200 bg-navy-50 text-navy-700" :
@@ -260,7 +308,12 @@ export default async function PlayerDetailPage({
                 <div className="font-display text-2xl font-bold mt-1 tabular-nums">{r.toFixed(1)}</div>
               </div>
             );
-          })()}
+          })() : (
+            <div className="border border-slate-200 bg-slate-50 rounded-lg p-3 text-center text-slate-400">
+              <div className="text-[10px] uppercase tracking-wider leading-tight font-semibold">Rating</div>
+              <div className="font-display text-2xl mt-1 tabular-nums">—</div>
+            </div>
+          )}
           {STAT_DEFS.map((def) => (
             <div key={def.key} className="bg-white border border-slate-200 rounded-lg p-3 text-center">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">{def.label}</div>
