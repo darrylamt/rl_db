@@ -12,7 +12,7 @@ import FontFamily from "@tiptap/extension-font-family";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,41 +121,92 @@ function ColorPicker({
   );
 }
 
-// ─── Image insert ─────────────────────────────────────────────────────────────
+// ─── Image insert (file upload) ───────────────────────────────────────────────
 
 function ImageInsert({ onInsert }: { onInsert: (url: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState("");
+  const [open, setOpen]           = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/articles/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      onInsert(json.url);
+      setOpen(false);
+    } catch (err: any) {
+      setUploadError(err.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = "";
+    }
+  }
+
+  const imgIcon = (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+      <path fillRule="evenodd" d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4Zm10 5.414-1.293-1.293a1 1 0 0 0-1.414 0L7 10.414l-1.293-1.293a1 1 0 0 0-1.414 0L3 10.414V12h9v-2.586ZM6.5 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" clipRule="evenodd" />
+    </svg>
+  );
+
   return (
     <div className="relative">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+        className="hidden"
+        onChange={handleFile}
+      />
       <Btn onClick={() => setOpen((o) => !o)} title="Insert image" active={open}>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
-          <path fillRule="evenodd" d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4Zm10 5.414-1.293-1.293a1 1 0 0 0-1.414 0L7 10.414l-1.293-1.293a1 1 0 0 0-1.414 0L3 10.414V12h9v-2.586ZM6.5 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" clipRule="evenodd" />
-        </svg>
+        {imgIcon}
       </Btn>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-72">
-          <p className="text-xs font-medium text-slate-600 mb-1.5">Image URL</p>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            className="w-full px-2 py-1.5 rounded border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500 mb-2"
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onMouseDown={() => { if (url.trim()) { onInsert(url.trim()); setUrl(""); setOpen(false); } }}
-              className="flex-1 py-1 rounded bg-navy-900 text-white text-xs font-medium hover:bg-navy-700"
-            >
-              Insert
-            </button>
-            <button type="button" onMouseDown={() => setOpen(false)} className="px-3 py-1 rounded border text-xs text-slate-600 hover:bg-slate-50">
-              Cancel
-            </button>
-          </div>
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-60">
+          <p className="text-xs font-semibold text-slate-600 mb-2">Insert image</p>
+
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); fileRef.current?.click(); }}
+            disabled={uploading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-600 hover:border-navy-400 hover:text-navy-700 disabled:opacity-50 transition-colors"
+          >
+            {uploading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Uploading…
+              </>
+            ) : (
+              <>
+                {imgIcon}
+                Choose image…
+              </>
+            )}
+          </button>
+
+          {uploadError && (
+            <p className="text-xs text-red-600 mt-1.5">{uploadError}</p>
+          )}
+
+          <p className="text-xs text-slate-400 mt-1.5">JPEG · PNG · WebP · GIF · max 8 MB</p>
+
+          <button
+            type="button"
+            onMouseDown={() => { setOpen(false); setUploadError(""); }}
+            className="mt-2 w-full text-center text-xs text-slate-400 hover:text-slate-600"
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>

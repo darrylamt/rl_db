@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect } from "react";
+import { useState, useTransition, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { saveArticle, setArticleStatus, deleteArticle } from "../actions";
@@ -26,9 +26,11 @@ export function ArticleEditor({ article }: { article: Article }) {
   const [author, setAuthor]         = useState(article.author ?? "");
   const [tagsRaw, setTagsRaw]       = useState((article.tags ?? []).join(", "));
   const [status, setStatus]         = useState(article.status);
-  const [saveMsg, setSaveMsg]       = useState("");
-  const [error, setError]           = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [saveMsg, setSaveMsg]         = useState("");
+  const [error, setError]             = useState("");
+  const [isPending, startTransition]  = useTransition();
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-save every 30s if content has changed
   const [dirty, setDirty] = useState(false);
@@ -92,6 +94,26 @@ export function ArticleEditor({ article }: { article: Article }) {
     startTransition(async () => {
       await deleteArticle(article.article_id);
     });
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverUploading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/articles/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      setCoverUrl(json.url);
+    } catch (err: any) {
+      setError(err.message ?? "Image upload failed");
+    } finally {
+      setCoverUploading(false);
+      e.target.value = "";
+    }
   }
 
   const statusColors: Record<string, string> = {
@@ -230,18 +252,66 @@ export function ArticleEditor({ article }: { article: Article }) {
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Cover image URL</label>
+            <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Cover image</label>
+
+            {/* Hidden file input */}
             <input
-              type="url"
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              placeholder="https://…"
-              className="w-full px-3 py-1.5 rounded border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+              ref={coverInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+              className="hidden"
+              onChange={handleCoverUpload}
             />
+
+            {/* Upload / change / remove row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={coverUploading || isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                {coverUploading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                      <path d="M7.25 10.25a.75.75 0 0 0 1.5 0V4.56l1.22 1.22a.75.75 0 1 0 1.06-1.06l-2.5-2.5a.75.75 0 0 0-1.06 0l-2.5 2.5a.75.75 0 0 0 1.06 1.06l1.22-1.22v5.69Z" />
+                      <path d="M3.5 9.75a.75.75 0 0 0-1.5 0v1.5A2.75 2.75 0 0 0 4.75 14h6.5A2.75 2.75 0 0 0 14 11.25v-1.5a.75.75 0 0 0-1.5 0v1.5c0 .69-.56 1.25-1.25 1.25h-6.5c-.69 0-1.25-.56-1.25-1.25v-1.5Z" />
+                    </svg>
+                    {coverUrl ? "Change image" : "Upload image"}
+                  </>
+                )}
+              </button>
+
+              {coverUrl && !coverUploading && (
+                <button
+                  type="button"
+                  onClick={() => setCoverUrl("")}
+                  className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-400 mt-1">JPEG, PNG, WebP, GIF or AVIF · max 8 MB</p>
+
+            {/* Preview */}
             {coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverUrl} alt="cover" referrerPolicy="no-referrer"
-                className="mt-2 h-32 w-full object-cover rounded border border-slate-200" />
+              <img
+                src={coverUrl}
+                alt="cover preview"
+                referrerPolicy="no-referrer"
+                className="mt-2 h-40 w-full object-cover rounded-lg border border-slate-200"
+              />
             )}
           </div>
         </div>
