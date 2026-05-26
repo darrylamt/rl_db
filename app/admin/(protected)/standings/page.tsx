@@ -10,26 +10,22 @@ type Tally = {
   count: number;
 };
 
-/** Count events of a given type, grouped by player, sorted desc, top N. */
-function tally(events: any[], type: string, top = 10): Tally[] {
+/** Aggregate rows from the scoring_leaders view into a top-N list. */
+function buildTally(rows: any[], type: string, compIds: Set<string> | null, top = 10): Tally[] {
   const m = new Map<string, Tally>();
-  for (const e of events) {
-    // Normalize case: compare lowercase for compatibility with both old (Title Case) and new (lowercase) events
-    if (e.event_type?.toLowerCase() !== type.toLowerCase()) continue;
-    const p = e.player;
-    if (!p?.player_id) continue;
-    const key = p.player_id as string;
+  for (const r of rows) {
+    if (r.event_type !== type) continue;
+    if (compIds !== null && !compIds.has(r.competition_id)) continue;
+    const key = r.player_id as string;
     const cur = m.get(key);
-    if (cur) cur.count += 1;
-    else
-      m.set(key, {
-        player_id: key,
-        name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—",
-        team: Array.isArray(p.team)
-          ? (p.team[0]?.name ?? null)
-          : (p.team?.name ?? null),
-        count: 1,
-      });
+    const n = Number(r.total) || 0;
+    if (cur) cur.count += n;
+    else m.set(key, {
+      player_id: key,
+      name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() || "—",
+      team: r.team_name ?? null,
+      count: n,
+    });
   }
   return Array.from(m.values())
     .sort((a, b) => b.count - a.count)
@@ -146,28 +142,19 @@ export default async function StandingsPage({
     rows = [];
   }
 
-  // --- Scoring events (for leaderboards) ---
-  // One fetch across all tries + conversions with player + fixture joins;
-  // bucket by season client-side.
-  const { data: scoringEvents } = await supabase
-    .from("match_events")
-    .select(
-      `event_type,
-       player:player_id(player_id, first_name, last_name, team:team_id(name)),
-       fixture:fixture_id(competition_id)`,
-    )
-    .in("event_type", ["try", "conversion", "Try", "Conversion"]);
+  // --- Scoring leaderboards from pre-aggregated view ---
+  // Uses the scoring_leaders view (aggregated in SQL) to avoid PostgREST's
+  // 1000-row default limit that would truncate raw event fetches.
+  const { data: leaderRows } = await supabase
+    .from("scoring_leaders")
+    .select("player_id, first_name, last_name, team_name, competition_id, event_type, total");
 
   const compIdSet = new Set(compIdsInSeason);
-  const seasonEvents = (scoringEvents ?? []).filter((e: any) => {
-    const cid = e.fixture?.competition_id;
-    return cid && compIdSet.has(cid);
-  });
 
-  const tryLeadersSeason = tally(seasonEvents, "try");
-  const convLeadersSeason = tally(seasonEvents, "conversion");
-  const tryLeadersAll = tally(scoringEvents ?? [], "try");
-  const convLeadersAll = tally(scoringEvents ?? [], "conversion");
+  const tryLeadersSeason  = buildTally(leaderRows ?? [], "try",        compIdSet);
+  const convLeadersSeason = buildTally(leaderRows ?? [], "conversion",  compIdSet);
+  const tryLeadersAll     = buildTally(leaderRows ?? [], "try",        null);
+  const convLeadersAll    = buildTally(leaderRows ?? [], "conversion",  null);
 
   // --- Group standings by competition ---
   const groups = new Map<

@@ -32,7 +32,9 @@ function tallyEvents(events: any[]): StatMap {
   const m: StatMap = {};
   for (const def of STAT_DEFS) m[def.key] = 0;
   for (const e of events) {
-    if (m[e.event_type] != null) m[e.event_type] += 1;
+    // Normalise case so old title-case events ("Conversion", "Try", etc.) are counted correctly
+    const key = e.event_type?.toLowerCase?.() ?? e.event_type;
+    if (m[key] != null) m[key] += 1;
   }
   return m;
 }
@@ -128,7 +130,8 @@ export default async function PlayerDetailPage({
     if (!f?.fixture_id) continue;
     if (!perMatch.has(f.fixture_id)) perMatch.set(f.fixture_id, { fixture: f, stats: {} as StatMap });
     const bucket = perMatch.get(f.fixture_id);
-    bucket.stats[e.event_type] = (bucket.stats[e.event_type] ?? 0) + 1;
+    const evKey = e.event_type?.toLowerCase?.() ?? e.event_type;
+    bucket.stats[evKey] = (bucket.stats[evKey] ?? 0) + 1;
   }
   const matchRows = Array.from(perMatch.values()).sort((a, b) => {
     const ad = a.fixture.scheduled_date ?? "";
@@ -156,7 +159,7 @@ export default async function PlayerDetailPage({
     const fid = f?.fixture_id;
     if (!fid) continue;
     if (!eventsByFixture.has(fid)) eventsByFixture.set(fid, []);
-    eventsByFixture.get(fid)!.push(e.event_type);
+    eventsByFixture.get(fid)!.push(e.event_type?.toLowerCase?.() ?? e.event_type);
   }
 
   const hasEvents = eventsByFixture.size > 0;
