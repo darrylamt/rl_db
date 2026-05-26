@@ -446,6 +446,64 @@ const ENDPOINTS: { section: string; description: string; endpoints: Endpoint[] }
       },
     ],
   },
+  {
+    section: "Articles",
+    description: "News articles and match reports published by the federation.",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/articles",
+        description: "List published articles, newest first. Filter by tag and paginate.",
+        params: [
+          { name: "tag", type: "string", description: 'Filter by a single tag, e.g. "match report" or "announcement"' },
+          { name: "limit", type: "number", description: "Items per page (default 50, max 200)" },
+          { name: "offset", type: "number", description: "Pagination offset (default 0)" },
+        ],
+        response: `{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "article_id": "uuid",
+        "title": "Lions Beat Bulls 26–14 in Thriller",
+        "slug": "lions-beat-bulls-26-14-in-thriller",
+        "excerpt": "Accra Lions secured a commanding home win…",
+        "cover_image_url": "https://….supabase.co/storage/v1/object/public/article-images/…",
+        "author": "RLFG Media",
+        "tags": ["match report", "premier league"],
+        "status": "published",
+        "published_at": "2025-06-07T15:30:00Z",
+        "updated_at": "2025-06-07T16:00:00Z"
+      }
+    ],
+    "total": 24
+  }
+}`,
+        cacheNote: "Cached 10 s",
+      },
+      {
+        method: "GET",
+        path: "/api/articles/:slug",
+        description: "Full article by URL slug — includes the HTML body content for rendering on your site.",
+        response: `{
+  "ok": true,
+  "data": {
+    "article_id": "uuid",
+    "title": "Lions Beat Bulls 26–14 in Thriller",
+    "slug": "lions-beat-bulls-26-14-in-thriller",
+    "excerpt": "Accra Lions secured a commanding home win…",
+    "content": "<h2>First Half</h2><p>The Lions started brightly…</p>",
+    "cover_image_url": "https://….supabase.co/storage/v1/object/public/article-images/…",
+    "author": "RLFG Media",
+    "tags": ["match report", "premier league"],
+    "published_at": "2025-06-07T15:30:00Z",
+    "updated_at": "2025-06-07T16:00:00Z"
+  }
+}`,
+        cacheNote: "Cached 10 s",
+      },
+    ],
+  },
 ];
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────
@@ -583,7 +641,7 @@ export default function ApiDocsPage() {
             <section id="overview">
               <h1 className="font-display text-3xl font-bold text-navy-900 mb-2">RLFG Public API</h1>
               <p className="text-slate-600 mb-6">
-                Open REST API for the Rugby League Federation of Ghana. All endpoints are read-only (GET) and publicly accessible — no authentication required.
+                Open REST API for the Rugby League Federation of Ghana. All endpoints are read-only (GET) and publicly accessible — no authentication required. Article images are served directly from Supabase Storage CDN.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-4 mb-6">

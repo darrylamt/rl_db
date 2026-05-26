@@ -38,6 +38,9 @@ export async function GET() {
       "GET /api/officials": "List officials. ?status=active|inactive",
 
       "GET /api/venues": "List venues.",
+
+      "GET /api/articles": "Published articles / news. ?tag=<string> ?limit=10 ?offset=0",
+      "GET /api/articles/:slug": "Full article content by slug (HTML body included)",
     },
     admin_endpoints: {
       note: "Require a valid Supabase session cookie (sign in at /admin/login)",
