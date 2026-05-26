@@ -785,6 +785,22 @@ function ScoreTab({
           <Input name="recorded_by" defaultValue={r.recorded_by ?? ""} placeholder="Your name" />
         </Field>
       </div>
+
+      <Field label="Highlights video (YouTube URL)">
+        <Input
+          name="video_url"
+          type="url"
+          defaultValue={r.video_url ?? ""}
+          placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…"
+        />
+        {r.video_url && (
+          <p className="mt-1 text-xs text-slate-400 truncate">
+            Saved: <a href={r.video_url} target="_blank" rel="noopener noreferrer"
+              className="text-navy-600 hover:underline">{r.video_url}</a>
+          </p>
+        )}
+      </Field>
+
       <Field label="Notes"><Textarea name="notes" defaultValue={r.notes ?? ""} /></Field>
 
       <button

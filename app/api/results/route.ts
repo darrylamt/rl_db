@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, recorded_at, fixture:fixture_id!inner(fixture_id, scheduled_date, round, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(competition_id, name, season))",
+      "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, video_url, recorded_at, fixture:fixture_id!inner(fixture_id, scheduled_date, round, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(competition_id, name, season))",
       { count: "exact" }
     )
     .order("recorded_at", { ascending: false })

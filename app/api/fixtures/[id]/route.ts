@@ -36,7 +36,7 @@ export async function GET(
     supabase
       .from("match_results")
       .select(
-        "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, recorded_at"
+        "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, video_url, recorded_at"
       )
       .eq("fixture_id", id)
       .maybeSingle(),

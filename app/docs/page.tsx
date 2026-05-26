@@ -245,7 +245,8 @@ const ENDPOINTS: { section: string; description: string; endpoints: Endpoint[] }
       "home_score": 26,
       "away_score": 14,
       "home_tries": 5, "home_conversions": 3,
-      "away_tries": 2, "away_conversions": 2
+      "away_tries": 2, "away_conversions": 2,
+      "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     },
     "events": [
       { "event_id": "uuid", "event_type": "try", "minute": 8, "half": 1,
@@ -290,6 +291,7 @@ const ENDPOINTS: { section: string; description: string; endpoints: Endpoint[] }
         "home_penalties": 0, "home_drop_goals": 0,
         "away_tries": 2, "away_conversions": 2,
         "attendance": 1200,
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         "fixture": {
           "fixture_id": "uuid",
           "scheduled_date": "2025-05-10",

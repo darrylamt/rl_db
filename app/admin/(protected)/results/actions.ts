@@ -41,6 +41,7 @@ function resultPayload(fd: FormData, fixture_id: string) {
     attendance: intOrNull(fd, "attendance"),
     notes: str(fd, "notes"),
     recorded_by: str(fd, "recorded_by"),
+    video_url: str(fd, "video_url"),
   };
 }
 
