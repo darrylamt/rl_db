@@ -12,7 +12,13 @@
       "Bash(git commit -m 'feat: add name search to all admin list pages *)",
       "Bash(git commit -m 'feat: production-ready public API *)",
       "Bash(git commit -m 'fix: search bugs - tabs preserve q, competitions qs\\(\\) preserves q *)",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Darryl Amoatey\\\\OneDrive - Smart Workplace\\\\Documents\\\\rl_db\\\\app\\\\admin\\\\\\(protected\\)\\\\articles\\\\[id]\" && echo done)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Darryl Amoatey\\\\OneDrive - Smart Workplace\\\\Documents\\\\rl_db\\\\app\\\\api\\\\articles\\\\[slug]\" && echo done)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Darryl Amoatey\\OneDrive - Smart Workplace\\Documents\\rl_db\\app\\admin\\(protected)\\articles",
+      "C:\\Users\\Darryl Amoatey\\OneDrive - Smart Workplace\\Documents\\rl_db\\app\\api\\articles"
     ]
   }
 }
