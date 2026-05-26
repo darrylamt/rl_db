@@ -22,7 +22,7 @@ interface Endpoint {
 
 // ─── Content ─────────────────────────────────────────────────────────────────
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://your-domain.com";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://rl-db.vercel.app";
 
 const ENDPOINTS: { section: string; description: string; endpoints: Endpoint[] }[] = [
   {
