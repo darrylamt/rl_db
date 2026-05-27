@@ -150,7 +150,7 @@ export async function POST(req: Request) {
   const skipped: string[] = [];
   const failed: string[] = [];
 
-  for (const [playerId, photo] of photoMap.entries()) {
+  for (const [playerId, photo] of Array.from(photoMap.entries())) {
     const player = (players ?? []).find((p) => p.player_id === playerId)!;
 
     // Skip if already stored in Supabase Storage (not an expiring Airtable URL)
