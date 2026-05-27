@@ -5,6 +5,7 @@ import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { getPageParams } from "@/lib/pagination";
 import { deletePlayer } from "./actions";
+import { SyncPhotosButton } from "@/components/admin/SyncPhotosButton";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -96,6 +97,7 @@ export default async function PlayersPage({
           <h1 className="font-display text-3xl md:text-4xl font-bold text-navy-900">Players</h1>
         </div>
         <div className="flex items-center gap-2">
+          <SyncPhotosButton />
           <Link
             href="/admin/players/bulk"
             className="border border-navy-900 text-navy-900 hover:bg-navy-50 px-4 py-2.5 rounded font-medium text-sm whitespace-nowrap"
