@@ -80,6 +80,8 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-anton)", "Impact", "system-ui", "sans-serif"],
         sans: ["var(--font-poppins)", "system-ui", "sans-serif"],
+        lato: ["var(--font-lato)", "system-ui", "sans-serif"],
+        bebas: ["var(--font-bebas-neue)", "Impact", "system-ui", "sans-serif"],
       },
     },
   },
