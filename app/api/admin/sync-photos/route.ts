@@ -214,7 +214,7 @@ export async function POST(req: Request) {
       skipped: skipped.length,
       failed: failed.length,
       unmatched: unmatched.length,
-      details: { updated, skipped, failed, unmatched: [...new Set(unmatched)] },
+      details: { updated, skipped, failed, unmatched: Array.from(new Set(unmatched)) },
     },
   });
 }
