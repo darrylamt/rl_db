@@ -12,9 +12,10 @@ const BUCKET = "player-photos";
 const AIRTABLE_BASE  = "appiGlfyfqWt6Vkzv";
 const AIRTABLE_TABLES = [
   // Most recent first — first match wins
-  { id: "tblSqVoKgDUOKvpe3", label: "2026", nameField: "fldJQrexeI5jjYMn5", photoField: "fldIqFyJqN7oLUFz2" },
-  { id: "tbl6j1FN2gTRCAhLB", label: "2025", nameField: "fldXJxvA0l4mb3EUD", photoField: "fldWjLPMcq6rDZx6A" },
-  { id: "tblb2ZyafvjBf2ouB", label: "2024", nameField: "fldNSBOM9L1tGnV81", photoField: "fldUPYK1qoSOcTcyy" },
+  { id: "tblSqVoKgDUOKvpe3", label: "2026",  nameField: "fldJQrexeI5jjYMn5", photoField: "fldIqFyJqN7oLUFz2" },
+  { id: "tbl6j1FN2gTRCAhLB", label: "2025",  nameField: "fldXJxvA0l4mb3EUD", photoField: "fldWjLPMcq6rDZx6A" },
+  { id: "tblb2ZyafvjBf2ouB", label: "2024",  nameField: "fldNSBOM9L1tGnV81", photoField: "fldUPYK1qoSOcTcyy" },
+  { id: "tblkM1ODbpEzMDNLM", label: "Women", nameField: "fldWCD4f5FmrdYkpc", photoField: "fld3z00umidMJuBPJ" },
 ];
 
 // ── Name normalisation helpers ────────────────────────────────────────────────
@@ -53,8 +54,8 @@ async function fetchAirtableRecords(
 
   do {
     const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}`);
-    url.searchParams.set("fields[]", nameField);
-    url.searchParams.set("fields[]", photoField);
+    url.searchParams.append("fields[]", nameField);
+    url.searchParams.append("fields[]", photoField);
     url.searchParams.set("pageSize", "100");
     if (offset) url.searchParams.set("offset", offset);
 
