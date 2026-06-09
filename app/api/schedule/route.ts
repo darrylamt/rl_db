@@ -83,17 +83,21 @@ export async function GET(req: Request) {
   ]);
 
   // ── 3. Index by fixture_id for O(1) lookups ───────────────────────────────
-  const resultMap = new Map<string, typeof results[0]>();
+  type ResultRow = NonNullable<typeof results>[number];
+  type EventRow = NonNullable<typeof events>[number];
+  type LineupRow = NonNullable<typeof lineups>[number];
+
+  const resultMap = new Map<string, ResultRow>();
   for (const r of results ?? []) resultMap.set(r.fixture_id, r);
 
-  const eventsByFixture = new Map<string, typeof events>();
+  const eventsByFixture = new Map<string, EventRow[]>();
   for (const e of events ?? []) {
     const list = eventsByFixture.get(e.fixture_id) ?? [];
     list.push(e);
     eventsByFixture.set(e.fixture_id, list);
   }
 
-  const lineupsByFixture = new Map<string, typeof lineups>();
+  const lineupsByFixture = new Map<string, LineupRow[]>();
   for (const l of lineups ?? []) {
     const list = lineupsByFixture.get(l.fixture_id) ?? [];
     list.push(l);
