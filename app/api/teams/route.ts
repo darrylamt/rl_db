@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("teams")
     .select(
-      "team_id, name, team_type, region, city, logo_url, founded_year, manager_name, coach_name, home_venue:home_venue_id(name)",
+      "team_id, name, slug, team_type, region, city, logo_url, instagram_url, founded_year, manager_name, coach_name, home_venue:home_venue_id(name)",
       { count: "exact" }
     )
     .order("name")
@@ -47,10 +47,12 @@ export async function POST(req: Request) {
     .from("teams")
     .insert({
       name: body.name,
+      slug: body.slug ?? null,
       team_type: body.team_type ?? "club",
       region: body.region ?? null,
       city: body.city ?? null,
       logo_url: body.logo_url ?? null,
+      instagram_url: body.instagram_url ?? null,
       founded_year: body.founded_year ?? null,
       home_venue_id: body.home_venue_id ?? null,
       manager_name: body.manager_name ?? null,
