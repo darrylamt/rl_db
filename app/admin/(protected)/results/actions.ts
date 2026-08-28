@@ -53,16 +53,18 @@ function resultPayload(fd: FormData, fixture_id: string) {
  * line-ups, player ratings — stores a team_id, so it follows the team and
  * needs no changes. Standings recompute from the corrected fixture.
  */
-export async function swapHomeAway(fixture_id: string) {
+export async function swapHomeAway(
+  fixture_id: string
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = createAdminClient();
 
   const { data: fixture, error: fixtureError } = await supabase
     .from("fixtures")
-    .select("home_team_id, away_team_id, slug, scheduled_date")
+    .select("home_team_id, away_team_id, scheduled_date")
     .eq("fixture_id", fixture_id)
     .maybeSingle();
-  if (fixtureError) throw new Error(fixtureError.message);
-  if (!fixture) throw new Error("Fixture not found");
+  if (fixtureError) return { ok: false, error: fixtureError.message };
+  if (!fixture) return { ok: false, error: "Fixture not found" };
 
   const { data: result } = await supabase
     .from("match_results")
@@ -72,40 +74,16 @@ export async function swapHomeAway(fixture_id: string) {
     .eq("fixture_id", fixture_id)
     .maybeSingle();
 
-  // The slug encodes the old team order, so rebuild it. A slug that was edited
-  // by hand is left alone — only regenerate one that still matches the
-  // generated home-away-date pattern.
-  let slug = fixture.slug as string | null;
-  if (slug && fixture.scheduled_date) {
-    const { data: teams } = await supabase
-      .from("teams")
-      .select("team_id, name")
-      .in("team_id", [fixture.home_team_id, fixture.away_team_id].filter(Boolean));
-    const nameOf = (id: string | null) =>
-      (teams ?? []).find((t: any) => t.team_id === id)?.name ?? "tbc";
-    const kebab = (v: string) =>
-      v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const datePart = String(fixture.scheduled_date)
-      .slice(0, 10)
-      .split("-")
-      .reverse()
-      .map((part, i) => (i === 2 ? part.slice(-2) : part))
-      .join("-");
-    const generated = `${kebab(nameOf(fixture.home_team_id))}-${kebab(nameOf(fixture.away_team_id))}-${datePart}`;
-    if (slug === generated) {
-      slug = `${kebab(nameOf(fixture.away_team_id))}-${kebab(nameOf(fixture.home_team_id))}-${datePart}`;
-    }
-  }
-
+  // The swap itself — this must succeed regardless of whether the optional
+  // slug column has been added yet.
   const { error: swapError } = await supabase
     .from("fixtures")
     .update({
       home_team_id: fixture.away_team_id,
       away_team_id: fixture.home_team_id,
-      slug,
     })
     .eq("fixture_id", fixture_id);
-  if (swapError) throw new Error(swapError.message);
+  if (swapError) return { ok: false, error: swapError.message };
 
   if (result) {
     const { error: scoreError } = await supabase
@@ -123,14 +101,57 @@ export async function swapHomeAway(fixture_id: string) {
         away_drop_goals: result.home_drop_goals,
       })
       .eq("fixture_id", fixture_id);
-    if (scoreError) throw new Error(scoreError.message);
+    if (scoreError) return { ok: false, error: scoreError.message };
   }
+
+  // A generated slug encodes the old team order, so rebuild it. Best-effort:
+  // the column only exists after integration_schema.sql has been run, and a
+  // stale URL must not fail a correction that has already been applied.
+  await rebuildFixtureSlug(supabase, fixture_id, fixture);
 
   revalidatePath(`/admin/results/${fixture_id}`);
   revalidatePath(`/admin/fixtures/${fixture_id}`);
   revalidatePath("/admin/results");
   revalidatePath("/admin/fixtures");
   revalidatePath("/admin/standings");
+
+  return { ok: true };
+}
+
+/** Rewrites a generated slug into the new team order. Hand-edited slugs and a
+ *  missing slug column are both left alone. */
+async function rebuildFixtureSlug(
+  supabase: ReturnType<typeof createAdminClient>,
+  fixture_id: string,
+  before: { home_team_id: string | null; away_team_id: string | null; scheduled_date: string | null }
+) {
+  if (!before.scheduled_date) return;
+
+  const { data: current, error: readError } = await supabase
+    .from("fixtures")
+    .select("slug")
+    .eq("fixture_id", fixture_id)
+    .maybeSingle();
+  if (readError || !current?.slug) return;
+
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("team_id, name")
+    .in("team_id", [before.home_team_id, before.away_team_id].filter(Boolean) as string[]);
+
+  const nameOf = (id: string | null) =>
+    (teams ?? []).find((t: any) => t.team_id === id)?.name ?? "tbc";
+  const kebab = (v: string) =>
+    v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const [y, m, d] = String(before.scheduled_date).slice(0, 10).split("-");
+  const datePart = `${d}-${m}-${y.slice(-2)}`;
+
+  const generated = `${kebab(nameOf(before.home_team_id))}-${kebab(nameOf(before.away_team_id))}-${datePart}`;
+  if (current.slug !== generated) return; // edited by hand — leave it
+
+  const swapped = `${kebab(nameOf(before.away_team_id))}-${kebab(nameOf(before.home_team_id))}-${datePart}`;
+  await supabase.from("fixtures").update({ slug: swapped }).eq("fixture_id", fixture_id);
 }
 
 export async function upsertResult(fixture_id: string, fd: FormData) {

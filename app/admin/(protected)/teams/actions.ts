@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { resolveImageUrl } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -46,6 +47,9 @@ function payloadFromForm(fd: FormData) {
   };
 }
 
+// Added by integration_schema.sql; a deploy can land before the migration.
+const OPTIONAL_TEAM_COLUMNS = ["legal_name", "is_public"] as const;
+
 /** Keep slugs URL-safe without silently changing what was typed. */
 function slugify(v: string | null) {
   if (!v) return null;
@@ -57,7 +61,11 @@ export async function createTeam(fd: FormData) {
   const payload = payloadFromForm(fd);
   if (!payload.name) throw new Error("Name is required");
   payload.logo_url = await resolveImageUrl(fd, "logo", "team-logos", "teams", null);
-  const { error } = await supabase.from("teams").insert(payload);
+  const { error } = await writeWithOptionalColumns(
+    payload,
+    OPTIONAL_TEAM_COLUMNS,
+    (values) => supabase.from("teams").insert(values)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/teams");
   revalidatePath("/admin/dashboard");
@@ -73,7 +81,11 @@ export async function updateTeam(id: string, fd: FormData) {
   const payload = payloadFromForm(fd);
   if (!payload.name) throw new Error("Name is required");
   payload.logo_url = await resolveImageUrl(fd, "logo", "team-logos", "teams", existing?.logo_url);
-  const { error } = await supabase.from("teams").update(payload).eq("team_id", id);
+  const { error } = await writeWithOptionalColumns(
+    payload,
+    OPTIONAL_TEAM_COLUMNS,
+    (values) => supabase.from("teams").update(values).eq("team_id", id)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/teams");
   revalidatePath(`/admin/teams/${id}`);

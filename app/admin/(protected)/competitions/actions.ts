@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -24,6 +25,9 @@ function payload(fd: FormData) {
   };
 }
 
+// Added by integration_schema.sql; a deploy can land before the migration.
+const OPTIONAL_COMPETITION_COLUMNS = ["slug", "logo_url", "banner_url"] as const;
+
 /** Keep slugs URL-safe without silently changing what was typed. */
 function slugify(v: string | null) {
   if (!v) return null;
@@ -34,7 +38,11 @@ export async function createCompetition(fd: FormData) {
   const supabase = createAdminClient();
   const p = payload(fd);
   if (!p.name) throw new Error("Name is required");
-  const { error } = await supabase.from("competitions").insert(p);
+  const { error } = await writeWithOptionalColumns(
+    p,
+    OPTIONAL_COMPETITION_COLUMNS,
+    (values) => supabase.from("competitions").insert(values)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/competitions");
 }
@@ -43,7 +51,11 @@ export async function updateCompetition(id: string, fd: FormData) {
   const supabase = createAdminClient();
   const p = payload(fd);
   if (!p.name) throw new Error("Name is required");
-  const { error } = await supabase.from("competitions").update(p).eq("competition_id", id);
+  const { error } = await writeWithOptionalColumns(
+    p,
+    OPTIONAL_COMPETITION_COLUMNS,
+    (values) => supabase.from("competitions").update(values).eq("competition_id", id)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/competitions");
   revalidatePath(`/admin/competitions/${id}`);

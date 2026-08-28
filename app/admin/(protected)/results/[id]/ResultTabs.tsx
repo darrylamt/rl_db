@@ -1111,7 +1111,7 @@ export function ResultTabs({
   deleteEvent: (eventId: string) => Promise<void>;
   saveRatings: (rows: { player_id: string; team_id: string; rating: number; notes: string | null }[]) => Promise<void>;
   deleteRating: (ratingId: string, fixtureId: string) => Promise<void>;
-  swapHomeAway: () => Promise<void>;
+  swapHomeAway: () => Promise<{ ok: boolean; error?: string }>;
 })
  {
   const [activeTab, setActiveTab] = useState<Tab>("Score");
@@ -1225,7 +1225,7 @@ function SwapHomeAway({
 }: {
   homeName: string;
   awayName: string;
-  onSwap: () => Promise<void>;
+  onSwap: () => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -1264,8 +1264,9 @@ function SwapHomeAway({
             setError("");
             startTransition(async () => {
               try {
-                await onSwap();
-                setConfirming(false);
+                const res = await onSwap();
+                if (res?.ok) setConfirming(false);
+                else setError(res?.error ?? "Could not swap the teams");
               } catch (e: any) {
                 setError(e?.message ?? "Could not swap the teams");
               }

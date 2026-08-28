@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -25,6 +26,9 @@ function payload(fd: FormData) {
   };
 }
 
+// Added by integration_schema.sql; a deploy can land before the migration.
+const OPTIONAL_FIXTURE_COLUMNS = ["slug"] as const;
+
 function slugify(v: string | null) {
   if (!v) return null;
   return v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || null;
@@ -35,7 +39,11 @@ export async function createFixture(fd: FormData) {
   const p = payload(fd);
   if (!p.home_team_id || !p.away_team_id) throw new Error("Home and away teams are required");
   if (p.home_team_id === p.away_team_id) throw new Error("Home and away teams must be different");
-  const { error } = await supabase.from("fixtures").insert(p);
+  const { error } = await writeWithOptionalColumns(
+    p,
+    OPTIONAL_FIXTURE_COLUMNS,
+    (values) => supabase.from("fixtures").insert(values)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/fixtures");
   revalidatePath("/admin/dashboard");
@@ -46,7 +54,11 @@ export async function updateFixture(id: string, fd: FormData) {
   const p = payload(fd);
   if (!p.home_team_id || !p.away_team_id) throw new Error("Home and away teams are required");
   if (p.home_team_id === p.away_team_id) throw new Error("Home and away teams must be different");
-  const { error } = await supabase.from("fixtures").update(p).eq("fixture_id", id);
+  const { error } = await writeWithOptionalColumns(
+    p,
+    OPTIONAL_FIXTURE_COLUMNS,
+    (values) => supabase.from("fixtures").update(values).eq("fixture_id", id)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/fixtures");
   revalidatePath(`/admin/fixtures/${id}`);
