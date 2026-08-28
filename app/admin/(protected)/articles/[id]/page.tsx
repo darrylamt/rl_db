@@ -11,7 +11,7 @@ export default async function ArticleEditPage({
 
   const { data: article } = await supabase
     .from("articles")
-    .select("article_id, title, slug, excerpt, content, cover_image_url, author, tags, status, published_at")
+    .select("*")
     .eq("article_id", params.id)
     .maybeSingle();
 

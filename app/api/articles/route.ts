@@ -31,5 +31,14 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok({ items: data ?? [], total: count ?? 0 }, { cache: "short" });
+  // Mirrored under the names the public site's news cards already use.
+  const items = (data ?? []).map((a: any) => ({
+    ...a,
+    poster: a.cover_image_url,
+    teaser: a.excerpt,
+    main_category: a.category,
+    date: a.published_at,
+  }));
+
+  return ok({ items, total: count ?? 0 }, { cache: "short" });
 }

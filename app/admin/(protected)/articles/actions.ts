@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 import { redirect } from "next/navigation";
 
 // ── Slug helper ────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ export async function saveArticle(
     cover_image_url: string | null;
     author: string | null;
     tags: string[];
+    category: string | null;
   }
 ) {
   const supabase = createAdminClient();
@@ -70,10 +72,16 @@ export async function saveArticle(
     slug = await uniqueSlug(supabase, toSlug(payload.title), article_id);
   }
 
-  const { error } = await supabase
-    .from("articles")
-    .update({ ...payload, slug })
-    .eq("article_id", article_id);
+  // Saving here takes ownership of the body. Imported articles carry a
+  // `blocks` array that the API serves in preference to the HTML, so leaving
+  // it in place would make the editor look like it had no effect.
+  // Both columns arrive with article_content.sql, so the write tolerates
+  // their absence.
+  const { error } = await writeWithOptionalColumns(
+    { ...payload, slug, blocks: null },
+    ["blocks", "category"],
+    (values) => supabase.from("articles").update(values).eq("article_id", article_id)
+  );
 
   if (error) throw new Error(error.message);
   revalidatePath("/admin/articles");

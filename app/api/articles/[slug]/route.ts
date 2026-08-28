@@ -17,7 +17,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("articles")
-    .select("article_id, title, slug, excerpt, content, cover_image_url, author, tags, published_at, updated_at")
+    .select("*")
     .eq("slug", params.slug)
     .eq("status", "published")
     .maybeSingle();
@@ -25,11 +25,21 @@ export async function GET(
   if (error) return fail(error.message, 500);
   if (!data)  return fail("Article not found", 404);
 
-  // `content` stays the source of truth (Tiptap HTML); `blocks` is the same
-  // article shaped for the public site's BlockRenderer. Both are returned so
-  // either consumer works without a second request.
+  // Imported articles carry their original typed blocks, which express
+  // galleries and attributed quotes that Tiptap HTML cannot. Those win.
+  // Anything written in the admin is converted from its HTML instead.
+  const stored = Array.isArray(data.blocks) ? data.blocks : null;
+
   return ok(
-    { ...data, poster: data.cover_image_url, blocks: htmlToBlocks(data.content) },
+    {
+      ...data,
+      // Field names the public site already renders.
+      poster: data.cover_image_url,
+      teaser: data.excerpt,
+      main_category: data.category,
+      date: data.published_at,
+      blocks: stored && stored.length ? stored : htmlToBlocks(data.content),
+    },
     { cache: "short" }
   );
 }

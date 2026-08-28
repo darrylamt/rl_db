@@ -12,6 +12,8 @@ interface Article {
   excerpt: string | null;
   content: string;
   cover_image_url: string | null;
+  category: string | null;
+  blocks: unknown[] | null;
   author: string | null;
   tags: string[];
   status: string;
@@ -25,6 +27,7 @@ export function ArticleEditor({ article }: { article: Article }) {
   const [coverUrl, setCoverUrl]     = useState(article.cover_image_url ?? "");
   const [author, setAuthor]         = useState(article.author ?? "");
   const [tagsRaw, setTagsRaw]       = useState((article.tags ?? []).join(", "));
+  const [category, setCategory]     = useState(article.category ?? "");
   const [status, setStatus]         = useState(article.status);
   const [saveMsg, setSaveMsg]         = useState("");
   const [error, setError]             = useState("");
@@ -34,7 +37,7 @@ export function ArticleEditor({ article }: { article: Article }) {
 
   // Auto-save every 30s if content has changed
   const [dirty, setDirty] = useState(false);
-  useEffect(() => { setDirty(true); }, [title, content, excerpt, coverUrl, author, tagsRaw]);
+  useEffect(() => { setDirty(true); }, [title, content, excerpt, coverUrl, author, tagsRaw, category]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -54,6 +57,7 @@ export function ArticleEditor({ article }: { article: Article }) {
           cover_image_url: coverUrl.trim() || null,
           author: author.trim() || null,
           tags,
+          category: category.trim() || null,
         });
         setDirty(false);
         if (showMsg) {
@@ -78,6 +82,7 @@ export function ArticleEditor({ article }: { article: Article }) {
           cover_image_url: coverUrl.trim() || null,
           author: author.trim() || null,
           tags,
+          category: category.trim() || null,
         });
         await setArticleStatus(article.article_id, newStatus);
         setStatus(newStatus);
@@ -228,6 +233,27 @@ export function ArticleEditor({ article }: { article: Article }) {
               />
             </div>
             <div>
+              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Category</label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="News, Official Announcements, …"
+                list="article-categories"
+                className="w-full px-3 py-1.5 rounded border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+              />
+              <datalist id="article-categories">
+                <option value="News" />
+                <option value="Official Announcements" />
+                <option value="Developmental news" />
+                <option value="Impact Stories" />
+                <option value="Competition News" />
+                <option value="Partnerships" />
+                <option value="Regulatory" />
+              </datalist>
+              <p className="text-xs text-slate-400 mt-0.5">Shown as the badge on news cards</p>
+            </div>
+            <div>
               <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Tags</label>
               <input
                 type="text"
@@ -239,6 +265,15 @@ export function ArticleEditor({ article }: { article: Article }) {
               <p className="text-xs text-slate-400 mt-0.5">Comma-separated</p>
             </div>
           </div>
+
+          {Array.isArray(article.blocks) && article.blocks.length > 0 && (
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded">
+              This article was imported with its original layout — galleries,
+              pull quotes and spacing the editor cannot reproduce. The website
+              is showing that version. Saving here replaces it with the editor
+              content below, which cannot be undone.
+            </div>
+          )}
 
           <div>
             <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Excerpt / Summary</label>
