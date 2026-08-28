@@ -2,10 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { PERSON_GROUPS } from "@/lib/contentTypes";
 
-// Governance groups shown on the website. Match officials are separate,
-// under /admin/officials.
-export const PERSON_GROUPS = ["board", "committee"];
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);

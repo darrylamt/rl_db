@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
-import { updateDocument, DOCUMENT_TYPES } from "../actions";
+import { updateDocument } from "../actions";
+import { DOCUMENT_TYPES } from "@/lib/contentTypes";
 
 export default async function EditDocumentPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();

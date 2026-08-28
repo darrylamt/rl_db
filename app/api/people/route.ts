@@ -1,9 +1,8 @@
 import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
 import { ok, fail, preflight, requireAdmin, readJson } from "@/lib/api";
+import { PERSON_GROUPS } from "@/lib/contentTypes";
 
 export const dynamic = "force-dynamic";
-
-export const PERSON_GROUPS = ["board", "committee"] as const;
 
 export async function OPTIONS() {
   return preflight();

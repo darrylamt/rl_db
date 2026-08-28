@@ -3,13 +3,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// The website renders three named tiers. tier_title is editable copy so a
-// tier can be renamed without a deploy.
-export const PARTNER_TIERS = [
-  { value: 1, label: "Tier 1" },
-  { value: 2, label: "Tier 2" },
-  { value: 3, label: "Tier 3" },
-];
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);

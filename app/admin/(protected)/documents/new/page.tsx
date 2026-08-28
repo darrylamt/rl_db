@@ -1,5 +1,6 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
-import { createDocument, DOCUMENT_TYPES } from "../actions";
+import { createDocument } from "../actions";
+import { DOCUMENT_TYPES } from "@/lib/contentTypes";
 
 export default function NewDocumentPage() {
   return (

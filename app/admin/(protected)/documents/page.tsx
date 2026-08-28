@@ -4,7 +4,8 @@ import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
 import { Pagination } from "@/components/admin/Pagination";
 import { getPageParams } from "@/lib/pagination";
-import { deleteDocument, DOCUMENT_TYPES } from "./actions";
+import { deleteDocument } from "./actions";
+import { DOCUMENT_TYPES } from "@/lib/contentTypes";
 
 function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;

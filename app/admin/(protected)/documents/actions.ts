@@ -2,14 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { DOCUMENT_TYPES } from "@/lib/contentTypes";
 
-// The public documents page filters on these exact strings.
-export const DOCUMENT_TYPES = [
-  "Reports",
-  "Annual General Meetings",
-  "Policies",
-  "Monthly Developmental Reports",
-];
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);

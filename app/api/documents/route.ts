@@ -1,14 +1,8 @@
 import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
 import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
+import { DOCUMENT_TYPES } from "@/lib/contentTypes";
 
 export const dynamic = "force-dynamic";
-
-export const DOCUMENT_TYPES = [
-  "Reports",
-  "Annual General Meetings",
-  "Policies",
-  "Monthly Developmental Reports",
-] as const;
 
 export async function OPTIONS() {
   return preflight();
