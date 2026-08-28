@@ -183,7 +183,7 @@ begin
   end loop;
 end$$;
 
--- ── 7. SLUG BACKFILL ────────────────────────────────────────
+-- ── 7. SLUG BACKFILL ────────────────────────────────────
 -- Slugs are editorial nicknames, not kebab-cased names: the site links to
 -- /clubs/panthers, not /clubs/accra-panthers. These values come from the
 -- site's own clubs.json so existing links keep resolving.
@@ -204,41 +204,99 @@ update teams set slug = 'pirates' where name = 'Pirates'     and slug is null;
 update teams set is_public = false
   where name in ('African Warriors', 'Accra Majestics');
 
--- Anything still unslugged gets a derived one so no team is unroutable.
-update teams
-set slug = regexp_replace(lower(trim(name)), '[^a-z0-9]+', '-', 'g')
-where slug is null and name is not null;
+-- Anything still unslugged gets a derived one, with a counter if that name is
+-- already taken. Every slug column here is uniquely indexed, so a plain
+-- kebab-case update would abort the whole migration on the first collision.
+do $$
+declare
+  r         record;
+  base      text;
+  candidate text;
+  n         integer;
+begin
+  for r in select team_id, name from teams where slug is null and name is not null
+  loop
+    base := trim(both '-' from regexp_replace(lower(trim(r.name)), '[^a-z0-9]+', '-', 'g'));
+    if base = '' then base := 'team'; end if;
+    candidate := base;
+    n := 1;
+    while exists (select 1 from teams where slug = candidate) loop
+      n := n + 1;
+      candidate := base || '-' || n;
+    end loop;
+    update teams set slug = candidate where team_id = r.team_id;
+  end loop;
+end$$;
 
--- Competitions: derive from the name; these have no editorial slugs today.
-update competitions
-set slug = regexp_replace(lower(trim(name)), '[^a-z0-9]+', '-', 'g')
-where slug is null and name is not null;
+-- Competitions are one row per season, and every row currently shares the same
+-- name, so the season is part of the identity rather than a tie-breaker: a
+-- repeated name always carries its season, and a unique one stays clean.
+do $$
+declare
+  r         record;
+  base      text;
+  candidate text;
+  n         integer;
+begin
+  for r in
+    select c.competition_id,
+           c.name,
+           c.season,
+           count(*) over (partition by lower(trim(c.name))) as name_count
+    from competitions c
+    where c.slug is null and c.name is not null
+    order by c.name, c.season
+  loop
+    base := trim(both '-' from regexp_replace(lower(trim(r.name)), '[^a-z0-9]+', '-', 'g'));
+    if base = '' then base := 'competition'; end if;
 
--- ── 8. FIXTURE SLUG BACKFILL ────────────────────────────────
--- Rebuilds the site's existing URL format: home-away-dd-mm-yy, lowercased
--- and hyphenated. A trailing counter keeps repeat meetings on the same day
--- distinct.
-with numbered as (
-  select
-    f.fixture_id,
-    regexp_replace(
-      lower(
-        coalesce(h.name, 'tbc') || '-' || coalesce(a.name, 'tbc') || '-' ||
-        to_char(f.scheduled_date, 'DD-MM-YY')
-      ),
-      '[^a-z0-9]+', '-', 'g'
-    ) as base,
-    row_number() over (
-      partition by f.home_team_id, f.away_team_id, f.scheduled_date
-      order by f.created_at, f.fixture_id
-    ) as n
-  from fixtures f
-  left join teams h on h.team_id = f.home_team_id
-  left join teams a on a.team_id = f.away_team_id
-  where f.slug is null and f.scheduled_date is not null
-)
-update fixtures f
-set slug = case when n = 1 then numbered.base
-                else numbered.base || '-' || n end
-from numbered
-where f.fixture_id = numbered.fixture_id;
+    if r.name_count > 1 and r.season is not null then
+      base := base || '-' || trim(both '-' from
+                regexp_replace(lower(r.season::text), '[^a-z0-9]+', '-', 'g'));
+    end if;
+
+    candidate := base;
+    n := 1;
+    while exists (select 1 from competitions where slug = candidate) loop
+      n := n + 1;
+      candidate := base || '-' || n;
+    end loop;
+    update competitions set slug = candidate where competition_id = r.competition_id;
+  end loop;
+end$$;
+
+-- ── 8. FIXTURE SLUG BACKFILL ────────────────────────────
+-- Rebuilds the site's existing URL format: home-away-dd-mm-yy, lowercased and
+-- hyphenated, with a counter when the same two teams meet twice on a day.
+do $$
+declare
+  r         record;
+  base      text;
+  candidate text;
+  n         integer;
+begin
+  for r in
+    select f.fixture_id,
+           coalesce(h.name, 'tbc') as home_name,
+           coalesce(a.name, 'tbc') as away_name,
+           f.scheduled_date
+    from fixtures f
+    left join teams h on h.team_id = f.home_team_id
+    left join teams a on a.team_id = f.away_team_id
+    where f.slug is null and f.scheduled_date is not null
+    order by f.scheduled_date, f.created_at, f.fixture_id
+  loop
+    base := trim(both '-' from regexp_replace(
+      lower(r.home_name || '-' || r.away_name || '-' ||
+            to_char(r.scheduled_date, 'DD-MM-YY')),
+      '[^a-z0-9]+', '-', 'g'));
+
+    candidate := base;
+    n := 1;
+    while exists (select 1 from fixtures where slug = candidate) loop
+      n := n + 1;
+      candidate := base || '-' || n;
+    end loop;
+    update fixtures set slug = candidate where fixture_id = r.fixture_id;
+  end loop;
+end$$;
