@@ -70,6 +70,10 @@ export default async function EditFixturePage({ params }: { params: { id: string
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </Select>
       </Field>
+      <Field label="URL slug" hint="Public address on the website. Leave blank to keep the generated one.">
+        <Input name="slug" placeholder="bulls-nungua-tigers-28-01-24" defaultValue={f.slug ?? ""} />
+      </Field>
+
     </FormShell>
   );
 }

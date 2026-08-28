@@ -36,8 +36,20 @@ function payloadFromForm(fd: FormData) {
     home_venue_id: str(fd, "home_venue_id"),
     manager_name: str(fd, "manager_name"),
     coach_name: str(fd, "coach_name"),
+    // Slug is the club's public URL on the website (/clubs/panthers), so it is
+    // a deliberate short name rather than something derived from the name.
+    slug: slugify(str(fd, "slug")),
+    legal_name: str(fd, "legal_name"),
+    instagram_url: str(fd, "instagram_url"),
+    is_public: fd.get("is_public") === "on",
     logo_url: null as string | null,
   };
+}
+
+/** Keep slugs URL-safe without silently changing what was typed. */
+function slugify(v: string | null) {
+  if (!v) return null;
+  return v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || null;
 }
 
 export async function createTeam(fd: FormData) {

@@ -19,7 +19,15 @@ function payload(fd: FormData) {
     scheduled_time: str(fd, "scheduled_time"),
     round: str(fd, "round"),
     status: str(fd, "status") ?? "scheduled",
+    // Readable id used by the public website: /fixtures/<slug>.
+    // Leave blank and one is generated from the teams and date.
+    slug: slugify(str(fd, "slug")),
   };
+}
+
+function slugify(v: string | null) {
+  if (!v) return null;
+  return v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || null;
 }
 
 export async function createFixture(fd: FormData) {

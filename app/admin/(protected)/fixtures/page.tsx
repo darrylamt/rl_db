@@ -36,6 +36,15 @@ export default async function FixturesPage({
     )
   ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 
+  // A fixture with no date renders as "unscheduled" everywhere downstream and
+  // is easy to lose at the end of a long list, so surface the count.
+  const { count: undatedCount } = await supabase
+    .from("fixtures")
+    .select("fixture_id", { count: "exact", head: true })
+    .is("scheduled_date", null);
+
+  const showUndatedOnly = first(searchParams?.undated) === "1";
+
   const rawYear = first(searchParams?.year);
   const rawQ = (first(searchParams?.q) ?? "").trim();
   const currentYear = String(new Date().getFullYear());
@@ -76,6 +85,8 @@ export default async function FixturesPage({
     else q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000"); // empty
   }
 
+  if (showUndatedOnly) q = q.is("scheduled_date", null);
+
   if (searchTeamIds !== null) {
     if (searchTeamIds.length === 0) {
       q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000"); // no match
@@ -105,6 +116,28 @@ export default async function FixturesPage({
           + Bulk add fixtures
         </Link>
       </div>
+
+      {(undatedCount ?? 0) > 0 && !showUndatedOnly && (
+        <div className="mb-4 bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded flex flex-wrap items-center gap-2">
+          <span>
+            {undatedCount} fixture{undatedCount === 1 ? " has" : "s have"} no date
+            set, so {undatedCount === 1 ? "it shows" : "they show"} as unscheduled
+            on the public site.
+          </span>
+          <Link href="/admin/fixtures?undated=1" className="font-medium underline">
+            Show them
+          </Link>
+        </div>
+      )}
+
+      {showUndatedOnly && (
+        <div className="mb-4 bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded flex flex-wrap items-center gap-2">
+          <span>Showing fixtures with no date.</span>
+          <Link href="/admin/fixtures" className="font-medium underline">
+            Show all
+          </Link>
+        </div>
+      )}
 
       <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
         <label className="text-sm flex-1 min-w-[12rem]">

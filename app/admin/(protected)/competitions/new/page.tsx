@@ -34,6 +34,18 @@ export default function NewCompetitionPage() {
           <Input name="end_date" type="date" />
         </Field>
       </div>
+      <Field label="URL slug" hint="Public address on the website: /competitions/<slug>">
+        <Input name="slug" placeholder="mens-13s-championship" />
+      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Logo" hint="Path or URL, e.g. /competitions/m13c.png">
+          <Input name="logo_url" />
+        </Field>
+        <Field label="Banner" hint="Wide image for the competition header">
+          <Input name="banner_url" />
+        </Field>
+      </div>
+
     </FormShell>
   );
 }

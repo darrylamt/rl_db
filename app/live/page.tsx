@@ -142,17 +142,17 @@ export default async function LiveHubPage() {
         </Section>
       )}
 
-      {results.length > 0 && (
-        <Section title="Latest results" subtitle="Most recent first">
-          {results.map((f: any) => (
+      {upcoming.length > 0 && (
+        <Section title="Coming up">
+          {upcoming.map((f: any) => (
             <MatchCard key={f.fixture_id} fixture={f} />
           ))}
         </Section>
       )}
 
-      {upcoming.length > 0 && (
-        <Section title="Coming up">
-          {upcoming.map((f: any) => (
+      {results.length > 0 && (
+        <Section title="Latest results" subtitle="Most recent first">
+          {results.map((f: any) => (
             <MatchCard key={f.fixture_id} fixture={f} />
           ))}
         </Section>

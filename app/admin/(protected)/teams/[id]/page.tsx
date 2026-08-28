@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
-import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { updateTeam } from "../actions";
 
@@ -55,6 +55,18 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
       <Field label="Founded year">
         <Input name="founded_year" type="number" min={1800} max={2100} defaultValue={team.founded_year ?? ""} />
       </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="URL slug" hint="Public address on the website: /clubs/<slug>">
+          <Input name="slug" placeholder="panthers" defaultValue={team.slug ?? ""} />
+        </Field>
+        <Field label="Legal name" hint="Registered name, if different from the playing name">
+          <Input name="legal_name" defaultValue={team.legal_name ?? ""} />
+        </Field>
+      </div>
+      <Field label="Instagram">
+        <Input name="instagram_url" type="url" placeholder="https://instagram.com/…" defaultValue={team.instagram_url ?? ""} />
+      </Field>
+      <Checkbox name="is_public" defaultChecked={team.is_public !== false}  label="Show this club on the public website" />
       <Field label="Club Logo">
         <PhotoUpload name="logo" currentUrl={team.logo_url} label="Logo" shape="square" />
       </Field>

@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createTeam } from "../actions";
 
@@ -59,6 +59,18 @@ export default async function NewTeamPage() {
       <Field label="Founded year">
         <Input name="founded_year" type="number" min={1800} max={2100} />
       </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="URL slug" hint="Public address on the website: /clubs/<slug>">
+          <Input name="slug" placeholder="panthers" />
+        </Field>
+        <Field label="Legal name" hint="Registered name, if different from the playing name">
+          <Input name="legal_name" />
+        </Field>
+      </div>
+      <Field label="Instagram">
+        <Input name="instagram_url" type="url" placeholder="https://instagram.com/…" />
+      </Field>
+      <Checkbox name="is_public" defaultChecked  label="Show this club on the public website" />
       <Field label="Club Logo">
         <PhotoUpload name="logo" label="Logo" shape="square" />
       </Field>
