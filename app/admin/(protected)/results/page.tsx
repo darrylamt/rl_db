@@ -117,24 +117,41 @@ export default async function ResultsPage({
     });
   }
 
+  // Query fixtures rather than match_results so rows can be sorted by match
+  // date — PostgREST can only order on columns of the top-level table, and
+  // "most recently recorded" is not the same as "most recent match".
   let q = supabase
-    .from("match_results")
+    .from("fixtures")
     .select(
-      "result_id, home_score, away_score, attendance, recorded_at, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season))",
+      "fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results!inner(result_id, home_score, away_score, attendance, recorded_at)",
       { count: "exact" }
     );
 
   if (fixtureIds !== null) {
     if (fixtureIds.length === 0) {
-      q = q.eq("result_id", "00000000-0000-0000-0000-000000000000");
+      q = q.eq("fixture_id", "00000000-0000-0000-0000-000000000000");
     } else {
       q = q.in("fixture_id", fixtureIds);
     }
   }
 
-  const { data: results, error, count } = await q
-    .order("recorded_at", { ascending: false })
+  const { data: playedFixtures, error, count } = await q
+    .order("scheduled_date", { ascending: false, nullsFirst: false })
+    .order("scheduled_time", { ascending: false, nullsFirst: false })
     .range(from, to);
+
+  // Flatten back into the result-shaped rows the table below renders.
+  const results = (playedFixtures ?? []).map((f: any) => {
+    const r = Array.isArray(f.result) ? f.result[0] : f.result;
+    return {
+      result_id: r?.result_id,
+      home_score: r?.home_score,
+      away_score: r?.away_score,
+      attendance: r?.attendance,
+      recorded_at: r?.recorded_at,
+      fixture: f,
+    };
+  });
 
   const isFiltered =
     rawYear === "all" ||

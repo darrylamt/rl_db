@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
+import { AttributeFields } from "@/components/admin/AttributeFields";
 import { updatePlayer } from "../actions";
 
 const POSITIONS = [
@@ -109,6 +110,24 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           <Input name="email" type="email" defaultValue={p.email ?? ""} />
         </Field>
       </div>
+      <div className="pt-2 border-t border-slate-200">
+        <h2 className="font-display text-lg text-navy-900 mb-1">
+          Scouting Attributes
+        </h2>
+        <p className="text-xs text-slate-500 mb-3">
+          Drives the radar chart on the public player page.
+        </p>
+        <AttributeFields
+          defaults={{
+            attr_strength: p.attr_strength,
+            attr_speed: p.attr_speed,
+            attr_iq: p.attr_iq,
+            attr_defense: p.attr_defense,
+            attr_ability: p.attr_ability,
+          }}
+        />
+      </div>
+
       <Field label="Player Photo">
         <PhotoUpload name="photo" currentUrl={p.photo_url} label="Photo" shape="round" />
       </Field>

@@ -84,8 +84,10 @@ export default async function FixturesPage({
     }
   }
 
+  // Most recent match first — the newest fixtures are the ones being worked on.
   const { data: fixtures, error, count } = await q
-    .order("scheduled_date", { ascending: true })
+    .order("scheduled_date", { ascending: false, nullsFirst: false })
+    .order("scheduled_time", { ascending: false, nullsFirst: false })
     .range(from, to);
 
   const nonDefaultYear =

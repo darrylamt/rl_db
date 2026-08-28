@@ -27,6 +27,20 @@ export default function Home() {
           </p>
         </header>
 
+        {/* Public match centre — safe to share, links nowhere near the admin login. */}
+        <Link
+          href="/live"
+          className="block mb-4 md:mb-6 bg-neutral-900 border border-ghanaYellow-500/30 hover:border-ghanaYellow-500 rounded-lg p-6 transition"
+        >
+          <h2 className="font-display text-2xl text-ghanaYellow-500 mb-2">
+            Live Scores &amp; Match Centre
+          </h2>
+          <p className="text-slate-300 text-sm">
+            The public page for fans — live scores, results and full match stats.
+            Share <span className="text-white font-medium">/live</span> freely.
+          </p>
+        </Link>
+
         <div className="grid md:grid-cols-2 gap-4 md:gap-6">
           <section className="bg-neutral-900 border border-white/10 rounded-lg p-6">
             <h2 className="font-display text-2xl text-ghanaYellow-500 mb-2">

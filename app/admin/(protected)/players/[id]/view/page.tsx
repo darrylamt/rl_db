@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/admin/Breadcrumb";
 import { createAdminClient } from "@/lib/supabase/server";
+import { fetchLineupAppearances } from "@/lib/appearances";
+import { RadarChart } from "@/components/RadarChart";
+import { ATTRIBUTE_AXES, attributeAverage, attributeValues, hasAttributes } from "@/lib/attributes";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -91,7 +94,7 @@ export default async function PlayerDetailPage({
     supabase
       .from("players")
       .select(
-        "player_id, first_name, last_name, jersey_number, position, playing_status, date_of_birth, height_cm, weight_kg, nationality, is_captain, photo_url, rating, team:team_id(team_id, name, team_type)"
+        "*, team:team_id(team_id, name, team_type)"
       )
       .eq("player_id", playerId)
       .maybeSingle(),
@@ -106,22 +109,18 @@ export default async function PlayerDetailPage({
   // Supabase types embedded FK joins as T[] — normalise to plain object.
   const team: any = Array.isArray(player.team) ? player.team[0] : player.team;
 
-  // All career events (for stats + matches played).
-  const { data: events } = await supabase
-    .from("match_events")
-    .select(
-      "event_id, event_type, minute, fixture:fixture_id(fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score))"
-    )
-    .eq("player_id", playerId);
+  // All career events (for stats) + every squad selection (for appearances).
+  const [{ data: events }, lineups] = await Promise.all([
+    supabase
+      .from("match_events")
+      .select(
+        "event_id, event_type, minute, fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score))"
+      )
+      .eq("player_id", playerId),
+    fetchLineupAppearances(supabase, playerId),
+  ]);
 
   const stats = tallyEvents(events ?? []);
-  const matchesPlayedIds = new Set(
-    (events ?? []).map((e: any) => {
-      const f = Array.isArray(e.fixture) ? e.fixture[0] : e.fixture;
-      return f?.fixture_id;
-    }).filter(Boolean)
-  );
-  const matchesPlayed = matchesPlayedIds.size;
 
   // Build a flat match-appearances list (one row per distinct fixture).
   const perMatch = new Map<string, any>();
@@ -133,6 +132,16 @@ export default async function PlayerDetailPage({
     const evKey = e.event_type?.toLowerCase?.() ?? e.event_type;
     bucket.stats[evKey] = (bucket.stats[evKey] ?? 0) + 1;
   }
+
+  // Matches the player was named in but has no recorded events for still count
+  // as appearances — they just contribute an empty stat line to the match log.
+  for (const l of lineups) {
+    const f: any = l.fixture;
+    if (!f?.fixture_id || perMatch.has(f.fixture_id)) continue;
+    perMatch.set(f.fixture_id, { fixture: f, stats: {} as StatMap });
+  }
+
+  const matchesPlayed = perMatch.size;
   const matchRows = Array.from(perMatch.values()).sort((a, b) => {
     const ad = a.fixture.scheduled_date ?? "";
     const bd = b.fixture.scheduled_date ?? "";
@@ -326,6 +335,62 @@ export default async function PlayerDetailPage({
         </div>
       </section>
 
+      {/* Scouting attributes — the radar chart fans see on the public page */}
+      <section className="mb-8">
+        <div className="flex items-baseline justify-between gap-3 mb-3">
+          <h2 className="font-display text-xl font-bold text-navy-900">
+            Attributes
+          </h2>
+          <Link
+            href={`/admin/players/${playerId}`}
+            className="text-xs text-navy-700 hover:underline"
+          >
+            Edit attributes →
+          </Link>
+        </div>
+        {hasAttributes(player) ? (
+          <div className="bg-neutral-950 rounded-lg p-4 text-white flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-full sm:w-72 mx-auto">
+              <RadarChart
+                axes={ATTRIBUTE_AXES}
+                series={[
+                  {
+                    label: `${player.first_name} ${player.last_name}`,
+                    values: attributeValues(player),
+                    color: "#c81e1e",
+                  },
+                ]}
+              />
+            </div>
+            <dl className="flex-1 space-y-1.5">
+              {ATTRIBUTE_AXES.map((label, i) => (
+                <div key={label} className="flex items-center gap-3 text-sm">
+                  <dt className="w-20 shrink-0 text-slate-400 text-xs uppercase tracking-wider">
+                    {label}
+                  </dt>
+                  <dd className="tabular-nums">
+                    {attributeValues(player)[i] ?? "—"}
+                  </dd>
+                </div>
+              ))}
+              <div className="pt-1.5 text-xs text-slate-400">
+                Overall {attributeAverage(player)}
+              </div>
+            </dl>
+          </div>
+        ) : (
+          <p className="text-slate-500 text-sm bg-white border border-slate-200 rounded-lg px-4 py-6 text-center">
+            No attributes entered yet.{" "}
+            <Link
+              href={`/admin/players/${playerId}`}
+              className="text-navy-700 hover:underline"
+            >
+              Add them →
+            </Link>
+          </p>
+        )}
+      </section>
+
       {/* H2H */}
       <section className="mb-8">
         <h2 className="font-display text-xl font-bold text-navy-900 mb-3">
@@ -414,7 +479,7 @@ export default async function PlayerDetailPage({
         </h2>
         {matchRows.length === 0 ? (
           <p className="text-slate-500 text-sm bg-white border border-slate-200 rounded-lg px-4 py-6 text-center">
-            No recorded match events yet.
+            No matches played yet.
           </p>
         ) : (
           <div className="space-y-2">

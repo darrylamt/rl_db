@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/server";
 import { ok, fail, preflight } from "@/lib/api";
+import { fetchLineupAppearances } from "@/lib/appearances";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,13 @@ export async function GET(
   const supabase = createPublicClient();
   const { id } = params;
 
-  const [{ data: player, error: playerError }, { data: events }] =
+  const [{ data: player, error: playerError }, { data: events }, lineups] =
     await Promise.all([
       supabase
         .from("public_players")
-        .select(
-          "player_id, team_id, first_name, last_name, date_of_birth, age, height_cm, weight_kg, nationality, jersey_number, position, is_captain, playing_status, photo_url, rating"
-        )
+        // public_players already excludes phone/email, so "*" is safe here and
+        // keeps working before/after the attribute columns are added.
+        .select("*")
         .eq("player_id", id)
         .maybeSingle(),
 
@@ -31,6 +32,9 @@ export async function GET(
         .from("match_events")
         .select("event_type, fixture_id")
         .eq("player_id", id),
+
+      // Squad selections — a player appears in a match even with no events
+      fetchLineupAppearances(supabase, id),
     ]);
 
   if (playerError) return fail(playerError.message, 500);
@@ -39,8 +43,14 @@ export async function GET(
   // Aggregate career stats from raw events
   const stats = aggregateStats(events ?? []);
 
-  // Distinct fixture IDs = matches played
-  const matchesPlayed = new Set((events ?? []).map((e: any) => e.fixture_id)).size;
+  // Distinct fixtures the player was selected for or recorded an event in
+  const playedFixtureIds = new Set<string>(
+    (events ?? []).map((e: any) => e.fixture_id).filter(Boolean)
+  );
+  for (const l of lineups) {
+    if (l.fixture?.fixture_id) playedFixtureIds.add(l.fixture.fixture_id);
+  }
+  const matchesPlayed = playedFixtureIds.size;
 
   return ok({
     ...player,

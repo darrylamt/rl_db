@@ -18,6 +18,12 @@ function intOrNull(fd: FormData, k: string) {
 function boolVal(fd: FormData, k: string) {
   return fd.get(k) === "on";
 }
+/** Attribute inputs are clamped to the 0-100 range the DB check enforces. */
+function attrOrNull(fd: FormData, k: string) {
+  const n = intOrNull(fd, k);
+  if (n === null) return null;
+  return Math.max(0, Math.min(100, n));
+}
 
 function payload(fd: FormData) {
   return {
@@ -37,6 +43,12 @@ function payload(fd: FormData) {
     photo_url: null as string | null,
     phone: str(fd, "phone"),
     email: str(fd, "email"),
+    // Scouting attributes (0-100). Blank stays null = "not rated yet".
+    attr_strength: attrOrNull(fd, "attr_strength"),
+    attr_speed: attrOrNull(fd, "attr_speed"),
+    attr_iq: attrOrNull(fd, "attr_iq"),
+    attr_defense: attrOrNull(fd, "attr_defense"),
+    attr_ability: attrOrNull(fd, "attr_ability"),
   };
 }
 
