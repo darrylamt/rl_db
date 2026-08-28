@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ResultTabs } from "./ResultTabs";
-import { upsertResult, addEvent, deleteEvent, saveRatings, deleteRating } from "../actions";
+import { upsertResult, addEvent, deleteEvent, saveRatings, deleteRating, swapHomeAway } from "../actions";
 
 export default async function EditResultPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
@@ -67,6 +67,7 @@ export default async function EditResultPage({ params }: { params: { id: string 
   const boundUpsert     = upsertResult.bind(null, params.id);
   const boundAddEvent   = addEvent.bind(null, params.id);
   const boundSaveRatings = saveRatings.bind(null, params.id);
+  const boundSwap        = swapHomeAway.bind(null, params.id);
 
   return (
     <ResultTabs
@@ -83,6 +84,7 @@ export default async function EditResultPage({ params }: { params: { id: string 
       deleteEvent={deleteEvent}
       saveRatings={boundSaveRatings}
       deleteRating={deleteRating}
+      swapHomeAway={boundSwap}
     />
   );
 }

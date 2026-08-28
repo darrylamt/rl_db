@@ -45,6 +45,94 @@ function resultPayload(fd: FormData, fixture_id: string) {
   };
 }
 
+/**
+ * Swap which team is home and which is away.
+ *
+ * Only two tables carry home/away meaning: the fixture's team columns, and the
+ * six paired score columns on the result. Everything else — match events,
+ * line-ups, player ratings — stores a team_id, so it follows the team and
+ * needs no changes. Standings recompute from the corrected fixture.
+ */
+export async function swapHomeAway(fixture_id: string) {
+  const supabase = createAdminClient();
+
+  const { data: fixture, error: fixtureError } = await supabase
+    .from("fixtures")
+    .select("home_team_id, away_team_id, slug, scheduled_date")
+    .eq("fixture_id", fixture_id)
+    .maybeSingle();
+  if (fixtureError) throw new Error(fixtureError.message);
+  if (!fixture) throw new Error("Fixture not found");
+
+  const { data: result } = await supabase
+    .from("match_results")
+    .select(
+      "result_id, home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals"
+    )
+    .eq("fixture_id", fixture_id)
+    .maybeSingle();
+
+  // The slug encodes the old team order, so rebuild it. A slug that was edited
+  // by hand is left alone — only regenerate one that still matches the
+  // generated home-away-date pattern.
+  let slug = fixture.slug as string | null;
+  if (slug && fixture.scheduled_date) {
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("team_id, name")
+      .in("team_id", [fixture.home_team_id, fixture.away_team_id].filter(Boolean));
+    const nameOf = (id: string | null) =>
+      (teams ?? []).find((t: any) => t.team_id === id)?.name ?? "tbc";
+    const kebab = (v: string) =>
+      v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const datePart = String(fixture.scheduled_date)
+      .slice(0, 10)
+      .split("-")
+      .reverse()
+      .map((part, i) => (i === 2 ? part.slice(-2) : part))
+      .join("-");
+    const generated = `${kebab(nameOf(fixture.home_team_id))}-${kebab(nameOf(fixture.away_team_id))}-${datePart}`;
+    if (slug === generated) {
+      slug = `${kebab(nameOf(fixture.away_team_id))}-${kebab(nameOf(fixture.home_team_id))}-${datePart}`;
+    }
+  }
+
+  const { error: swapError } = await supabase
+    .from("fixtures")
+    .update({
+      home_team_id: fixture.away_team_id,
+      away_team_id: fixture.home_team_id,
+      slug,
+    })
+    .eq("fixture_id", fixture_id);
+  if (swapError) throw new Error(swapError.message);
+
+  if (result) {
+    const { error: scoreError } = await supabase
+      .from("match_results")
+      .update({
+        home_score: result.away_score,
+        away_score: result.home_score,
+        home_tries: result.away_tries,
+        away_tries: result.home_tries,
+        home_conversions: result.away_conversions,
+        away_conversions: result.home_conversions,
+        home_penalties: result.away_penalties,
+        away_penalties: result.home_penalties,
+        home_drop_goals: result.away_drop_goals,
+        away_drop_goals: result.home_drop_goals,
+      })
+      .eq("fixture_id", fixture_id);
+    if (scoreError) throw new Error(scoreError.message);
+  }
+
+  revalidatePath(`/admin/results/${fixture_id}`);
+  revalidatePath(`/admin/fixtures/${fixture_id}`);
+  revalidatePath("/admin/results");
+  revalidatePath("/admin/fixtures");
+  revalidatePath("/admin/standings");
+}
+
 export async function upsertResult(fixture_id: string, fd: FormData) {
   const supabase = createAdminClient();
   const p = resultPayload(fd, fixture_id);

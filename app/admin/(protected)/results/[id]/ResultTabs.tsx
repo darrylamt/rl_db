@@ -1096,6 +1096,7 @@ export function ResultTabs({
   deleteEvent,
   saveRatings,
   deleteRating,
+  swapHomeAway,
 }: {
   fixtureId: string;
   fixture: any;
@@ -1110,6 +1111,7 @@ export function ResultTabs({
   deleteEvent: (eventId: string) => Promise<void>;
   saveRatings: (rows: { player_id: string; team_id: string; rating: number; notes: string | null }[]) => Promise<void>;
   deleteRating: (ratingId: string, fixtureId: string) => Promise<void>;
+  swapHomeAway: () => Promise<void>;
 })
  {
   const [activeTab, setActiveTab] = useState<Tab>("Score");
@@ -1141,6 +1143,11 @@ export function ResultTabs({
               })
             : "Date unknown"}
         </p>
+        <SwapHomeAway
+          homeName={homeTeam?.name ?? "?"}
+          awayName={awayTeam?.name ?? "?"}
+          onSwap={swapHomeAway}
+        />
       </div>
 
       {/* Tabs */}
@@ -1201,6 +1208,85 @@ export function ResultTabs({
           deleteRating={deleteRating}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Fixes a fixture entered with the teams the wrong way round.
+ *
+ * Scores move with the teams, and events, line-ups and ratings are stored
+ * against a team_id, so nothing recorded has to be entered again.
+ */
+function SwapHomeAway({
+  homeName,
+  awayName,
+  onSwap,
+}: {
+  homeName: string;
+  awayName: string;
+  onSwap: () => Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-navy-700 hover:text-navy-900 hover:underline"
+      >
+        <span aria-hidden="true">⇄</span> Swap home and away
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 text-sm">
+      <p className="text-amber-900">
+        Swap so <span className="font-semibold">{awayName}</span> becomes the
+        home team and <span className="font-semibold">{homeName}</span> the away
+        team?
+      </p>
+      <p className="text-amber-800 text-xs mt-1">
+        Scores swap with them. Events, line-ups and player ratings are recorded
+        against each team, so nothing needs re-entering. Standings recalculate
+        on their own.
+      </p>
+      {error && <p className="text-red-700 text-xs mt-1.5">{error}</p>}
+      <div className="flex items-center gap-2 mt-2.5">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setError("");
+            startTransition(async () => {
+              try {
+                await onSwap();
+                setConfirming(false);
+              } catch (e: any) {
+                setError(e?.message ?? "Could not swap the teams");
+              }
+            });
+          }}
+          className="px-3 py-1.5 rounded bg-navy-900 hover:bg-navy-800 disabled:opacity-60 text-white text-xs font-medium"
+        >
+          {pending ? "Swapping…" : "Yes, swap them"}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setConfirming(false);
+            setError("");
+          }}
+          className="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-xs font-medium"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
