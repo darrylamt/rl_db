@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { UploadOrLink } from "@/components/admin/UploadOrLink";
 import { updatePartner } from "../actions";
 
 export default async function EditPartnerPage({ params }: { params: { id: string } }) {
@@ -37,8 +38,15 @@ export default async function EditPartnerPage({ params }: { params: { id: string
       <Field label="Website">
         <Input name="link" type="url" defaultValue={p.link ?? ""} />
       </Field>
-      <Field label="Logo" hint="Path or URL, e.g. /partners/polytank.png">
-        <Input name="logo_url" defaultValue={p.logo_url ?? ""} />
+      <Field label="Logo" hint="Shown on the partners page and in the site footer.">
+        <UploadOrLink
+          urlName="logo_url"
+          bucket="content-images"
+          prefix="partners"
+          accept="image/*"
+          urlPlaceholder="/partners/polytank.png"
+          currentUrl={p.logo_url}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Sort order" hint="Lower shows first">

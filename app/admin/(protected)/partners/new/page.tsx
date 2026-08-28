@@ -1,4 +1,5 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { UploadOrLink } from "@/components/admin/UploadOrLink";
 import { createPartner } from "../actions";
 
 export default function NewPartnerPage() {
@@ -25,8 +26,15 @@ export default function NewPartnerPage() {
       <Field label="Website">
         <Input name="link" type="url" />
       </Field>
-      <Field label="Logo" hint="Path or URL, e.g. /partners/polytank.png">
-        <Input name="logo_url" placeholder="/partners/polytank.png" />
+      <Field label="Logo" hint="Shown on the partners page and in the site footer.">
+        <UploadOrLink
+          urlName="logo_url"
+          bucket="content-images"
+          prefix="partners"
+          accept="image/*"
+          urlPlaceholder="/partners/polytank.png"
+          
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Sort order" hint="Lower shows first">

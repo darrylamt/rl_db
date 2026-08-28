@@ -1,4 +1,5 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { UploadOrLink } from "@/components/admin/UploadOrLink";
 import { createPerson } from "../actions";
 
 export default function NewPersonPage() {
@@ -21,8 +22,15 @@ export default function NewPersonPage() {
       <Field label="Email">
         <Input name="email" type="email" />
       </Field>
-      <Field label="Photo" hint="Path or URL, e.g. /team/12.png">
-        <Input name="photo_url" placeholder="/team/12.png" />
+      <Field label="Photo" hint="Headshot shown on the about and governance pages.">
+        <UploadOrLink
+          urlName="photo_url"
+          bucket="content-images"
+          prefix="people"
+          accept="image/*"
+          urlPlaceholder="/team/12.png"
+          
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Sort order" hint="Lower shows first">

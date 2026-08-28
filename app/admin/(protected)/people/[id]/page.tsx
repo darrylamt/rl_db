@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { UploadOrLink } from "@/components/admin/UploadOrLink";
 import { updatePerson } from "../actions";
 
 export default async function EditPersonPage({ params }: { params: { id: string } }) {
@@ -33,8 +34,15 @@ export default async function EditPersonPage({ params }: { params: { id: string 
       <Field label="Email">
         <Input name="email" type="email" defaultValue={p.email ?? ""} />
       </Field>
-      <Field label="Photo" hint="Path or URL, e.g. /team/12.png">
-        <Input name="photo_url" defaultValue={p.photo_url ?? ""} />
+      <Field label="Photo" hint="Headshot shown on the about and governance pages.">
+        <UploadOrLink
+          urlName="photo_url"
+          bucket="content-images"
+          prefix="people"
+          accept="image/*"
+          urlPlaceholder="/team/12.png"
+          currentUrl={p.photo_url}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Sort order" hint="Lower shows first">

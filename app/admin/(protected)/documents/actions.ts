@@ -20,6 +20,8 @@ function payload(fd: FormData) {
   return {
     name: str(fd, "name"),
     type: str(fd, "type") ?? "Reports",
+    // UploadOrLink puts the storage URL in this field after a browser-side
+    // upload, so either route arrives here the same way.
     link: str(fd, "link"),
     thumbnail_url: str(fd, "thumbnail_url"),
     published_at: str(fd, "published_at"),
