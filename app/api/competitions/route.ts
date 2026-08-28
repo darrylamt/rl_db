@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("competitions")
     .select(
-      "competition_id, name, season, type, start_date, end_date, status",
+      "*",
       { count: "exact" }
     )
     .order("season", { ascending: false })

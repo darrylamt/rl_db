@@ -1,0 +1,327 @@
+{
+  "info": {
+    "name": "RLFG — Rugby League Federation Ghana API",
+    "description": "Official API for the Rugby League Federation Ghana. Base URL: https://rl-db.vercel.app",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://rl-db.vercel.app",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "teams"],
+              "query": [
+                { "key": "type", "value": "club", "description": "Filter by team type: club | national | president_xv", "disabled": true },
+                { "key": "limit", "value": "50", "description": "Number of results (max 200)", "disabled": true },
+                { "key": "offset", "value": "0", "description": "Pagination offset", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of all teams. Filter by type with ?type=club|national|president_xv"
+          }
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/teams/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "teams", ":id"],
+              "variable": [
+                { "key": "id", "value": "", "description": "Team UUID" }
+              ]
+            },
+            "description": "Returns a single team with full details including players and recent results."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "List Players",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/players",
+              "host": ["{{base_url}}"],
+              "path": ["api", "players"],
+              "query": [
+                { "key": "team", "value": "", "description": "Filter by team_id", "disabled": true },
+                { "key": "limit", "value": "50", "description": "Number of results (max 200)", "disabled": true },
+                { "key": "offset", "value": "0", "description": "Pagination offset", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of players. Optionally filter by team."
+          }
+        },
+        {
+          "name": "Get Player by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/players/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "players", ":id"],
+              "variable": [
+                { "key": "id", "value": "", "description": "Player UUID" }
+              ]
+            },
+            "description": "Returns a single player's profile including stats and match history."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fixtures",
+      "item": [
+        {
+          "name": "List Fixtures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/fixtures",
+              "host": ["{{base_url}}"],
+              "path": ["api", "fixtures"],
+              "query": [
+                { "key": "competition", "value": "", "description": "Filter by competition_id", "disabled": true },
+                { "key": "team", "value": "", "description": "Filter by team_id", "disabled": true },
+                { "key": "status", "value": "scheduled", "description": "Filter by status: scheduled | completed", "disabled": true },
+                { "key": "limit", "value": "50", "disabled": true },
+                { "key": "offset", "value": "0", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of fixtures with basic team and competition info."
+          }
+        },
+        {
+          "name": "Get Fixture by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/fixtures/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "fixtures", ":id"],
+              "variable": [
+                { "key": "id", "value": "", "description": "Fixture UUID" }
+              ]
+            },
+            "description": "Returns full fixture detail: result, match events (tries/conversions), lineup, and officials."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schedule",
+      "item": [
+        {
+          "name": "Get Full Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/schedule",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schedule"],
+              "query": [
+                { "key": "season", "value": "2025", "description": "Filter by season year", "disabled": true },
+                { "key": "competition", "value": "", "description": "Filter by competition_id", "disabled": true },
+                { "key": "team", "value": "", "description": "Filter by team_id", "disabled": true }
+              ]
+            },
+            "description": "Returns all fixtures with embedded scores, rosters, and try/conversion activities per team. Designed for building standings and match cards on the frontend."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Results",
+      "item": [
+        {
+          "name": "List Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/results",
+              "host": ["{{base_url}}"],
+              "path": ["api", "results"],
+              "query": [
+                { "key": "competition", "value": "", "description": "Filter by competition_id", "disabled": true },
+                { "key": "team", "value": "", "description": "Filter by team_id", "disabled": true },
+                { "key": "limit", "value": "50", "disabled": true },
+                { "key": "offset", "value": "0", "disabled": true }
+              ]
+            },
+            "description": "Returns completed match results with scores and fixture details."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Standings",
+      "item": [
+        {
+          "name": "Get Standings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/standings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "standings"],
+              "query": [
+                { "key": "competition", "value": "", "description": "Filter by competition_id", "disabled": true },
+                { "key": "season", "value": "2025", "description": "Filter by season year", "disabled": true }
+              ]
+            },
+            "description": "Returns league table standings: played, won, drawn, lost, points for/against, and league points."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Competitions",
+      "item": [
+        {
+          "name": "List Competitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/competitions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "competitions"],
+              "query": [
+                { "key": "season", "value": "2025", "description": "Filter by season year", "disabled": true },
+                { "key": "status", "value": "active", "description": "Filter by status: upcoming | active | completed", "disabled": true }
+              ]
+            },
+            "description": "Returns all competitions with name, season, type, and status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Articles",
+      "item": [
+        {
+          "name": "List Articles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/articles",
+              "host": ["{{base_url}}"],
+              "path": ["api", "articles"],
+              "query": [
+                { "key": "limit", "value": "20", "disabled": true },
+                { "key": "offset", "value": "0", "disabled": true }
+              ]
+            },
+            "description": "Returns published articles with title, slug, excerpt, cover image, author, tags, and published date. Does not include full content body."
+          }
+        },
+        {
+          "name": "Get Article by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/articles/:slug",
+              "host": ["{{base_url}}"],
+              "path": ["api", "articles", ":slug"],
+              "variable": [
+                { "key": "slug", "value": "", "description": "Article slug (e.g. ghana-wins-cup-2025)" }
+              ]
+            },
+            "description": "Returns a single published article including the full content body."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Officials",
+      "item": [
+        {
+          "name": "List Officials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/officials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "officials"],
+              "query": [
+                { "key": "limit", "value": "50", "disabled": true },
+                { "key": "offset", "value": "0", "disabled": true }
+              ]
+            },
+            "description": "Returns match officials (referees, touch judges, etc.)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Venues",
+      "item": [
+        {
+          "name": "List Venues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/venues",
+              "host": ["{{base_url}}"],
+              "path": ["api", "venues"]
+            },
+            "description": "Returns all venues with name, region, city, and capacity."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "List Match Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events"],
+              "query": [
+                { "key": "fixture", "value": "", "description": "Filter by fixture_id", "disabled": true },
+                { "key": "player", "value": "", "description": "Filter by player_id", "disabled": true },
+                { "key": "type", "value": "try", "description": "Filter by event_type: try | conversion | penalty | drop_goal", "disabled": true }
+              ]
+            },
+            "description": "Returns individual match events (tries, conversions, penalties, drop goals)."
+          }
+        }
+      ]
+    }
+  ]
+}

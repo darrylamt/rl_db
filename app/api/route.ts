@@ -40,7 +40,13 @@ export async function GET() {
       "GET /api/venues": "List venues.",
 
       "GET /api/articles": "Published articles / news. ?tag=<string> ?limit=10 ?offset=0",
-      "GET /api/articles/:slug": "Full article content by slug (HTML body included)",
+      "GET /api/articles/:slug": "Full article content by slug — HTML body plus a typed blocks[] array",
+
+      "GET /api/schedule": "Every fixture with scores, rosters and scoring events. ?season=2025 ?competition=<uuid> ?team=<uuid>",
+
+      "GET /api/documents": "Reports, AGM minutes and policies. ?type=<string> ?q=<search>",
+      "GET /api/people": "Board and committee members. ?group=board|committee",
+      "GET /api/partners": "Sponsors grouped into three tiers. ?flat=1 for a plain list",
     },
     admin_endpoints: {
       note: "Require a valid Supabase session cookie (sign in at /admin/login)",
@@ -53,6 +59,9 @@ export async function GET() {
         "POST /api/officials",
         "POST /api/competitions",
         "POST /api/venues",
+        "POST /api/documents",
+        "POST /api/people",
+        "POST /api/partners",
       ],
     },
   });

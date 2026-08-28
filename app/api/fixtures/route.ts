@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, round, status, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), venue:venue_id(name), competition:competition_id(competition_id, name, season)",
+      "*, scheduled_date, scheduled_time, round, status, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), venue:venue_id(name), competition:competition_id(competition_id, name, season)",
       { count: "exact" }
     )
     .order("scheduled_date", { ascending: true })

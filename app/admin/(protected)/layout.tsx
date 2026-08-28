@@ -17,6 +17,9 @@ const navItems = [
   { href: "/admin/results", label: "Results" },
   { href: "/admin/standings", label: "Standings" },
   { href: "/admin/suspensions", label: "Suspensions" },
+  { href: "/admin/documents", label: "Documents", divider: true },
+  { href: "/admin/people", label: "Board & Committee" },
+  { href: "/admin/partners", label: "Partners" },
   { href: "/docs", label: "API Docs", divider: true, external: true },
 ];
 

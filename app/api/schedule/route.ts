@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   let fixturesQuery = supabase
     .from("fixtures")
     .select(
-      `fixture_id, scheduled_date, scheduled_time, round, status,
+      `*,
        home_team:home_team_id(team_id, name, logo_url, slug),
        away_team:away_team_id(team_id, name, logo_url, slug),
        venue:venue_id(name),
@@ -144,6 +144,8 @@ export async function GET(req: Request) {
 
     return {
       fixture_id: f.fixture_id,
+      // Readable id matching the website's existing /fixtures/<slug> URLs.
+      slug: f.slug ?? null,
       played,
       date: f.scheduled_date
         ? `${f.scheduled_date}T${f.scheduled_time ?? "00:00:00"}`

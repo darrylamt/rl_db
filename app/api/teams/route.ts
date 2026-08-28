@@ -19,7 +19,8 @@ export async function GET(req: Request) {
   let q = supabase
     .from("teams")
     .select(
-      "team_id, name, slug, team_type, region, city, logo_url, instagram_url, founded_year, manager_name, coach_name, home_venue:home_venue_id(name)",
+      // "*" keeps this working whether or not the integration migration has run.
+      "*, home_venue:home_venue_id(name)",
       { count: "exact" }
     )
     .order("name")
