@@ -31,6 +31,7 @@ function payloadFromForm(fd: FormData) {
   return {
     name: str(fd, "name"),
     team_type: teamType(fd),
+    division: str(fd, "division") ?? "men",
     region: str(fd, "region"),
     city: str(fd, "city"),
     founded_year: intOrNull(fd, "founded_year"),
@@ -48,7 +49,7 @@ function payloadFromForm(fd: FormData) {
 }
 
 // Added by integration_schema.sql; a deploy can land before the migration.
-const OPTIONAL_TEAM_COLUMNS = ["legal_name", "is_public"] as const;
+const OPTIONAL_TEAM_COLUMNS = ["legal_name", "is_public", "division"] as const;
 
 /** Keep slugs URL-safe without silently changing what was typed. */
 function slugify(v: string | null) {

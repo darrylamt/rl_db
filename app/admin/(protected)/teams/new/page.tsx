@@ -20,7 +20,7 @@ export default async function NewTeamPage() {
 
   return (
     <FormShell title="Add Team" backHref="/admin/teams" onSubmit={createTeam} submitLabel="Create team">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Name">
           <Input name="name" required placeholder="e.g. Accra Panthers" />
         </Field>
@@ -29,6 +29,13 @@ export default async function NewTeamPage() {
             <option value="club">Club</option>
             <option value="national">National</option>
             <option value="president_xv">President XIII</option>
+          </Select>
+        </Field>
+        <Field label="Division" hint="Drives the men/women/youth toggle on the website">
+          <Select name="division" defaultValue="men">
+            <option value="men">Men</option>
+            <option value="women">Women</option>
+            <option value="youth">Youth</option>
           </Select>
         </Field>
       </div>
