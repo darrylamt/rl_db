@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("articles")
     .select(
-      "article_id, title, slug, excerpt, cover_image_url, author, tags, status, published_at, updated_at",
+      "article_id, title, slug, excerpt, cover_image_url, category, author, tags, status, published_at, updated_at",
       { count: "exact" }
     )
     .eq("status", "published")   // RLS also enforces this; belt+braces
