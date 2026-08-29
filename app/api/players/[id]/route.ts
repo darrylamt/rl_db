@@ -58,6 +58,15 @@ export async function GET(
       matches_played: matchesPlayed,
       ...stats,
       // Rugby League points: try=4, conversion=2, penalty=2, drop_goal=1
+      // Goal-kicking accuracy. Null rather than 0 when nobody has recorded a
+      // kick either way, so "no data" doesn't read as "missed everything".
+      conversion_attempts: stats.conversions + stats.missed_conversions,
+      conversion_rate:
+        stats.conversions + stats.missed_conversions > 0
+          ? Math.round(
+              (stats.conversions / (stats.conversions + stats.missed_conversions)) * 100
+            )
+          : null,
       total_points:
         stats.tries * 4 +
         stats.conversions * 2 +
@@ -68,6 +77,13 @@ export async function GET(
 }
 
 // Map event_type → stat counter name
+/** Events have been entered from three screens, so "penalty goal",
+ *  "penalty_goal" and "penalty" all appear. Count them as one thing. */
+function normaliseEventType(value: string): string {
+  const t = (value ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+  return t === "penalty" ? "penalty_goal" : t;
+}
+
 const EVENT_STAT_MAP: Record<string, string> = {
   try: "tries",
   conversion: "conversions",
@@ -87,7 +103,7 @@ const EVENT_STAT_MAP: Record<string, string> = {
 function aggregateStats(events: { event_type: string }[]) {
   const stats: Record<string, number> = {};
   for (const ev of events) {
-    const key = EVENT_STAT_MAP[ev.event_type];
+    const key = EVENT_STAT_MAP[normaliseEventType(ev.event_type)];
     if (key) stats[key] = (stats[key] ?? 0) + 1;
   }
   // Ensure all keys exist even if zero

@@ -3,6 +3,28 @@ import { ok, fail, preflight } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+// Per-player counters rather than things that happen at a minute mark.
+const TALLY_EVENTS = new Set([
+  "completed_set",
+  "tackle",
+  "missed_tackle",
+  "offload",
+  "metres_gained",
+  "tackle_break",
+  "clean_break",
+  "turnover_won",
+]);
+
+/**
+ * Events have been entered from three screens over the years, so the same
+ * act appears as "penalty goal", "penalty_goal" and "penalty". Callers
+ * should only ever see the canonical form.
+ */
+function normaliseEventType(value: string | null): string {
+  const t = (value ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+  return t === "penalty" ? "penalty_goal" : t;
+}
+
 export async function OPTIONS() {
   return preflight();
 }
@@ -71,7 +93,6 @@ export async function GET(req: Request) {
         "fixture_id, event_type, minute, team_id, player:player_id(first_name, last_name)"
       )
       .in("fixture_id", fixtureIds)
-      .in("event_type", ["try", "conversion", "Try", "Conversion"])
       .order("minute", { ascending: true }),
 
     supabase
@@ -123,8 +144,11 @@ export async function GET(req: Request) {
         .map((e) => ({
           player: `${(e.player as any)?.first_name ?? ""} ${(e.player as any)?.last_name ?? ""}`.trim(),
           time: e.minute !== null ? String(e.minute) : "",
-          activity_type: (e.event_type ?? "").toLowerCase() as "try" | "conversion",
-        }));
+          activity_type: normaliseEventType(e.event_type),
+        }))
+        // Running tallies belong on a player's stat line, not in a match
+        // timeline — a reader wants the moments, not fourteen completed sets.
+        .filter((a) => !TALLY_EVENTS.has(a.activity_type));
 
       const roster = fixtureLineup
         .filter((l) => l.team_id === teamId)
