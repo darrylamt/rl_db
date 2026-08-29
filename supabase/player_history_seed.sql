@@ -5,7 +5,7 @@
 -- match_lineups: if a player was named in a squad for a club in a season,
 -- that is a spell, and the first and last team sheet give its dates.
 --
--- 632 spells across 483 players — 554 at clubs and 78
+-- 631 spells across 483 players — 553 at clubs and 78
 -- representative call-ups, kept apart in the role column. A call-up to the
 -- national or President XIII side is a selection, not a transfer, and
 -- reading it as a change of club would be wrong.
@@ -188,7 +188,6 @@ insert into _ph_seed values
   ('be7bbd8e-f0bf-42e3-aab4-b82d96f03780', 'Skolars', '2025', 'Club', '2025-09-05', '2025-10-03', '7 appearances on record'),
   ('9a6bdd80-20af-4eb9-8edf-54adbee19548', 'Accra Panthers', '2025', 'Club', '2025-09-05', '2025-10-03', '7 appearances on record'),
   ('7372abe0-52b9-4c4c-8ca5-9878d9700ae2', 'Accra Panthers', '2025', 'Club', '2025-05-11', '2025-08-31', '6 appearances on record'),
-  ('7372abe0-52b9-4c4c-8ca5-9878d9700ae2', 'Bulls', '2025', 'Club', '2025-05-11', '2025-05-11', '1 appearance on record'),
   ('7372abe0-52b9-4c4c-8ca5-9878d9700ae2', 'Bulls', '2026', 'Club', '2026-04-12', '2026-08-30', '7 appearances on record'),
   ('20742ac8-a6bf-4b5b-8ea1-c9403fa8c72b', 'Accra Panthers', '2025', 'Club', '2025-09-05', '2025-10-03', '7 appearances on record'),
   ('f7b9a95b-5499-4174-8711-299ce394f3b7', 'Skolars', '2025', 'Club', '2025-09-05', '2025-10-03', '7 appearances on record'),
