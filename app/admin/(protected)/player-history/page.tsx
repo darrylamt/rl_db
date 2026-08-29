@@ -4,16 +4,40 @@ import { ListHeader } from "@/components/admin/ListHeader";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
 import { Pagination } from "@/components/admin/Pagination";
 import { LiveRefresh } from "@/components/LiveRefresh";
-import { getPageParams } from "@/lib/pagination";
 import { deletePlayerHistory } from "./actions";
 
-function fmt(d: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
+export const dynamic = "force-dynamic";
 
 function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+type Spell = {
+  history_id: string;
+  player_id: string;
+  season: string | null;
+  role: string | null;
+  joined_date: string | null;
+  left_date: string | null;
+  notes: string | null;
+  player: { first_name: string; last_name: string } | null;
+  team: { team_id: string; name: string; logo_url: string | null } | null;
+};
+
+function Crest({ name, logo, size = 20 }: { name: string; logo: string | null; size?: number }) {
+  const px = `${size}px`;
+  if (logo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={logo} alt="" style={{ width: px, height: px }} className="rounded-full object-cover shrink-0" />;
+  }
+  return (
+    <span
+      style={{ width: px, height: px }}
+      className="rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600 grid place-items-center shrink-0"
+    >
+      {name.slice(0, 2).toUpperCase()}
+    </span>
+  );
 }
 
 export default async function PlayerHistoryPage({
@@ -22,55 +46,90 @@ export default async function PlayerHistoryPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
   const q = (first(searchParams?.q) ?? "").trim();
+  const selectedClub = first(searchParams?.club) || "";
+  const page = Math.max(1, parseInt(first(searchParams?.page) ?? "1", 10) || 1);
+  const perPage = 10;
 
-  // The table holds no name of its own, so a name search resolves to player ids
-  // first — the same approach the suspensions list takes.
-  let playerIdFilter: string[] | null = null;
-  if (q) {
-    const { data: matches } = await supabase
-      .from("players")
-      .select("player_id")
-      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
-    playerIdFilter = (matches ?? []).map((p: any) => p.player_id as string);
-  }
-
-  let query = supabase
+  // A career is only legible whole, so the spells are grouped rather than
+  // paged as rows — the paging below is by player.
+  const { data, error } = await supabase
     .from("player_history")
     .select(
-      "history_id, season, role, joined_date, left_date, notes, player:player_id(first_name, last_name), team:team_id(name)",
-      { count: "exact" }
+      "history_id, player_id, season, role, joined_date, left_date, notes, player:player_id(first_name, last_name), team:team_id(team_id, name, logo_url)"
     )
-    .order("joined_date", { ascending: false, nullsFirst: false })
-    .range(from, to);
+    .order("season", { ascending: true })
+    .limit(5000);
 
-  if (playerIdFilter !== null) {
-    if (playerIdFilter.length === 0) {
-      query = query.eq("history_id", "00000000-0000-0000-0000-000000000000");
-    } else {
-      query = query.in("player_id", playerIdFilter);
-    }
+  const spells = (data ?? []) as unknown as Spell[];
+
+  const byPlayer = new Map<string, Spell[]>();
+  for (const s of spells) {
+    const list = byPlayer.get(s.player_id) ?? [];
+    list.push(s);
+    byPlayer.set(s.player_id, list);
   }
 
-  const { data: rows, error, count } = await query;
+  type Career = {
+    player_id: string;
+    name: string;
+    spells: Spell[];
+    clubs: number;
+    span: string;
+    current: Spell | null;
+  };
+
+  let careers: Career[] = Array.from(byPlayer).map(([player_id, rows]) => {
+    const ordered = [...rows].sort((a, b) => (a.season ?? "").localeCompare(b.season ?? ""));
+    const clubSpells = ordered.filter((s) => s.role !== "Representative");
+    const seasons = ordered.map((s) => s.season).filter(Boolean) as string[];
+    const p = ordered[0]?.player;
+    return {
+      player_id,
+      name: `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "—",
+      spells: ordered,
+      clubs: new Set(clubSpells.map((s) => s.team?.name).filter(Boolean)).size,
+      span:
+        seasons.length === 0
+          ? "—"
+          : seasons[0] === seasons[seasons.length - 1]
+          ? seasons[0]
+          : `${seasons[0]}–${seasons[seasons.length - 1]}`,
+      current: clubSpells[clubSpells.length - 1] ?? null,
+    };
+  });
+
+  if (q) {
+    const needle = q.toLowerCase();
+    careers = careers.filter((c) => c.name.toLowerCase().includes(needle));
+  }
+  if (selectedClub) {
+    careers = careers.filter((c) => c.spells.some((s) => s.team?.name === selectedClub));
+  }
+
+  // Longest careers first — the ones with something to show.
+  careers.sort((a, b) => b.spells.length - a.spells.length || a.name.localeCompare(b.name));
+
+  const clubs = Array.from(
+    new Set(spells.map((s) => s.team?.name).filter(Boolean) as string[])
+  ).sort();
+
+  const total = careers.length;
+  const visible = careers.slice((page - 1) * perPage, page * perPage);
+  const isFiltered = q || selectedClub;
 
   return (
     <div className="p-4 md:p-8">
       <LiveRefresh tables={["player_history"]} />
-      <ListHeader
-        title="Club History"
-        addHref="/admin/player-history/new"
-        addLabel="Add Spell"
-      />
+      <ListHeader title="Club History" addHref="/admin/player-history/new" addLabel="Add Spell" />
 
-      <p className="text-sm text-slate-500 mb-4">
-        Where a player has been, and when. A registration records who is signed on
-        for one season; this is the record behind it — transfers, loans, and the
-        years before.
+      <p className="text-sm text-slate-500 -mt-3 mb-5 max-w-2xl">
+        Where each player has been, season by season. A registration records who
+        is signed on for one year; this is the career behind it — the spells,
+        the moves, and the years before.
       </p>
 
-      <form className="mb-4 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
+      <form className="mb-5 flex flex-wrap items-end gap-3 bg-white border border-slate-200 rounded-lg p-3">
         <label className="text-sm flex-1 min-w-[12rem]">
           <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Search player</span>
           <input
@@ -81,12 +140,28 @@ export default async function PlayerHistoryPage({
             className="w-full px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
           />
         </label>
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Club</span>
+          <select
+            name="club"
+            defaultValue={selectedClub}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[11rem]"
+          >
+            <option value="">All clubs</option>
+            {clubs.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
           Search
         </button>
-        {q && (
+        {isFiltered && (
           <Link href="/admin/player-history" className="text-xs text-slate-500 hover:underline">clear</Link>
         )}
+        <span className="text-xs text-slate-400 ml-auto">
+          {total} player{total === 1 ? "" : "s"}
+        </span>
       </form>
 
       {error && (
@@ -95,68 +170,122 @@ export default async function PlayerHistoryPage({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-slate-700 text-left">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Player</th>
-              <th className="hidden sm:table-cell px-4 py-2.5 font-medium">Club</th>
-              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Season</th>
-              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Role</th>
-              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Joined</th>
-              <th className="hidden md:table-cell px-4 py-2.5 font-medium">Left</th>
-              <th className="px-4 py-2.5 text-right"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {(rows ?? []).length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                  No club history recorded.{" "}
-                  <Link href="/admin/player-history/new" className="text-navy-700 hover:underline">
-                    Record a spell →
+      {visible.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-lg p-10 text-center text-slate-500">
+          {spells.length === 0 ? (
+            <>
+              No club history recorded.{" "}
+              <Link href="/admin/player-history/new" className="text-navy-700 hover:underline">
+                Record a spell →
+              </Link>
+            </>
+          ) : (
+            "No players match that search."
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {visible.map((c) => (
+            <article
+              key={c.player_id}
+              className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-navy-300 transition-colors"
+            >
+              {/* Who, and where they are now */}
+              <header className="flex items-start gap-3 px-4 pt-4 pb-3">
+                <div className="w-10 h-10 rounded-full bg-navy-900 text-white grid place-items-center font-display text-sm shrink-0">
+                  {c.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/admin/players/${c.player_id}/view`}
+                    className="font-semibold text-navy-900 hover:underline block truncate"
+                  >
+                    {c.name}
                   </Link>
-                </td>
-              </tr>
-            ) : (
-              (rows ?? []).map((h: any) => (
-                <tr key={h.history_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5">
-                    <p className="font-medium text-navy-900">
-                      {h.player ? `${h.player.first_name} ${h.player.last_name}`.trim() : "—"}
-                    </p>
-                    {/* Mobile-only detail row */}
-                    <div className="sm:hidden mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                      <span>{h.team?.name ?? "—"}</span>
-                      {h.season && <span>· {h.season}</span>}
-                      {h.role && <span>· {h.role}</span>}
-                    </div>
-                  </td>
-                  <td className="hidden sm:table-cell px-4 py-2.5 text-slate-600">{h.team?.name ?? "—"}</td>
-                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{h.season ?? "—"}</td>
-                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600">{h.role ?? "—"}</td>
-                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmt(h.joined_date)}</td>
-                  <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmt(h.left_date)}</td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    <Link
-                      href={`/admin/player-history/${h.history_id}`}
-                      className="sm:hidden inline-block bg-navy-900 text-white text-xs font-medium px-2.5 py-1 rounded hover:bg-navy-700"
-                    >
-                      Edit
-                    </Link>
-                    <span className="hidden sm:inline-flex items-center gap-2">
-                      <Link href={`/admin/player-history/${h.history_id}`} className="text-navy-700 hover:underline text-sm">Edit</Link>
-                      <DeleteRowButton id={h.history_id} action={deletePlayerHistory} />
-                    </span>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                    {c.current?.team && (
+                      <>
+                        <Crest name={c.current.team.name} logo={c.current.team.logo_url} size={14} />
+                        <span className="truncate">{c.current.team.name}</span>
+                        <span className="text-slate-300">·</span>
+                      </>
+                    )}
+                    <span>{c.span}</span>
+                    {c.clubs > 1 && (
+                      <>
+                        <span className="text-slate-300">·</span>
+                        <span className="text-navy-700 font-medium">{c.clubs} clubs</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </header>
 
-      <Pagination page={page} pageSize={pageSize} total={count ?? 0} />
+              {/* The career itself */}
+              <ol className="border-t border-slate-100 divide-y divide-slate-50">
+                {c.spells.map((s, i) => {
+                  const prev = c.spells[i - 1];
+                  const moved =
+                    i > 0 &&
+                    s.role !== "Representative" &&
+                    prev?.role !== "Representative" &&
+                    prev?.team?.name !== s.team?.name;
+                  const inferred = (s.notes ?? "").includes("from scoring records");
+                  const rep = s.role === "Representative";
+
+                  return (
+                    <li key={s.history_id} className="group flex items-center gap-3 px-4 py-2 hover:bg-slate-50">
+                      <span className="w-10 shrink-0 text-xs font-medium text-slate-500 tabular-nums">
+                        {s.season ?? "—"}
+                      </span>
+
+                      <span className="flex items-center gap-2 min-w-0 flex-1">
+                        {s.team && <Crest name={s.team.name} logo={s.team.logo_url} />}
+                        <span className={`truncate text-sm ${rep ? "text-slate-500 italic" : "text-navy-900"}`}>
+                          {s.team?.name ?? "—"}
+                        </span>
+
+                        {moved && (
+                          <span
+                            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-navy-50 text-navy-700 border border-navy-100 shrink-0"
+                            title={`Moved from ${prev?.team?.name}`}
+                          >
+                            moved
+                          </span>
+                        )}
+                        {rep && (
+                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gold-50 text-gold-800 border border-gold-200 shrink-0">
+                            call-up
+                          </span>
+                        )}
+                        {inferred && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                            title="No team sheet behind this spell — built from the scoring record"
+                          />
+                        )}
+                      </span>
+
+                      {/* Only on hover, so the card stays a career and not a toolbar */}
+                      <span className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <Link
+                          href={`/admin/player-history/${s.history_id}`}
+                          className="text-navy-700 hover:underline text-xs"
+                        >
+                          Edit
+                        </Link>
+                        <DeleteRowButton id={s.history_id} action={deletePlayerHistory} label="✕" />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <Pagination page={page} pageSize={perPage} total={total} />
     </div>
   );
 }
