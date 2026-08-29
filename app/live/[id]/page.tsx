@@ -191,7 +191,7 @@ export default async function MatchCentrePage({
   return (
     <>
       {/* Only tables in the supabase_realtime publication (see supabase/realtime.sql). */}
-      <LiveRefresh tables={["match_events", "match_results", "fixtures"]} />
+      <LiveRefresh tables={["match_events", "match_results", "fixtures", "match_lineups", "match_player_ratings"]} />
 
       <Link
         href="/live"
