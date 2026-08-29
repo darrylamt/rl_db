@@ -147,6 +147,10 @@ export async function GET(req: Request) {
       // Readable id matching the website's existing /fixtures/<slug> URLs.
       slug: f.slug ?? null,
       played,
+      // scheduled | live | completed | postponed | cancelled. `played` alone
+      // cannot distinguish a match in progress from a finished one.
+      status: f.status ?? "scheduled",
+      live: f.status === "live",
       date: f.scheduled_date
         ? `${f.scheduled_date}T${f.scheduled_time ?? "00:00:00"}`
         : null,

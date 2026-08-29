@@ -71,6 +71,7 @@ export async function GET(
 const EVENT_STAT_MAP: Record<string, string> = {
   try: "tries",
   conversion: "conversions",
+  missed_conversion: "missed_conversions",
   penalty_goal: "penalty_goals",
   drop_goal: "drop_goals",
   yellow_card: "yellow_cards",
