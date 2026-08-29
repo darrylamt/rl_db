@@ -22,6 +22,7 @@ export default async function PlayersPage({
   const selectedTeam = first(searchParams?.team) || "";
   const rawYear = first(searchParams?.year);
   const q = (first(searchParams?.q) ?? "").trim();
+  const selectedGrade = first(searchParams?.grade) || "";
   // "all" means no year filter; otherwise default to current year
   const selectedYear =
     rawYear === "all" ? null : rawYear ? parseInt(rawYear, 10) : CURRENT_YEAR;
@@ -61,13 +62,14 @@ export default async function PlayersPage({
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, jersey_number, position, gender, is_captain, playing_status, photo_url, rating, team:team_id(team_id, name)",
+      "player_id, first_name, last_name, jersey_number, position, gender, category, is_captain, playing_status, photo_url, rating, team:team_id(team_id, name)",
       { count: "exact" }
     )
     .order("last_name")
     .range(from, to);
 
   if (q) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+  if (selectedGrade) query = query.eq("category", selectedGrade);
 
   if (selectedYear && playerIds !== null) {
     if (playerIds.length === 0) {
@@ -86,7 +88,7 @@ export default async function PlayersPage({
   ]);
 
 
-  const isFiltered = selectedYear || selectedTeam || q;
+  const isFiltered = selectedYear || selectedTeam || q || selectedGrade;
 
   return (
     <div className="p-4 md:p-8">
@@ -148,6 +150,19 @@ export default async function PlayersPage({
             {(teams ?? []).map((t: any) => (
               <option key={t.team_id} value={t.team_id}>{t.name}</option>
             ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Grade</span>
+          <select
+            name="grade"
+            defaultValue={selectedGrade}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[9rem]"
+          >
+            <option value="">All grades</option>
+            <option value="senior_men">Men</option>
+            <option value="senior_women">Women</option>
+            <option value="youth">Youth</option>
           </select>
         </label>
         <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
@@ -231,6 +246,19 @@ export default async function PlayersPage({
                     {p.is_captain && (
                       <span className="ml-1.5 bg-gold-100 text-gold-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">
                         Capt
+                      </span>
+                    )}
+                    {/* Grade is a property of the player, unlike division, which
+                        belongs to the competition — six clubs field men's,
+                        women's and youth sides from a single team row. */}
+                    {p.category === "senior_women" && (
+                      <span className="ml-1.5 bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider" title="Women">
+                        W
+                      </span>
+                    )}
+                    {p.category === "youth" && (
+                      <span className="ml-1.5 bg-sky-100 text-sky-800 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider" title="Youth">
+                        Y
                       </span>
                     )}
                     {/* Mobile-only: team + status pill */}
