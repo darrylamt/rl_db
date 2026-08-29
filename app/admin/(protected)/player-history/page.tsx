@@ -74,20 +74,38 @@ export default async function PlayerHistoryPage({
     player_id: string;
     name: string;
     spells: Spell[];
+    movedAt: Set<string>;
     clubs: number;
     span: string;
     current: Spell | null;
   };
 
   let careers: Career[] = Array.from(byPlayer).map(([player_id, rows]) => {
+    // Chronological first: a move can only be seen against the season before
+    // it. The list is reversed afterwards for display.
     const ordered = [...rows].sort((a, b) => (a.season ?? "").localeCompare(b.season ?? ""));
     const clubSpells = ordered.filter((s) => s.role !== "Representative");
     const seasons = ordered.map((s) => s.season).filter(Boolean) as string[];
     const p = ordered[0]?.player;
+    const movedAt = new Set<string>();
+    for (let i = 1; i < ordered.length; i++) {
+      const prev = ordered[i - 1];
+      const cur = ordered[i];
+      if (
+        cur.role !== "Representative" &&
+        prev.role !== "Representative" &&
+        prev.team?.name !== cur.team?.name
+      ) {
+        movedAt.add(cur.history_id);
+      }
+    }
+
     return {
       player_id,
       name: `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "—",
-      spells: ordered,
+      // Newest first: the season that matters most is the one just gone.
+      spells: [...ordered].reverse(),
+      movedAt,
       clubs: new Set(clubSpells.map((s) => s.team?.name).filter(Boolean)).size,
       span:
         seasons.length === 0
@@ -184,104 +202,109 @@ export default async function PlayerHistoryPage({
           )}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {visible.map((c) => (
-            <article
-              key={c.player_id}
-              className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-navy-300 transition-colors"
-            >
-              {/* Who, and where they are now */}
-              <header className="flex items-start gap-3 px-4 pt-4 pb-3">
+        <div className="grid gap-4 lg:grid-cols-2 items-start">
+          {visible.map((c) => {
+            const [latest, ...earlier] = c.spells;
+            const initials = c.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+            const Row = ({ s, dim }: { s: Spell; dim?: boolean }) => {
+              const rep = s.role === "Representative";
+              const inferred = (s.notes ?? "").includes("from scoring records");
+              return (
+                <li className="group/row flex items-center gap-3 px-4 py-2 hover:bg-slate-50">
+                  <span className={`w-10 shrink-0 text-xs font-medium tabular-nums ${dim ? "text-slate-400" : "text-navy-900"}`}>
+                    {s.season ?? "—"}
+                  </span>
+                  <span className="flex items-center gap-2 min-w-0 flex-1">
+                    {s.team && <Crest name={s.team.name} logo={s.team.logo_url} />}
+                    <span className={`truncate text-sm ${rep ? "text-slate-500 italic" : dim ? "text-slate-600" : "text-navy-900 font-medium"}`}>
+                      {s.team?.name ?? "—"}
+                    </span>
+                    {c.movedAt.has(s.history_id) && (
+                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-navy-50 text-navy-700 border border-navy-100 shrink-0">
+                        moved
+                      </span>
+                    )}
+                    {rep && (
+                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gold-50 text-gold-800 border border-gold-200 shrink-0">
+                        call-up
+                      </span>
+                    )}
+                    {inferred && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                        title="No team sheet behind this spell — built from the scoring record"
+                      />
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <Link href={`/admin/player-history/${s.history_id}`} className="text-navy-700 hover:underline text-xs">
+                      Edit
+                    </Link>
+                    <DeleteRowButton id={s.history_id} action={deletePlayerHistory} label="✕" />
+                  </span>
+                </li>
+              );
+            };
+
+            const head = (
+              <>
                 <div className="w-10 h-10 rounded-full bg-navy-900 text-white grid place-items-center font-display text-sm shrink-0">
-                  {c.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                  {initials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/admin/players/${c.player_id}/view`}
-                    className="font-semibold text-navy-900 hover:underline block truncate"
-                  >
-                    {c.name}
-                  </Link>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                    {c.current?.team && (
-                      <>
-                        <Crest name={c.current.team.name} logo={c.current.team.logo_url} size={14} />
-                        <span className="truncate">{c.current.team.name}</span>
-                        <span className="text-slate-300">·</span>
-                      </>
-                    )}
-                    <span>{c.span}</span>
-                    {c.clubs > 1 && (
-                      <>
-                        <span className="text-slate-300">·</span>
-                        <span className="text-navy-700 font-medium">{c.clubs} clubs</span>
-                      </>
-                    )}
-                  </p>
+                  <span className="font-semibold text-navy-900 block truncate">{c.name}</span>
+                  <span className="text-xs text-slate-500">
+                    {c.span}
+                    {c.clubs > 1 && <> · <span className="text-navy-700 font-medium">{c.clubs} clubs</span></>}
+                    {earlier.length > 0 && <> · {c.spells.length} seasons</>}
+                  </span>
                 </div>
-              </header>
+              </>
+            );
 
-              {/* The career itself */}
-              <ol className="border-t border-slate-100 divide-y divide-slate-50">
-                {c.spells.map((s, i) => {
-                  const prev = c.spells[i - 1];
-                  const moved =
-                    i > 0 &&
-                    s.role !== "Representative" &&
-                    prev?.role !== "Representative" &&
-                    prev?.team?.name !== s.team?.name;
-                  const inferred = (s.notes ?? "").includes("from scoring records");
-                  const rep = s.role === "Representative";
+            // Nothing to open when the career is a single season.
+            if (earlier.length === 0) {
+              return (
+                <article key={c.player_id} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="flex items-start gap-3 px-4 pt-4 pb-3">{head}</div>
+                  <ol className="border-t border-slate-100">
+                    <Row s={latest} />
+                  </ol>
+                </article>
+              );
+            }
 
-                  return (
-                    <li key={s.history_id} className="group flex items-center gap-3 px-4 py-2 hover:bg-slate-50">
-                      <span className="w-10 shrink-0 text-xs font-medium text-slate-500 tabular-nums">
-                        {s.season ?? "—"}
-                      </span>
+            return (
+              <details
+                key={c.player_id}
+                className="group bg-white border border-slate-200 rounded-xl overflow-hidden open:border-navy-300"
+              >
+                {/* The summary carries the newest season, so a shut card still
+                    answers where the player is now. */}
+                <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                  <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+                    {head}
+                    <span className="text-slate-400 text-xs shrink-0 mt-1 transition-transform group-open:rotate-180">
+                      ▾
+                    </span>
+                  </div>
+                  <ol className="border-t border-slate-100">
+                    <Row s={latest} />
+                  </ol>
+                  <p className="px-4 py-1.5 text-[11px] text-slate-400 border-t border-slate-50 group-open:hidden">
+                    {earlier.length} earlier season{earlier.length === 1 ? "" : "s"} — click to open
+                  </p>
+                </summary>
 
-                      <span className="flex items-center gap-2 min-w-0 flex-1">
-                        {s.team && <Crest name={s.team.name} logo={s.team.logo_url} />}
-                        <span className={`truncate text-sm ${rep ? "text-slate-500 italic" : "text-navy-900"}`}>
-                          {s.team?.name ?? "—"}
-                        </span>
-
-                        {moved && (
-                          <span
-                            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-navy-50 text-navy-700 border border-navy-100 shrink-0"
-                            title={`Moved from ${prev?.team?.name}`}
-                          >
-                            moved
-                          </span>
-                        )}
-                        {rep && (
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gold-50 text-gold-800 border border-gold-200 shrink-0">
-                            call-up
-                          </span>
-                        )}
-                        {inferred && (
-                          <span
-                            className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
-                            title="No team sheet behind this spell — built from the scoring record"
-                          />
-                        )}
-                      </span>
-
-                      {/* Only on hover, so the card stays a career and not a toolbar */}
-                      <span className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                        <Link
-                          href={`/admin/player-history/${s.history_id}`}
-                          className="text-navy-700 hover:underline text-xs"
-                        >
-                          Edit
-                        </Link>
-                        <DeleteRowButton id={s.history_id} action={deletePlayerHistory} label="✕" />
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            </article>
-          ))}
+                <ol className="border-t border-slate-100 divide-y divide-slate-50">
+                  {earlier.map((s) => (
+                    <Row key={s.history_id} s={s} dim />
+                  ))}
+                </ol>
+              </details>
+            );
+          })}
         </div>
       )}
 

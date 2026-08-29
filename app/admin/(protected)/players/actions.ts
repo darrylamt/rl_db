@@ -49,6 +49,7 @@ function payload(fd: FormData) {
     attr_iq: attrOrNull(fd, "attr_iq"),
     attr_defense: attrOrNull(fd, "attr_defense"),
     attr_ability: attrOrNull(fd, "attr_ability"),
+    attr_kicking: attrOrNull(fd, "attr_kicking"),
   };
 }
 

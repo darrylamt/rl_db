@@ -120,6 +120,7 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
             attr_iq: p.attr_iq,
             attr_defense: p.attr_defense,
             attr_ability: p.attr_ability,
+            attr_kicking: p.attr_kicking,
           }}
         />
       </div>

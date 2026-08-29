@@ -7,6 +7,7 @@ export const PLAYER_ATTRIBUTES = [
   { key: "attr_iq", label: "IQ" },
   { key: "attr_defense", label: "Defense" },
   { key: "attr_ability", label: "Ability" },
+  { key: "attr_kicking", label: "Kicking" },
 ] as const;
 
 export const ATTRIBUTE_AXES = PLAYER_ATTRIBUTES.map((a) => a.label);
