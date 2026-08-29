@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { registerPlayer, unregisterPlayer, bulkRegisterTeam } from "./actions";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -19,6 +20,9 @@ export default async function RegistrationsPage({
 
   const rawYear = first(searchParams?.year);
   const selectedYear = rawYear ? parseInt(rawYear, 10) : CURRENT_YEAR;
+  // A season holds well over a hundred registrations. The page already groups
+  // them by club, so filtering to one club is the natural way to shorten it.
+  const selectedClub = first(searchParams?.club) || "";
 
   // Year options: current year ± 3 years
   const yearOptions = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 + i);
@@ -47,7 +51,10 @@ export default async function RegistrationsPage({
     if (!byTeam.has(teamId)) byTeam.set(teamId, { teamName, rows: [] });
     byTeam.get(teamId)!.rows.push(reg);
   }
-  const teamGroups = Array.from(byTeam.entries()).sort((a, b) =>
+  const visibleGroups = selectedClub
+    ? Array.from(byTeam.entries()).filter(([id]) => id === selectedClub)
+    : Array.from(byTeam.entries());
+  const teamGroups = visibleGroups.sort((a, b) =>
     a[1].teamName.localeCompare(b[1].teamName)
   );
 
@@ -88,9 +95,27 @@ export default async function RegistrationsPage({
             ))}
           </select>
         </label>
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Club</span>
+          <select
+            name="club"
+            defaultValue={selectedClub}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[10rem]"
+          >
+            <option value="">All clubs</option>
+            {(teams ?? []).map((t) => (
+              <option key={t.team_id} value={t.team_id}>{t.name}</option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
           Apply
         </button>
+        {selectedClub && (
+          <Link href={`/admin/registrations?year=${selectedYear}`} className="text-xs text-slate-500 hover:underline">
+            clear
+          </Link>
+        )}
       </form>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -160,36 +185,29 @@ export default async function RegistrationsPage({
             <input type="hidden" name="season_year" value={selectedYear} />
             <div>
               <label className="block text-xs uppercase tracking-wider text-slate-600 mb-1">Player</label>
-              <select
+              <SearchableSelect
                 name="player_id"
                 required
-                className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:border-navy-700 focus:outline-none"
-              >
-                <option value="">— select player —</option>
-                {unregisteredPlayers.map((p) => (
-                  <option key={p.player_id} value={p.player_id}>
-                    {p.first_name} {p.last_name}
-                    {p.jersey_number ? ` #${p.jersey_number}` : ""}
-                    {(p as any).team_id
-                      ? ` · ${(teams ?? []).find((t) => t.team_id === (p as any).team_id)?.name ?? ""}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
+                emptyLabel="— select player —"
+                options={unregisteredPlayers.map((p: any) => ({
+                  value: p.player_id,
+                  label: `${p.first_name} ${p.last_name}`.trim(),
+                  hint: [
+                    p.jersey_number ? `#${p.jersey_number}` : null,
+                    (teams ?? []).find((t) => t.team_id === p.team_id)?.name ?? null,
+                  ].filter(Boolean).join(" · ") || undefined,
+                }))}
+              />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-slate-600 mb-1">
                 Register under team (optional override)
               </label>
-              <select
+              <SearchableSelect
                 name="team_id"
-                className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:border-navy-700 focus:outline-none"
-              >
-                <option value="">— player&apos;s own team —</option>
-                {(teams ?? []).map((t) => (
-                  <option key={t.team_id} value={t.team_id}>{t.name}</option>
-                ))}
-              </select>
+                emptyLabel="— player's own team —"
+                options={(teams ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
+              />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-slate-600 mb-1">Notes</label>
@@ -218,16 +236,12 @@ export default async function RegistrationsPage({
             <input type="hidden" name="season_year" value={selectedYear} />
             <div>
               <label className="block text-xs uppercase tracking-wider text-slate-600 mb-1">Team</label>
-              <select
+              <SearchableSelect
                 name="team_id"
                 required
-                className="w-full px-3 py-2 rounded border border-slate-300 bg-white text-sm text-navy-900 focus:border-navy-700 focus:outline-none"
-              >
-                <option value="">— select team —</option>
-                {(teams ?? []).map((t) => (
-                  <option key={t.team_id} value={t.team_id}>{t.name}</option>
-                ))}
-              </select>
+                emptyLabel="— select team —"
+                options={(teams ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
+              />
             </div>
             <button
               type="submit"

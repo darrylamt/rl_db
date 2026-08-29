@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Textarea } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { updateSuspension } from "../actions";
 
 const STATUSES = ["active","served","overturned"];
@@ -18,24 +19,28 @@ export default async function EditSuspensionPage({ params }: { params: { id: str
   return (
     <FormShell title="Edit Suspension" backHref="/admin/suspensions" onSubmit={bound} submitLabel="Save changes">
       <Field label="Player">
-        <Select name="player_id" required defaultValue={s.player_id ?? ""}>
-          <option value="">— select player —</option>
-          {(players ?? []).map((p: any) => (
-            <option key={p.player_id} value={p.player_id}>
-              {p.first_name} {p.last_name}{p.team?.name ? ` · ${p.team.name}` : ""}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="player_id"
+          required
+          emptyLabel="— select player —"
+          defaultValue={s.player_id ?? ""}
+          options={(players ?? []).map((p: any) => ({
+            value: p.player_id,
+            label: `${p.first_name} ${p.last_name}`.trim(),
+            hint: p.team?.name ?? undefined,
+          }))}
+        />
       </Field>
       <Field label="Related fixture (optional)">
-        <Select name="fixture_id" defaultValue={s.fixture_id ?? ""}>
-          <option value="">—</option>
-          {(fixtures ?? []).map((f: any) => (
-            <option key={f.fixture_id} value={f.fixture_id}>
-              {f.scheduled_date} · {f.home?.name ?? "?"} vs {f.away?.name ?? "?"}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="fixture_id"
+          defaultValue={s.fixture_id ?? ""}
+          options={(fixtures ?? []).map((f: any) => ({
+            value: f.fixture_id,
+            label: `${f.home?.name ?? "?"} vs ${f.away?.name ?? "?"}`,
+            hint: f.scheduled_date ?? undefined,
+          }))}
+        />
       </Field>
       <Field label="Reason">
         <Input name="reason" defaultValue={s.reason ?? ""} />

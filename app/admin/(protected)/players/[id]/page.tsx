@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { AttributeFields } from "@/components/admin/AttributeFields";
 import { updatePlayer } from "../actions";
@@ -46,17 +47,12 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
         </Field>
       </div>
       <Field label="Club">
-        <Select name="team_id" defaultValue={p.team_id ?? ""}>
-          <option value="">— unassigned —</option>
-          {currentNonClub && (
-            <option value={currentNonClub.team_id}>
-              {currentNonClub.name} (non-club, current)
-            </option>
-          )}
-          {(clubs ?? []).map((t: any) => (
-            <option key={t.team_id} value={t.team_id}>{t.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="team_id"
+          emptyLabel="— unassigned —"
+          defaultValue={p.team_id ?? ""}
+          options={(clubs ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">

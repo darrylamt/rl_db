@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Textarea } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { createPlayerHistory } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -27,22 +28,24 @@ export default async function NewPlayerHistoryPage() {
       submitLabel="Record spell"
     >
       <Field label="Player">
-        <Select name="player_id" required defaultValue="">
-          <option value="">— select player —</option>
-          {players.map((p: any) => (
-            <option key={p.player_id} value={p.player_id}>
-              {p.first_name} {p.last_name}{p.team?.name ? ` · ${p.team.name}` : ""}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="player_id"
+          required
+          emptyLabel="— select player —"
+          defaultValue={""}
+          options={players.map((p: any) => ({
+            value: p.player_id,
+            label: `${p.first_name} ${p.last_name}`.trim(),
+            hint: p.team?.name ?? undefined,
+          }))}
+        />
       </Field>
       <Field label="Club">
-        <Select name="team_id" defaultValue="">
-          <option value="">—</option>
-          {teams.map((t: any) => (
-            <option key={t.team_id} value={t.team_id}>{t.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="team_id"
+          defaultValue={""}
+          options={teams.map((t: any) => ({ value: t.team_id, label: t.name }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Season">

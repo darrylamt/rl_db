@@ -15,7 +15,7 @@ export type PageParams = {
 
 export function getPageParams(
   searchParams: Record<string, string | string[] | undefined> | undefined,
-  pageSize = 20
+  pageSize = 10
 ): PageParams {
   const raw = searchParams?.page;
   const str = Array.isArray(raw) ? raw[0] : raw;

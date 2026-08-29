@@ -22,7 +22,7 @@ export default async function ArticlesPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const supabase = createAdminClient();
-  const { page, pageSize, from, to } = getPageParams(searchParams, 15);
+  const { page, pageSize, from, to } = getPageParams(searchParams, 10);
   const q = (first(searchParams?.q) ?? "").trim();
   const rawStatus = first(searchParams?.status) ?? "all";
   const filterStatus = STATUS_OPTS.includes(rawStatus as any) ? rawStatus : "all";

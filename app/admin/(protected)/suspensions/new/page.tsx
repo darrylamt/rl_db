@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Textarea } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { createSuspension } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -24,24 +25,28 @@ export default async function NewSuspensionPage() {
   return (
     <FormShell title="Add Suspension" backHref="/admin/suspensions" onSubmit={createSuspension} submitLabel="Record suspension">
       <Field label="Player">
-        <Select name="player_id" required defaultValue="">
-          <option value="">— select player —</option>
-          {players.map((p: any) => (
-            <option key={p.player_id} value={p.player_id}>
-              {p.first_name} {p.last_name}{p.team?.name ? ` · ${p.team.name}` : ""}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="player_id"
+          required
+          emptyLabel="— select player —"
+          defaultValue={""}
+          options={players.map((p: any) => ({
+            value: p.player_id,
+            label: `${p.first_name} ${p.last_name}`.trim(),
+            hint: p.team?.name ?? undefined,
+          }))}
+        />
       </Field>
       <Field label="Related fixture (optional)">
-        <Select name="fixture_id" defaultValue="">
-          <option value="">—</option>
-          {fixtures.map((f: any) => (
-            <option key={f.fixture_id} value={f.fixture_id}>
-              {f.scheduled_date} · {f.home?.name ?? "?"} vs {f.away?.name ?? "?"}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="fixture_id"
+          defaultValue={""}
+          options={fixtures.map((f: any) => ({
+            value: f.fixture_id,
+            label: `${f.home?.name ?? "?"} vs ${f.away?.name ?? "?"}`,
+            hint: f.scheduled_date ?? undefined,
+          }))}
+        />
       </Field>
       <Field label="Reason">
         <Input name="reason" placeholder="Red card — dangerous tackle" />

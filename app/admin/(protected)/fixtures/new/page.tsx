@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { createFixture } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -27,40 +28,42 @@ export default async function NewFixturePage() {
   return (
     <FormShell title="Add Fixture" backHref="/admin/fixtures" onSubmit={createFixture} submitLabel="Create fixture">
       <Field label="Competition">
-        <Select name="competition_id" defaultValue="">
-          <option value="">—</option>
-          {comps.map((c: any) => (
-            <option key={c.competition_id} value={c.competition_id}>
-              {c.name}{c.season ? ` · ${c.season}` : ""}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="competition_id"
+          defaultValue={""}
+          options={comps.map((c: any) => ({
+            value: c.competition_id,
+            label: c.name,
+            hint: c.season ?? undefined,
+          }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Home team">
-          <Select name="home_team_id" required defaultValue="">
-            <option value="">— select —</option>
-            {teams.map((t: any) => (
-              <option key={t.team_id} value={t.team_id}>{t.name}</option>
-            ))}
-          </Select>
+          <SearchableSelect
+            name="home_team_id"
+            required
+            emptyLabel="— select —"
+            defaultValue={""}
+            options={teams.map((t: any) => ({ value: t.team_id, label: t.name }))}
+          />
         </Field>
         <Field label="Away team">
-          <Select name="away_team_id" required defaultValue="">
-            <option value="">— select —</option>
-            {teams.map((t: any) => (
-              <option key={t.team_id} value={t.team_id}>{t.name}</option>
-            ))}
-          </Select>
+          <SearchableSelect
+            name="away_team_id"
+            required
+            emptyLabel="— select —"
+            defaultValue={""}
+            options={teams.map((t: any) => ({ value: t.team_id, label: t.name }))}
+          />
         </Field>
       </div>
       <Field label="Venue">
-        <Select name="venue_id" defaultValue="">
-          <option value="">—</option>
-          {venues.map((v: any) => (
-            <option key={v.venue_id} value={v.venue_id}>{v.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="venue_id"
+          defaultValue={""}
+          options={venues.map((v: any) => ({ value: v.venue_id, label: v.name }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date">

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createPlayer } from "../actions";
 
@@ -35,12 +36,12 @@ export default async function NewPlayerPage() {
         </Field>
       </div>
       <Field label="Club">
-        <Select name="team_id" defaultValue="">
-          <option value="">— unassigned —</option>
-          {teams.map((t: any) => (
-            <option key={t.team_id} value={t.team_id}>{t.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="team_id"
+          emptyLabel="— unassigned —"
+          defaultValue={""}
+          options={teams.map((t: any) => ({ value: t.team_id, label: t.name }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">

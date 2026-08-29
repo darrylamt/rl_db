@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { updateTeam } from "../actions";
 
@@ -44,12 +45,12 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
         </Field>
       </div>
       <Field label="Home venue">
-        <Select name="home_venue_id" defaultValue={team.home_venue_id ?? ""}>
-          <option value="">— select —</option>
-          {(venues ?? []).map((v: any) => (
-            <option key={v.venue_id} value={v.venue_id}>{v.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="home_venue_id"
+          emptyLabel="— select —"
+          defaultValue={team.home_venue_id ?? ""}
+          options={(venues ?? []).map((v: any) => ({ value: v.venue_id, label: v.name }))}
+        />
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Manager">
