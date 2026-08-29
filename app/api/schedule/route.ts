@@ -90,7 +90,7 @@ export async function GET(req: Request) {
     supabase
       .from("match_events")
       .select(
-        "fixture_id, event_type, minute, team_id, player:player_id(first_name, last_name)"
+        "fixture_id, event_type, minute, team_id, player:player_id(player_id, first_name, last_name)"
       )
       .in("fixture_id", fixtureIds)
       .order("minute", { ascending: true }),
@@ -143,6 +143,9 @@ export async function GET(req: Request) {
         .filter((e) => e.team_id === teamId)
         .map((e) => ({
           player: `${(e.player as any)?.first_name ?? ""} ${(e.player as any)?.last_name ?? ""}`.trim(),
+          // So a scorer in a timeline or a records table can link to their
+          // profile without matching on a name.
+          player_id: (e.player as any)?.player_id ?? null,
           time: e.minute !== null ? String(e.minute) : "",
           activity_type: normaliseEventType(e.event_type),
         }))
