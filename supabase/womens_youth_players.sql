@@ -237,7 +237,7 @@ insert into _wy_players values
   ('Lalebanor Augustina', 'Lalebanor', 'Augustina', 'Bulls', 'female', 'youth'),
   ('Lambo Stephen', 'Lambo', 'Stephen', 'Nungua Tigers', 'male', 'youth'),
   ('Lamisi Alomile', 'Lamisi', 'Alomile', 'Accra Panthers', 'female', 'youth'),
-  ('Lesley', 'Lesley', null, 'Accra Panthers', 'female', 'youth'),
+  ('Lesley', 'Lesley', '', 'Accra Panthers', 'female', 'youth'),
   ('Leslie McCarthy', 'Leslie', 'McCarthy', 'Nungua Tigers', 'male', 'youth'),
   ('Leticia Zormelo', 'Leticia', 'Zormelo', 'Women President XIII', 'female', 'senior_women'),
   ('Lisa Egyir', 'Lisa', 'Egyir', 'Accra Panthers', 'female', 'youth'),
@@ -656,7 +656,7 @@ join fixtures f
  and f.away_team_id = a.team_id
  and f.scheduled_date = e.dt
 join teams tm on tm.name = e.team
-join players pl on pl.first_name || ' ' || pl.last_name = e.player_name
+join players pl on trim(pl.first_name || ' ' || pl.last_name) = e.player_name
 where not exists (
   select 1 from match_events x
   where x.fixture_id = f.fixture_id
@@ -2432,7 +2432,7 @@ join fixtures f
  and f.away_team_id = a.team_id
  and f.scheduled_date = l.dt
 join teams tm on tm.name = l.team
-join players pl on pl.first_name || ' ' || pl.last_name = l.player_name
+join players pl on trim(pl.first_name || ' ' || pl.last_name) = l.player_name
 on conflict (fixture_id, team_id, player_id) do nothing;
 
 drop table _wy_players;
