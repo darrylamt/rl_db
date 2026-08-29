@@ -33,12 +33,24 @@ export function createClient() {
 
 import { createClient as createAdminClient_ } from "@supabase/supabase-js";
 
+// supabase-js reads through fetch, and Next caches fetch — on Vercel that
+// cache also survives a deployment. A live page was serving a squad list
+// captured before half of it was entered, and redeploying could not shift it
+// because the entry was still valid. Nothing here is worth a stale answer.
+function uncachedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, { ...init, cache: "no-store" });
+}
+
+
 // Admin client — uses the service role key. NEVER expose to the browser.
 export function createAdminClient() {
   return createAdminClient_(
     process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY || FALLBACK_SERVICE,
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: uncachedFetch },
+    }
   );
 }
 
@@ -49,6 +61,9 @@ export function createPublicClient() {
   return createAdminClient_(
     process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_ANON,
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: uncachedFetch },
+    }
   );
 }

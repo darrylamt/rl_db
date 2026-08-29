@@ -367,24 +367,6 @@ export default async function MatchCentrePage({
         </section>
       )}
 
-      {/* TEMPORARY probe — remove once the missing side is explained. */}
-      <div
-        data-probe={JSON.stringify({
-          homeId,
-          awayId,
-          lineupRows: (lineup ?? []).length,
-          perTeam: ((lineup ?? []) as any[]).reduce((a: any, l: any) => {
-            a[l.team_id] = (a[l.team_id] ?? 0) + 1;
-            return a;
-          }, {}),
-          homeStarters: lineupFor(homeId, true).length,
-          homeBench: lineupFor(homeId, false).length,
-          awayStarters: lineupFor(awayId, true).length,
-          awayBench: lineupFor(awayId, false).length,
-        })}
-        hidden
-      />
-
       {/* Line-ups */}
       {(lineup ?? []).length > 0 && (
         <section className="mb-6">
