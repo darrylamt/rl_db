@@ -3,6 +3,28 @@ import { ok, fail, preflight } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Reads every row, not just the first page.
+ *
+ * PostgREST caps a response at max-rows — 1000 by default — and says nothing
+ * when it truncates. The events query silently stopped at exactly 1000, so a
+ * player's later matches vanished from anything built on the schedule while
+ * still counting in their own profile. Rosters were at 937 and next in line.
+ */
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>
+): Promise<T[]> {
+  const SIZE = 1000;
+  const rows: T[] = [];
+  for (let from = 0; ; from += SIZE) {
+    const { data, error } = await page(from, from + SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < SIZE) return rows;
+  }
+}
+
 // Per-player counters rather than things that happen at a minute mark.
 const TALLY_EVENTS = new Set([
   "completed_set",
@@ -77,36 +99,45 @@ export async function GET(req: Request) {
   const fixtureIds = fixtures.map((f) => f.fixture_id);
 
   // ── 2. Fetch results, events, and lineups for all fixtures in parallel ────
-  const [
-    { data: results },
-    { data: events },
-    { data: lineups },
-  ] = await Promise.all([
-    supabase
-      .from("match_results")
-      .select("fixture_id, home_score, away_score, video_url")
-      .in("fixture_id", fixtureIds),
+  // Every one of these can exceed a single PostgREST page, so each is read
+  // through to the end. Paging needs a unique tiebreaker in the sort or rows
+  // can repeat or be skipped between pages.
+  const [results, events, lineups] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase
+        .from("match_results")
+        .select("fixture_id, home_score, away_score, video_url")
+        .in("fixture_id", fixtureIds)
+        .order("result_id", { ascending: true })
+        .range(from, to)
+    ),
 
-    supabase
-      .from("match_events")
-      .select(
-        "fixture_id, event_type, minute, team_id, player:player_id(player_id, first_name, last_name)"
-      )
-      .in("fixture_id", fixtureIds)
-      .order("minute", { ascending: true }),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("match_events")
+        .select(
+          "fixture_id, event_type, minute, team_id, player:player_id(player_id, first_name, last_name)"
+        )
+        .in("fixture_id", fixtureIds)
+        .order("minute", { ascending: true })
+        .order("event_id", { ascending: true })
+        .range(from, to)
+    ),
 
-    supabase
-      .from("match_lineups")
-      .select(
-        "fixture_id, team_id, player:player_id(first_name, last_name)"
-      )
-      .in("fixture_id", fixtureIds),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("match_lineups")
+        .select("fixture_id, team_id, player:player_id(first_name, last_name)")
+        .in("fixture_id", fixtureIds)
+        .order("lineup_id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   // ── 3. Index by fixture_id for O(1) lookups ───────────────────────────────
-  type ResultRow = NonNullable<typeof results>[number];
-  type EventRow = NonNullable<typeof events>[number];
-  type LineupRow = NonNullable<typeof lineups>[number];
+  type ResultRow = (typeof results)[number];
+  type EventRow = (typeof events)[number];
+  type LineupRow = (typeof lineups)[number];
 
   const resultMap = new Map<string, ResultRow>();
   for (const r of results ?? []) resultMap.set(r.fixture_id, r);
