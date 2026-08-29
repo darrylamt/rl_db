@@ -127,7 +127,7 @@ export async function GET(req: Request) {
     fetchAllRows((from, to) =>
       supabase
         .from("match_lineups")
-        .select("fixture_id, team_id, player:player_id(first_name, last_name)")
+        .select("fixture_id, team_id, player:player_id(player_id, first_name, last_name)")
         .in("fixture_id", fixtureIds)
         .order("lineup_id", { ascending: true })
         .range(from, to)
@@ -184,10 +184,21 @@ export async function GET(req: Request) {
         // timeline — a reader wants the moments, not fourteen completed sets.
         .filter((a) => !TALLY_EVENTS.has(a.activity_type));
 
-      const roster = fixtureLineup
-        .filter((l) => l.team_id === teamId)
+      const named = fixtureLineup.filter((l) => l.team_id === teamId);
+
+      // Kept as plain names: the website renders this array directly.
+      const roster = named
         .map((l) => `${(l.player as any)?.first_name ?? ""} ${(l.player as any)?.last_name ?? ""}`.trim())
         .filter(Boolean);
+
+      // The same eleven with their ids, so a squad list can link to a profile
+      // without matching on a name.
+      const squad = named
+        .map((l) => ({
+          player_id: (l.player as any)?.player_id ?? null,
+          name: `${(l.player as any)?.first_name ?? ""} ${(l.player as any)?.last_name ?? ""}`.trim(),
+        }))
+        .filter((p) => p.name);
 
       return {
         team_id: team?.team_id ?? null,
@@ -196,6 +207,7 @@ export async function GET(req: Request) {
         slug: team?.slug ?? null,
         score: result ? (teamId === homeId ? result.home_score : result.away_score) : null,
         roster,
+        squad,
         activities,
       };
     }
