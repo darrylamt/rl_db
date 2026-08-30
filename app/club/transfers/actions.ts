@@ -62,20 +62,31 @@ export async function requestPlayer(fd: FormData) {
       throw new Error("That player is already yours.");
     }
 
+    // Nobody holds a free agent, so there is no club to agree to it. The
+    // request goes straight to the federation, which is the step that would
+    // have followed anyway.
+    const fromTeam = (player as any).team_id ?? null;
+    const free = !fromTeam;
+
     const { error } = await supabase.from("transfer_requests").insert({
       player_id: playerId,
-      from_team_id: (player as any).team_id,
+      from_team_id: fromTeam,
       to_team_id: teamId,
       kind,
       loan_until: kind === "loan" ? loanUntil : null,
       message,
       requested_by: user?.userId ?? null,
+      status: free ? "with_federation" : "with_club",
+      club_answered_at: free ? new Date().toISOString() : null,
+      club_note: free ? "No club to answer — the player is a free agent." : null,
     });
     if (error) throw new Error(describe(error.message));
 
     const name = `${(player as any).first_name ?? ""} ${(player as any).last_name ?? ""}`.trim();
     outcome = {
-      note: `Asked ${(player as any).team?.name ?? "their club"} about ${name}. They answer next.`,
+      note: free
+        ? `${name} has no club, so this goes straight to the federation to sign off.`
+        : `Asked ${(player as any).team?.name ?? "their club"} about ${name}. They answer next.`,
     };
   } catch (e: any) {
     outcome = { error: describe(e.message ?? String(e)) };

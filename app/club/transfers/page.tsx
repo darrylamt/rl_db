@@ -51,10 +51,13 @@ export default async function ClubTransfersPage({
         .neq("is_public", false)
         .neq("team_id", teamId)
         .order("name"),
+      // or(...) rather than neq: a player with no club has a null team_id,
+      // and "team_id <> ours" is null for them — so neq alone quietly hides
+      // every free agent.
       supabase
         .from("players")
         .select("player_id, first_name, last_name, position, photo_url, category, team_id")
-        .neq("team_id", teamId)
+        .or(`team_id.is.null,team_id.neq.${teamId}`)
         .eq("playing_status", "active")
         .eq("approval_status", "approved")
         .order("last_name")
@@ -100,7 +103,9 @@ export default async function ClubTransfersPage({
             {r.kind === "loan" ? "Loan" : "Transfer"}
             {r.kind === "loan" && r.loan_until ? ` until ${r.loan_until}` : ""}
             {" · "}
-            {mine ? `from ${r.from_team?.name ?? "their club"}` : `to ${r.to_team?.name ?? "them"}`}
+            {mine
+              ? `from ${r.from_team?.name ?? "no club — free agent"}`
+              : `to ${r.to_team?.name ?? "them"}`}
           </p>
           {r.message && (
             <p className="text-xs text-slate-600 mt-1.5 italic">“{r.message}”</p>

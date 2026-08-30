@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 
+const FREE = "__free__";
+
 type Player = {
   player_id: string;
   first_name: string | null;
@@ -10,7 +12,7 @@ type Player = {
   position: string | null;
   photo_url: string | null;
   category: string | null;
-  team_id: string;
+  team_id: string | null;
 };
 
 type Team = { team_id: string; name: string; logo_url: string | null };
@@ -45,7 +47,11 @@ export function TransferMarket({
   openFor: string[];
   request: (fd: FormData) => Promise<void>;
 }) {
-  const [club, setClub] = useState<string>(teams[0]?.team_id ?? "");
+  const freeAgents = useMemo(
+    () => players.filter((p) => !p.team_id).length,
+    [players]
+  );
+  const [club, setClub] = useState<string>(teams[0]?.team_id ?? FREE);
   const [query, setQuery] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   const [kind, setKind] = useState<"transfer" | "loan">("transfer");
@@ -58,13 +64,16 @@ export function TransferMarket({
       ? players.filter((p) =>
           `${p.first_name ?? ""} ${p.last_name ?? ""}`.toLowerCase().includes(q)
         )
+      : club === FREE
+      ? players.filter((p) => !p.team_id)
       : players.filter((p) => p.team_id === club);
     return [...base].sort((a, b) =>
       (a.last_name ?? "").localeCompare(b.last_name ?? "")
     );
   }, [players, club, q]);
 
-  const teamName = (id: string) => teams.find((t) => t.team_id === id)?.name ?? "";
+  const teamName = (id: string | null) =>
+    id ? teams.find((t) => t.team_id === id)?.name ?? "" : "no club";
 
   return (
     <div>
@@ -79,6 +88,20 @@ export function TransferMarket({
 
       {!q && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
+          {/* A player nobody holds can be signed without asking anyone. */}
+          {freeAgents > 0 && (
+            <button
+              onClick={() => setClub(FREE)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap border ${
+                club === FREE
+                  ? "bg-emerald-700 text-white border-emerald-700"
+                  : "bg-white border-emerald-200 text-emerald-800 hover:border-emerald-400"
+              }`}
+            >
+              Free agents
+              <span className="text-[10px] opacity-80">{freeAgents}</span>
+            </button>
+          )}
           {teams.map((t) => (
             <button
               key={t.team_id}
@@ -112,7 +135,11 @@ export function TransferMarket({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-navy-900 truncate">{name}</p>
                     <p className="text-xs text-slate-500 truncate">
-                      {[q ? teamName(p.team_id) : null, p.position, grade(p.category)]
+                      {[
+                        !p.team_id ? "Free agent" : q ? teamName(p.team_id) : null,
+                        p.position,
+                        grade(p.category),
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -176,7 +203,7 @@ export function TransferMarket({
 
                     <div className="flex gap-2">
                       <button className="bg-navy-900 hover:bg-navy-800 text-white text-xs font-medium px-3 py-2 rounded">
-                        Send to {teamName(p.team_id)}
+                        {p.team_id ? `Send to ${teamName(p.team_id)}` : "Send to the federation"}
                       </button>
                       <button
                         type="button"
@@ -188,8 +215,9 @@ export function TransferMarket({
                     </div>
 
                     <p className="text-[11px] text-slate-500">
-                      They accept or turn it down. Nothing moves until the
-                      federation signs it off after that.
+                      {p.team_id
+                        ? "They accept or turn it down. Nothing moves until the federation signs it off after that."
+                        : "Nobody holds this player, so there is no club to ask — it goes straight to the federation to sign off."}
                     </p>
                   </form>
                 )}
