@@ -36,7 +36,9 @@ export default async function RegistrationsPage({
         )
         .eq("season_year", selectedYear)
         .order("season_year"),
-      supabase.from("teams").select("team_id, name").eq("team_type", "club").order("name"),
+      supabase.from("teams").select("team_id, name").eq("team_type", "club")
+        // Retired clubs are not somewhere new things can be filed.
+        .neq("is_public", false).order("name"),
       supabase
         .from("players")
         .select("player_id, first_name, last_name, team_id, jersey_number, position")

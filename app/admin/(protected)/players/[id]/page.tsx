@@ -20,6 +20,8 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
       .from("teams")
       .select("team_id, name, team_type")
       .eq("team_type", "club")
+        // Retired clubs are not somewhere new things can be filed.
+        .neq("is_public", false)
       .order("name"),
   ]);
   if (!p) notFound();

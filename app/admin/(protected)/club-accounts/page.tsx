@@ -36,6 +36,8 @@ export default async function ClubAccountsPage({
         .from("teams")
         .select("team_id, name")
         .eq("team_type", "club")
+        // Retired clubs are not somewhere new things can be filed.
+        .neq("is_public", false)
         .order("name"),
       supabase
         .from("fixtures")

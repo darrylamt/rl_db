@@ -39,15 +39,17 @@ export default async function ClubTeamSheetsPage() {
 
   const [{ data: fixtures }, { data: sheets, error }, { data: named }] =
     await Promise.all([
+      // Not filtered to future dates in the query. A sheet the federation
+      // has reopened is work to do whatever the fixture's date, and asking
+      // only for what is still to come hid exactly those.
       supabase
         .from("fixtures")
         .select(
           "fixture_id, scheduled_date, scheduled_time, status, home_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season), result:match_results(home_score, away_score)"
         )
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-        .gte("scheduled_date", today)
-        .order("scheduled_date", { ascending: true })
-        .limit(20),
+        .order("scheduled_date", { ascending: false })
+        .limit(120),
       supabase
         .from("team_sheets")
         .select("fixture_id, status, review_note, submitted_at")
@@ -66,7 +68,19 @@ export default async function ClubTeamSheetsPage() {
     countFor.set(l.fixture_id, (countFor.get(l.fixture_id) ?? 0) + 1);
   }
 
-  const rows = ((fixtures ?? []) as any[]).filter(stillToPlay);
+  // A fixture belongs on this page if there is still a side to name for it,
+  // or if its sheet is back in the club's hands — reopened by the
+  // federation, or sent back — which is work regardless of the date.
+  const needsWork = new Set(
+    ((sheets ?? []) as any[])
+      .filter((s) => ["draft", "declined", "submitted"].includes(s.status))
+      .map((s) => s.fixture_id)
+  );
+
+  const rows = ((fixtures ?? []) as any[])
+    .filter((f) => stillToPlay(f) || needsWork.has(f.fixture_id))
+    .sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""))
+    .slice(0, 30);
   const notMigrated = !!error && /team_sheets/.test(error.message);
 
   return (
@@ -122,6 +136,12 @@ export default async function ClubTeamSheetsPage() {
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
+                      {!stillToPlay(f) && (
+                        <p className="text-xs text-amber-700 mt-1">
+                          This match has been played — the federation has
+                          reopened the sheet for you to correct.
+                        </p>
+                      )}
                       {status === "declined" && sheet?.review_note && (
                         <p className="text-xs text-red-700 mt-1">
                           Sent back — {sheet.review_note}

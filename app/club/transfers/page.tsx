@@ -47,6 +47,8 @@ export default async function ClubTransfersPage({
         .from("teams")
         .select("team_id, name, logo_url")
         .eq("team_type", "club")
+        // Retired clubs are not somewhere new things can be filed.
+        .neq("is_public", false)
         .neq("team_id", teamId)
         .order("name"),
       supabase
