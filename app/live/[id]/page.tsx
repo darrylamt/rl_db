@@ -10,6 +10,7 @@ import { EventIcon } from "@/components/live/EventIcon";
 import { TeamBadge, StatusPill } from "../MatchCard";
 import {
   TEAM_STAT_ROWS,
+  byMatchTime,
   TIMELINE_EVENTS,
   eventLabel,
   fmtDate,
@@ -164,9 +165,11 @@ export default async function MatchCentrePage({
     statsByPlayer.set(p.player_id, bucket);
   }
 
-  const timeline = allEvents.filter((e) =>
-    TIMELINE_EVENTS.has(normaliseType(e.event_type)),
-  );
+  // Sorted here rather than in the query: the database can only order on the
+  // columns as stored, and half is unreliable — see byMatchTime.
+  const timeline = allEvents
+    .filter((e) => TIMELINE_EVENTS.has(normaliseType(e.event_type)))
+    .sort(byMatchTime);
 
   const statRows = TEAM_STAT_ROWS.map((row) => ({
     label: row.label,

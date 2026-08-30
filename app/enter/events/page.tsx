@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MatchClockPanel } from "@/components/enter/MatchClockPanel";
 import { TallyPad } from "@/components/enter/TallyPad";
 import { clockState, displayMinute, currentHalf } from "@/lib/matchClock";
+import { byMatchTime, halfForMinute } from "@/lib/matchStats";
 
 type Fixture = {
   fixture_id: string;
@@ -459,7 +460,12 @@ export default function EnterEventsPage() {
                     type="number"
                     min={1} max={120}
                     value={minute}
-                    onChange={(e) => { setMinuteTouched(true); setMinute(e.target.value); }}
+                    onChange={(e) => {
+                      setMinuteTouched(true);
+                      setMinute(e.target.value);
+                      const m = parseInt(e.target.value, 10);
+                      if (!Number.isNaN(m)) setHalf(String(halfForMinute(m)) as "1" | "2");
+                    }}
                     placeholder="e.g. 23"
                     className="w-full px-3 py-2 rounded-lg bg-navy-800 border border-navy-600 text-white focus:outline-none focus:border-gold-400 text-sm"
                   />
@@ -579,7 +585,7 @@ export default function EnterEventsPage() {
                 EVENTS ({events.length})
               </h2>
               <div className="bg-navy-800 border border-navy-700 rounded-lg divide-y divide-navy-700 max-h-64 overflow-y-auto">
-                {[...events].reverse().map((ev) => {
+                {[...events].sort(byMatchTime).reverse().map((ev) => {
                   const p = ev.player as any;
                   const t = ev.team as any;
                   const se = SCORE_EVENTS.find((s) => s.type === ev.event_type);

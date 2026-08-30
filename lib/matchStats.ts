@@ -127,3 +127,37 @@ export function fmtShortDate(d: string | null | undefined): string {
 export function fmtTime(t: string | null | undefined): string {
   return t ? t.slice(0, 5) : "";
 }
+
+/**
+ * Orders events as the match ran, not as they were typed.
+ *
+ * A recorder catching up enters the ninth minute during the twelfth, so
+ * insertion order is not match order. Sorting on the half first was worse
+ * still: an event whose minute was corrected back to 9 kept the half the
+ * clock was in when it was typed, and 180 events carry no half at all, which
+ * put them after everything else however early they happened.
+ *
+ * The minute is the fact worth trusting — it runs 0 to 80 across the whole
+ * match — so it leads, and the half only separates two events sharing one.
+ */
+export function byMatchTime(
+  a: { minute?: number | null; half?: number | null },
+  b: { minute?: number | null; half?: number | null }
+): number {
+  const am = a.minute ?? null;
+  const bm = b.minute ?? null;
+
+  // An event with no minute cannot be placed in the match, so it sits at the
+  // end rather than pretending to belong at the start.
+  if (am === null && bm === null) return 0;
+  if (am === null) return 1;
+  if (bm === null) return -1;
+  if (am !== bm) return am - bm;
+
+  return (a.half ?? 0) - (b.half ?? 0);
+}
+
+/** Which half a minute falls in. Rugby league is two forties. */
+export function halfForMinute(minute: number): 1 | 2 {
+  return minute > 40 ? 2 : 1;
+}
