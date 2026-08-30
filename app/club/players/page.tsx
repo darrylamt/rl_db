@@ -21,7 +21,7 @@ export default async function ClubSquadPage({
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status"
+      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status, approval_status, review_note"
     )
     .eq("team_id", teamId)
     .order("last_name");
@@ -151,11 +151,28 @@ export default async function ClubSquadPage({
                         Capt
                       </span>
                     )}
+                    {/* Where a submission stands. Approved is the norm and
+                        needs no badge. */}
+                    {p.approval_status === "pending" && (
+                      <span className="ml-1.5 bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded uppercase">
+                        Awaiting approval
+                      </span>
+                    )}
+                    {p.approval_status === "declined" && (
+                      <span className="ml-1.5 bg-red-100 text-red-800 text-[10px] px-1.5 py-0.5 rounded uppercase">
+                        Declined
+                      </span>
+                    )}
                   </span>
                   <span className="block text-xs text-slate-500">
                     {p.position || <span className="text-amber-700">position needed</span>}
                     {p.jersey_number != null && ` · #${p.jersey_number}`}
                   </span>
+                  {p.approval_status === "declined" && p.review_note && (
+                    <span className="block text-xs text-red-700 mt-0.5">
+                      {p.review_note}
+                    </span>
+                  )}
                 </span>
                 <span className="text-slate-300 text-xs shrink-0">edit →</span>
               </Link>

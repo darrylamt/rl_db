@@ -13,6 +13,42 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return v ?? null;
 }
 
+/**
+ * "Today", "Yesterday", or the date written out.
+ *
+ * A run of results all headed 30/08/2026 tells a reader nothing they cannot
+ * work out; the two days that need naming are the two they are most likely
+ * to be looking for.
+ */
+function dayLabel(date: string, today: string): string {
+  if (date === today) return "Today";
+
+  const d = new Date(`${date}T00:00:00`);
+  const yesterday = new Date(`${today}T00:00:00`);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+  return d.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Played matches, newest day first, each day keeping its kick-off order. */
+function byDay(fixtures: any[]): { date: string; matches: any[] }[] {
+  const days = new Map<string, any[]>();
+  for (const f of fixtures) {
+    const key = f.scheduled_date ?? "";
+    if (!days.has(key)) days.set(key, []);
+    days.get(key)!.push(f);
+  }
+  return Array.from(days)
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([date, matches]) => ({ date, matches }));
+}
+
 function Section({
   title,
   subtitle,
@@ -85,21 +121,26 @@ export default async function LiveHubPage() {
   const live = liveRows ?? [];
   const liveIds = new Set(live.map((f: any) => f.fixture_id));
 
+  /** Something was actually scored — a 0-0 row is an unplayed fixture. */
+  const hasScore = (f: any) => {
+    const r = one<any>(f.result);
+    return !!r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0);
+  };
+
+  // A match played today belongs under Today in the results, not in the
+  // list of kick-off times still to come.
   const todaysMatches = (todayRows ?? []).filter(
-    (f: any) => !liveIds.has(f.fixture_id)
+    (f: any) => !liveIds.has(f.fixture_id) && !hasScore(f)
   );
-  const todayIds = new Set(todaysMatches.map((f: any) => f.fixture_id));
 
   // A 0–0 row is how an unplayed fixture looks before anyone enters a score,
   // so only surface results where something was actually scored.
   const results = (playedRows ?? [])
-    .filter((f: any) => {
-      if (liveIds.has(f.fixture_id) || todayIds.has(f.fixture_id)) return false;
-      const r = one<any>(f.result);
-      return !!r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0);
-    })
-    .slice(0, 12);
+    .filter((f: any) => !liveIds.has(f.fixture_id) && hasScore(f))
+    .slice(0, 24);
+  const resultDays = byDay(results);
 
+  const todayIds = new Set(todaysMatches.map((f: any) => f.fixture_id));
   const upcoming = (upcomingRows ?? [])
     .filter(
       (f: any) => !liveIds.has(f.fixture_id) && !todayIds.has(f.fixture_id)
@@ -109,7 +150,7 @@ export default async function LiveHubPage() {
   const nothingAtAll =
     live.length === 0 &&
     todaysMatches.length === 0 &&
-    results.length === 0 &&
+    resultDays.length === 0 &&
     upcoming.length === 0;
 
   return (
@@ -150,12 +191,24 @@ export default async function LiveHubPage() {
         </Section>
       )}
 
-      {results.length > 0 && (
-        <Section title="Latest results" subtitle="Most recent first">
-          {results.map((f: any) => (
-            <MatchCard key={f.fixture_id} fixture={f} />
+      {resultDays.length > 0 && (
+        <section className="mb-8">
+          <h2 className="font-display text-xl md:text-2xl text-white mb-3">
+            Results
+          </h2>
+          {resultDays.map(({ date, matches }) => (
+            <div key={date} className="mb-6 last:mb-0">
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2 pb-1 border-b border-white/10">
+                {date ? dayLabel(date, today) : "Date unknown"}
+              </h3>
+              <div className="space-y-2">
+                {matches.map((f: any) => (
+                  <MatchCard key={f.fixture_id} fixture={f} />
+                ))}
+              </div>
+            </div>
           ))}
-        </Section>
+        </section>
       )}
 
       {nothingAtAll && (

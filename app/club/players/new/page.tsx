@@ -68,8 +68,9 @@ export default async function NewClubPlayerPage() {
       </div>
 
       <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-3">
-        The player joins your squad on record, but not registered for a season —
-        registering is the federation&apos;s to grant.
+        The player is added to your squad and sent to the federation for
+        approval. You can fill in their details straight away; they appear on
+        the public site once the federation has approved them.
       </p>
     </FormShell>
   );

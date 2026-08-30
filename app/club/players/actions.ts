@@ -1,7 +1,8 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { requireClub } from "@/lib/auth";
+import { requireClub, getAppUser } from "@/lib/auth";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -106,7 +107,14 @@ export async function createClubPlayer(fd: FormData) {
   const last_name = str(fd, "last_name");
   if (!first_name || !last_name) throw new Error("First and last name are required");
 
-  const { error } = await supabase.from("players").insert({
+  const user = await getAppUser();
+
+  // Pending, not on the register. A club naming a player is a claim; the
+  // federation decides who is actually registered. The columns arrive with
+  // supabase/player_approvals.sql — until it is run the insert simply drops
+  // them and behaves as it did before.
+  const { error } = await writeWithOptionalColumns(
+    {
     first_name,
     last_name,
     team_id: teamId,
@@ -122,7 +130,13 @@ export async function createClubPlayer(fd: FormData) {
     // A new player is on record but not registered — that is the federation's
     // to grant, for a season.
     playing_status: "inactive",
-  });
+    approval_status: "pending",
+    submitted_by: user?.userId ?? null,
+    submitted_at: new Date().toISOString(),
+    },
+    ["approval_status", "submitted_by", "submitted_at"] as const,
+    (values) => supabase.from("players").insert(values)
+  );
   if (error) throw new Error(error.message);
 
   revalidatePath("/club/players");
