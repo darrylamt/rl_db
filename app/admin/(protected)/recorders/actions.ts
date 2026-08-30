@@ -1,36 +1,84 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
+type Outcome = { error: string } | { created: string } | { note: string };
+
+/** Finds an auth account by email, or null. */
+async function findAuthUser(supabase: ReturnType<typeof createAdminClient>, email: string) {
+  const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  return (data?.users ?? []).find((u) => u.email?.toLowerCase() === email) ?? null;
+}
+
 /**
  * Issues a match-day login.
  *
- * The same two-step as a club account: create the auth user, record what it
- * is, and undo the first if the second fails. An account that can sign in but
- * has no role reaches nothing and cannot be told why.
+ * Returns what happened rather than throwing. A thrown error in a server
+ * action is a full-page crash in production — the admin loses the form and
+ * is told only that "a server-side exception has occurred", which is no help
+ * at all when the real answer is "that email is already taken".
  */
-export async function createRecorderAccount(fd: FormData) {
-  await requireFederation();
-
+async function attemptCreate(fd: FormData): Promise<Outcome> {
   const email = (fd.get("email") as string)?.trim().toLowerCase();
   const password = (fd.get("password") as string) ?? "";
 
-  if (!email) throw new Error("Email is required");
-  if (password.length < 8) throw new Error("Password must be at least 8 characters");
+  if (!email) return { error: "Email is required." };
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
 
   const supabase = createAdminClient();
 
-  const { data: created, error: authError } =
-    await supabase.auth.admin.createUser({
-      email,
+  // An email can only ever hold one account, so say what the existing one is
+  // rather than letting Supabase's own wording surface.
+  const existing = await findAuthUser(supabase, email);
+  if (existing) {
+    const { data: role } = await supabase
+      .from("app_users")
+      .select("role")
+      .eq("user_id", existing.id)
+      .maybeSingle();
+
+    if (role?.role === "recorder") {
+      return { error: `${email} is already a recorder.` };
+    }
+    if (role) {
+      return {
+        error: `${email} is already a ${role.role} account. One email can hold one login — use a different address.`,
+      };
+    }
+
+    // An account with no role reaches nothing and cannot be repaired from
+    // anywhere else in the admin, so adopt it as the recorder that was asked
+    // for and set the password that was typed.
+    const { error: pwError } = await supabase.auth.admin.updateUserById(existing.id, {
       password,
-      email_confirm: true,
     });
-  if (authError) throw new Error(authError.message);
+    if (pwError) return { error: pwError.message };
+
+    const { error: roleError } = await supabase.from("app_users").insert({
+      user_id: existing.id,
+      role: "recorder",
+      email,
+    });
+    if (roleError) return { error: describe(roleError.message) };
+
+    return {
+      note: `${email} already had a sign-in with no access. It is now a recorder, with the password you set.`,
+    };
+  }
+
+  const { data: created, error: authError } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (authError) return { error: authError.message };
   const userId = created.user?.id;
-  if (!userId) throw new Error("Account was not created");
+  if (!userId) return { error: "The account was not created." };
 
   const { error } = await supabase.from("app_users").insert({
     user_id: userId,
@@ -38,19 +86,29 @@ export async function createRecorderAccount(fd: FormData) {
     email,
   });
   if (error) {
+    // Leave nothing half-made: an account that can sign in but has no role
+    // lands on the no-access page with no way forward.
     await supabase.auth.admin.deleteUser(userId);
-    // The check constraint only learned about recorders in
-    // supabase/recorder_accounts.sql — say so rather than showing the raw
-    // constraint name.
-    if (/app_users_role_check/.test(error.message)) {
-      throw new Error(
-        "The database does not know the recorder role yet — run supabase/recorder_accounts.sql first."
-      );
-    }
-    throw new Error(error.message);
+    return { error: describe(error.message) };
   }
 
+  return { created: email };
+}
+
+/** Turns the one database error worth explaining into plain words. */
+function describe(message: string) {
+  if (/app_users_role_check/.test(message)) {
+    return "The database does not know the recorder role yet — run supabase/recorder_accounts.sql first.";
+  }
+  return message;
+}
+
+export async function createRecorderAccount(fd: FormData) {
+  await requireFederation();
+  const outcome = await attemptCreate(fd);
   revalidatePath("/admin/recorders");
+  // redirect throws to unwind, so it stays outside anything that catches.
+  redirect(`/admin/recorders?${new URLSearchParams(outcome as any)}`);
 }
 
 /** Removes a recorder login entirely — the role and the account behind it. */
@@ -64,29 +122,44 @@ export async function revokeRecorderAccount(userId: string) {
     .eq("user_id", userId)
     .maybeSingle();
   // Never let this be turned on a federation or club account.
-  if (!row || row.role !== "recorder") throw new Error("That is not a recorder account");
+  if (!row || row.role !== "recorder") {
+    redirect("/admin/recorders?error=That+is+not+a+recorder+account.");
+  }
 
   await supabase.from("app_users").delete().eq("user_id", userId);
   const { error } = await supabase.auth.admin.deleteUser(userId);
-  if (error) throw new Error(error.message);
   revalidatePath("/admin/recorders");
+  redirect(
+    error
+      ? `/admin/recorders?${new URLSearchParams({ error: error.message })}`
+      : "/admin/recorders?note=Login+revoked."
+  );
 }
 
 /** Sets a new password, for when a recorder has lost theirs. */
 export async function resetRecorderPassword(userId: string, fd: FormData) {
   await requireFederation();
   const password = (fd.get("password") as string) ?? "";
-  if (password.length < 8) throw new Error("Password must be at least 8 characters");
 
   const supabase = createAdminClient();
   const { data: row } = await supabase
     .from("app_users")
-    .select("role")
+    .select("role, email")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!row || row.role !== "recorder") throw new Error("That is not a recorder account");
 
-  const { error } = await supabase.auth.admin.updateUserById(userId, { password });
-  if (error) throw new Error(error.message);
+  let outcome: Outcome;
+  if (password.length < 8) {
+    outcome = { error: "Password must be at least 8 characters." };
+  } else if (!row || row.role !== "recorder") {
+    outcome = { error: "That is not a recorder account." };
+  } else {
+    const { error } = await supabase.auth.admin.updateUserById(userId, { password });
+    outcome = error
+      ? { error: error.message }
+      : { note: `New password set for ${row.email ?? "that recorder"}.` };
+  }
+
   revalidatePath("/admin/recorders");
+  redirect(`/admin/recorders?${new URLSearchParams(outcome as any)}`);
 }

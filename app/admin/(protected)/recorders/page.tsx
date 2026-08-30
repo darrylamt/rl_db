@@ -6,8 +6,17 @@ import { createRecorderAccount, revokeRecorderAccount } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function RecordersPage() {
+export default async function RecordersPage({
+  searchParams,
+}: {
+  searchParams?: { error?: string; created?: string; note?: string };
+}) {
   const supabase = createAdminClient();
+
+  const problem = searchParams?.error;
+  const good = searchParams?.created
+    ? `${searchParams.created} can now sign in at /login and record matches.`
+    : searchParams?.note;
 
   const { data: accounts, error } = await supabase
     .from("app_users")
@@ -27,6 +36,18 @@ export default async function RecordersPage() {
         else: not this admin, not a club portal. What they save is what the
         public live page shows.
       </p>
+
+      {problem && (
+        <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2.5 rounded mb-4">
+          {problem}
+        </div>
+      )}
+
+      {good && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm px-3 py-2.5 rounded mb-4">
+          {good}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">

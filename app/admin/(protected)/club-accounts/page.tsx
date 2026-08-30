@@ -8,8 +8,17 @@ export const dynamic = "force-dynamic";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-export default async function ClubAccountsPage() {
+export default async function ClubAccountsPage({
+  searchParams,
+}: {
+  searchParams?: { error?: string; created?: string; note?: string };
+}) {
   const supabase = createAdminClient();
+
+  const problem = searchParams?.error;
+  const good = searchParams?.created
+    ? `${searchParams.created} can now sign in at /login and fill in their squad.`
+    : searchParams?.note;
 
   const [{ data: accounts, error }, { data: teams }, { data: seasonFixtures }] =
     await Promise.all([
@@ -53,6 +62,18 @@ export default async function ClubAccountsPage() {
         photos, positions, jersey numbers. It cannot reach the admin, cannot see
         another club, and cannot register a player for a season. That stays here.
       </p>
+
+      {problem && (
+        <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2.5 rounded mb-4">
+          {problem}
+        </div>
+      )}
+
+      {good && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm px-3 py-2.5 rounded mb-4">
+          {good}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">
