@@ -5,17 +5,58 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-type NavItem = { href: string; label: string; divider?: boolean; external?: boolean };
+type NavItem = {
+  href: string;
+  label: string;
+  divider?: boolean;
+  external?: boolean;
+  /** How many things are waiting here — shown as a count, hidden at zero. */
+  badge?: number;
+};
+
+export type NavSection = { title: string; items: NavItem[] };
 
 export function AdminSidebar({
   items,
+  sections = [],
   email,
 }: {
   items: NavItem[];
+  /** Grouped nav. Twenty-three links in one list has no shape to it. */
+  sections?: NavSection[];
   email: string | null | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+
+  const inSection = (section: NavSection) =>
+    section.items.some(
+      (i) => pathname === i.href || pathname?.startsWith(i.href + "/")
+    );
+
+  // The section you are in is open; the rest are shut until you say
+  // otherwise. Choices are remembered, so a section you keep open stays open.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("rlfg.adminNav");
+      if (saved) setOpenSections(JSON.parse(saved));
+    } catch {
+      // A private window or blocked storage: the defaults below still work.
+    }
+  }, []);
+
+  const toggleSection = (title: string) => {
+    setOpenSections((cur) => {
+      const next = { ...cur, [title]: !(cur[title] ?? false) };
+      try {
+        localStorage.setItem("rlfg.adminNav", JSON.stringify(next));
+      } catch {
+        // Nothing to do — the menu still works, it just forgets.
+      }
+      return next;
+    });
+  };
 
   // Close the drawer whenever the route changes.
   useEffect(() => {
@@ -33,6 +74,38 @@ export function AdminSidebar({
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  const NavLink = ({ item, nested }: { item: NavItem; nested?: boolean }) => {
+    const active =
+      pathname === item.href || pathname?.startsWith(item.href + "/");
+    return (
+      <Link
+        href={item.href}
+        className={[
+          "flex items-center justify-between gap-2 py-2.5 text-sm border-l-2 transition",
+          nested ? "pl-9 pr-4" : "px-6",
+          active
+            ? "bg-navy-800 text-gold-400 border-gold-400"
+            : "text-navy-100 border-transparent hover:bg-navy-800 hover:text-gold-400 hover:border-gold-400",
+        ].join(" ")}
+      >
+        <span className="truncate">{item.label}</span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          {/* A queue with nothing in it should not shout. */}
+          {!!item.badge && item.badge > 0 && (
+            <span className="bg-gold-500 text-navy-900 text-[10px] font-bold rounded-full min-w-[1.15rem] h-[1.15rem] px-1 flex items-center justify-center tabular-nums">
+              {item.badge}
+            </span>
+          )}
+          {item.external && (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" className="w-3 h-3 opacity-50">
+              <path d="M3.5 3a.5.5 0 0 0 0 1H7.29L2.15 9.15a.5.5 0 1 0 .7.7L8 4.71V8.5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5h-5Z" />
+            </svg>
+          )}
+        </span>
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -140,30 +213,52 @@ export function AdminSidebar({
         </div>
 
         <nav className="flex-1 py-4 overflow-y-auto">
-          {items.map((item) => {
-            const active =
-              pathname === item.href || pathname?.startsWith(item.href + "/");
+          {items.map((item) => (
+            <div key={item.href}>
+              {item.divider && (
+                <div className="mx-6 my-2 border-t border-navy-700" />
+              )}
+              <NavLink item={item} />
+            </div>
+          ))}
+
+          {sections.map((section) => {
+            const here = inSection(section);
+            const isOpen = openSections[section.title] ?? here;
+            const waiting = section.items.reduce((n, i) => n + (i.badge ?? 0), 0);
             return (
-              <div key={item.href}>
-                {item.divider && (
-                  <div className="mx-6 my-2 border-t border-navy-700" />
-                )}
-                <Link
-                  href={item.href}
-                  className={[
-                    "flex items-center justify-between px-6 py-2.5 text-sm border-l-2 transition",
-                    active
-                      ? "bg-navy-800 text-gold-400 border-gold-400"
-                      : "text-navy-100 border-transparent hover:bg-navy-800 hover:text-gold-400 hover:border-gold-400",
-                  ].join(" ")}
+              <div key={section.title} className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.title)}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-center justify-between gap-2 px-6 py-2 text-[11px] uppercase tracking-wider text-navy-300 hover:text-gold-400"
                 >
-                  {item.label}
-                  {item.external && (
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" className="w-3 h-3 opacity-50">
-                      <path d="M3.5 3a.5.5 0 0 0 0 1H7.29L2.15 9.15a.5.5 0 1 0 .7.7L8 4.71V8.5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5h-5Z" />
+                  <span className="truncate">{section.title}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    {!isOpen && waiting > 0 && (
+                      <span className="bg-gold-500 text-navy-900 text-[10px] font-bold rounded-full min-w-[1.15rem] h-[1.15rem] px-1 flex items-center justify-center tabular-nums">
+                        {waiting}
+                      </span>
+                    )}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 12 12"
+                      fill="currentColor"
+                      className={`w-2.5 h-2.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                      aria-hidden="true"
+                    >
+                      <path d="M4 2.5 8 6l-4 3.5V2.5Z" />
                     </svg>
-                  )}
-                </Link>
+                  </span>
+                </button>
+                {isOpen && (
+                  <div>
+                    {section.items.map((item) => (
+                      <NavLink key={item.href} item={item} nested />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

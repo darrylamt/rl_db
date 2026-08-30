@@ -77,7 +77,7 @@ export default async function ClubLayout({
         </nav>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
+      <main className="max-w-5xl mx-auto px-4 py-6 min-w-0 overflow-x-hidden">{children}</main>
 
       <footer className="max-w-5xl mx-auto px-4 pb-8 text-xs text-slate-400">
         You can edit your own players here. Registrations, results and

@@ -89,16 +89,16 @@ export default async function ClubTeamSheetsPage() {
                   href={`/club/team-sheets/${f.fixture_id}`}
                   className="block bg-white border border-slate-200 hover:border-navy-300 rounded-lg px-4 py-3"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
                     <div className="min-w-0">
-                      <p className="font-medium text-navy-900 truncate">
+                      <p className="font-medium text-navy-900 break-words">
                         {f.home?.name} <span className="text-slate-400">v</span>{" "}
                         {f.away?.name}
                         <span className="ml-2 text-[10px] uppercase tracking-wider text-slate-400">
                           {home ? "home" : "away"}
                         </span>
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 break-words">
                         {[
                           f.scheduled_date,
                           f.scheduled_time?.slice(0, 5),

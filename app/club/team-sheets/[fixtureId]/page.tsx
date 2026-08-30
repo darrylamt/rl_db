@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
-import { POSITIONS } from "@/lib/positions";
+import { TeamSheetPicker } from "@/components/club/TeamSheetPicker";
 import { saveTeamSheet, submitTeamSheet, withdrawTeamSheet } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -63,10 +63,10 @@ export default async function BuildTeamSheetPage({
       </Link>
 
       <div className="mt-3 mb-5">
-        <h1 className="font-display text-2xl font-bold text-navy-900">
+        <h1 className="font-display text-2xl font-bold text-navy-900 break-words">
           {f.home?.name} v {f.away?.name}
         </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
+        <p className="text-sm text-slate-500 mt-0.5 break-words">
           {[f.scheduled_date, f.scheduled_time?.slice(0, 5), f.venue?.name, f.competition?.name]
             .filter(Boolean)
             .join(" · ")}
@@ -108,85 +108,27 @@ export default async function BuildTeamSheetPage({
       )}
 
       <form action={saveTeamSheet.bind(null, fixtureId)}>
-        <fieldset disabled={locked} className="disabled:opacity-60">
-          <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 mb-4">
-            {(squad ?? []).length === 0 ? (
-              <p className="p-8 text-center text-slate-500 text-sm">
-                No players on your squad yet.{" "}
-                <Link href="/club/players/new" className="text-navy-700 hover:underline">
-                  Add one
-                </Link>
-                .
-              </p>
-            ) : (
-              ((squad ?? []) as any[]).map((p) => {
-                const on = namedBy.get(p.player_id);
-                return (
-                  <div
-                    key={p.player_id}
-                    className="flex flex-wrap items-center gap-3 px-3 py-2.5"
-                  >
-                    <input
-                      type="checkbox"
-                      name={`picked:${p.player_id}`}
-                      defaultChecked={!!on}
-                      className="w-4 h-4 shrink-0"
-                      aria-label={`Name ${p.first_name} ${p.last_name}`}
-                    />
-                    <span className="min-w-0 flex-1 text-sm">
-                      <span className="block font-medium text-navy-900 truncate">
-                        {p.first_name} {p.last_name}
-                      </span>
-                      {p.position && (
-                        <span className="block text-xs text-slate-500">{p.position}</span>
-                      )}
-                    </span>
-
-                    <input
-                      type="number"
-                      name={`jersey:${p.player_id}`}
-                      min={1}
-                      defaultValue={on?.jersey_number ?? p.jersey_number ?? ""}
-                      placeholder="#"
-                      className="w-14 px-2 py-1.5 rounded border border-slate-300 text-sm"
-                      aria-label="Jersey number"
-                    />
-
-                    <select
-                      name={`position:${p.player_id}`}
-                      defaultValue={on?.position ?? p.position ?? ""}
-                      className="px-2 py-1.5 rounded border border-slate-300 text-sm w-36"
-                      aria-label="Position"
-                    >
-                      <option value="">— position —</option>
-                      {POSITIONS.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        name={`bench:${p.player_id}`}
-                        defaultChecked={on ? on.is_starter === false : false}
-                        className="w-3.5 h-3.5"
-                      />
-                      Bench
-                    </label>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        <fieldset disabled={locked} className="disabled:opacity-60 border-0 p-0 m-0 min-w-0">
+          {(squad ?? []).length === 0 ? (
+            <p className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
+              No players on your squad yet.{" "}
+              <Link href="/club/players/new" className="text-navy-700 hover:underline">
+                Add one
+              </Link>
+              .
+            </p>
+          ) : (
+            <TeamSheetPicker
+              squad={(squad ?? []) as any}
+              named={(named ?? []) as any}
+              locked={locked}
+            />
+          )}
 
           {!locked && (squad ?? []).length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              <button className="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2.5 rounded">
-                Save side
-              </button>
-            </div>
+            <button className="mt-4 bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2.5 rounded">
+              Save side
+            </button>
           )}
         </fieldset>
       </form>
