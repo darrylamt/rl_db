@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
@@ -191,11 +192,10 @@ export default async function PublicPlayerPage({
         <div className="flex items-start gap-4">
           {p.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Avatar
               src={p.photo_url}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover bg-white/10 shrink-0"
+              name={`${p.first_name ?? ""} ${p.last_name ?? ""}`}
+              size={88}
             />
           ) : (
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 text-slate-400 text-2xl font-bold flex items-center justify-center shrink-0">

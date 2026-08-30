@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -131,18 +132,11 @@ export default async function ClubSquadPage({
                 href={`/club/players/${p.player_id}`}
                 className="flex items-center gap-3 bg-white border border-slate-200 hover:border-navy-300 rounded-lg px-3 py-2.5"
               >
-                {p.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.photo_url}
-                    alt=""
-                    className="w-10 h-10 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <span className="w-10 h-10 rounded-full bg-slate-200 text-slate-500 grid place-items-center text-xs shrink-0">
-                    {(p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "")}
-                  </span>
-                )}
+                <Avatar
+                  src={p.photo_url}
+                  name={`${p.first_name ?? ""} ${p.last_name ?? ""}`}
+                  size={40}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-navy-900 truncate">
                     {p.first_name} {p.last_name}

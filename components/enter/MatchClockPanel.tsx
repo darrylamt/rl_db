@@ -17,6 +17,7 @@ import { EVENT_POINTS, normaliseType } from "@/lib/matchStats";
 
 type Fixture = MatchClock & {
   fixture_id: string;
+  status?: string | null;
   home_team_id: string;
   away_team_id: string;
   home_team?: { name: string } | null;
@@ -41,6 +42,7 @@ export function MatchClockPanel({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [askWalkover, setAskWalkover] = useState(false);
+  const [askAbandon, setAskAbandon] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, tick] = useState(0);
 
@@ -162,6 +164,45 @@ export function MatchClockPanel({
     await write({ ...pauseFields("finished"), status: "completed" });
   }
 
+  /**
+   * A match that started and could not be finished.
+   *
+   * Not the same as a walkover, where nobody turned up, and not the same as
+   * full time. What was recorded before it stopped stays on record — those
+   * events happened — but there is no result, because there was no result.
+   * Any result already written is removed, so an abandoned match cannot go
+   * on standing as a scoreline in the tables.
+   */
+  async function abandon() {
+    setBusy(true);
+    setError(null);
+
+    const { error: fixtureError } = await supabase
+      .from("fixtures")
+      .update({
+        status: "abandoned",
+        clock_state: "finished",
+        paused_at: new Date().toISOString(),
+      })
+      .eq("fixture_id", fixture.fixture_id);
+
+    if (fixtureError) {
+      setBusy(false);
+      setError(fixtureError.message);
+      return;
+    }
+
+    const { error: resultError } = await supabase
+      .from("match_results")
+      .delete()
+      .eq("fixture_id", fixture.fixture_id);
+
+    setBusy(false);
+    setAskAbandon(false);
+    if (resultError) { setError(resultError.message); return; }
+    onChange();
+  }
+
   /** The side that turned up is awarded the match; nothing is played. */
   async function walkover(forfeitingTeamId: string) {
     const homeForfeited = forfeitingTeamId === fixture.home_team_id;
@@ -261,24 +302,36 @@ export function MatchClockPanel({
               <Btn onClick={pause} tone="stop">Pause</Btn>
               <Btn onClick={halfTime} tone="stop">Half time</Btn>
               <Btn onClick={fullTime}>Full time</Btn>
+              <Btn onClick={() => setAskAbandon(!askAbandon)}>Abandon</Btn>
             </>
           )}
           {state === "paused" && (
             <>
               <Btn onClick={resume} tone="go">Resume</Btn>
               <Btn onClick={fullTime}>Full time</Btn>
+              <Btn onClick={() => setAskAbandon(!askAbandon)}>Abandon</Btn>
             </>
           )}
           {state === "half_time" && (
             <>
               <Btn onClick={secondHalf} tone="go">Start second half</Btn>
               <Btn onClick={fullTime}>Full time</Btn>
+              <Btn onClick={() => setAskAbandon(!askAbandon)}>Abandon</Btn>
             </>
           )}
           {state === "finished" && (
-            <span className="text-xs text-slate-500 self-center">
-              {fixture.forfeited_by_team_id ? "Awarded — walkover" : "Match over"}
-            </span>
+            <>
+              <span className="text-xs text-slate-500 self-center">
+                {fixture.forfeited_by_team_id
+                  ? "Awarded — walkover"
+                  : fixture.status === "abandoned"
+                  ? "Abandoned"
+                  : "Match over"}
+              </span>
+              {fixture.status !== "abandoned" && (
+                <Btn onClick={() => setAskAbandon(!askAbandon)}>Abandon</Btn>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -295,6 +348,20 @@ export function MatchClockPanel({
             <Btn onClick={() => walkover(fixture.away_team_id)}>
               {fixture.away_team?.name ?? "Away"} did not turn up
             </Btn>
+          </div>
+        </div>
+      )}
+
+      {askAbandon && (
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <p className="text-xs text-slate-400 mb-2">
+            The match started but cannot be finished. Everything recorded so
+            far stays — those things happened — but no result is kept, and any
+            score already saved for it is removed.
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <Btn onClick={abandon} tone="stop">Yes, abandon this match</Btn>
+            <Btn onClick={() => setAskAbandon(false)}>Keep it as it is</Btn>
           </div>
         </div>
       )}

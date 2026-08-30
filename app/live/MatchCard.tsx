@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { LiveClock } from "@/components/LiveClock";
 import { fmtShortDate, fmtTime } from "@/lib/matchStats";
 
@@ -20,19 +21,7 @@ export function TeamBadge({
         align === "right" ? "flex-row-reverse text-right" : ""
       }`}
     >
-      {team?.logo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={team.logo_url}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="w-8 h-8 rounded-full object-cover bg-white/10 shrink-0"
-        />
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-white/10 text-slate-300 text-[11px] font-bold flex items-center justify-center shrink-0">
-          {(team?.name ?? "?").slice(0, 3).toUpperCase()}
-        </div>
-      )}
+      <Avatar src={team?.logo_url} name={team?.name} size={32} />
       <span className="font-medium text-sm md:text-base truncate">
         {team?.name ?? "TBC"}
       </span>
@@ -53,7 +42,9 @@ export function StatusPill({ status }: { status: string | null | undefined }) {
     );
   }
   const label =
-    status === "completed"
+    status === "abandoned"
+      ? "Abandoned"
+      : status === "completed"
       ? "Full time"
       : status === "postponed"
       ? "Postponed"
@@ -63,7 +54,7 @@ export function StatusPill({ status }: { status: string | null | undefined }) {
   const tone =
     status === "completed"
       ? "text-emerald-400"
-      : status === "postponed" || status === "cancelled"
+      : status === "postponed" || status === "cancelled" || status === "abandoned"
       ? "text-amber-400"
       : "text-slate-400";
   return (

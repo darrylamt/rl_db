@@ -18,6 +18,20 @@ const WORDS: Record<string, string> = {
   declined: "Sent back",
 };
 
+/**
+ * A match still to be played.
+ *
+ * Naming a side for a match that has finished is not a thing anyone wants to
+ * do, and the date alone does not answer it — a match kicking off at two is
+ * still today's date at six. A result, or a fixture that has been closed
+ * one way or another, settles it.
+ */
+function stillToPlay(f: any): boolean {
+  const r = Array.isArray(f?.result) ? f.result[0] : f?.result;
+  if (r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0)) return false;
+  return !["completed", "abandoned", "cancelled"].includes(f?.status ?? "");
+}
+
 export default async function ClubTeamSheetsPage() {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
@@ -28,7 +42,7 @@ export default async function ClubTeamSheetsPage() {
       supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)"
+          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season), result:match_results(home_score, away_score)"
         )
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .gte("scheduled_date", today)
@@ -52,7 +66,7 @@ export default async function ClubTeamSheetsPage() {
     countFor.set(l.fixture_id, (countFor.get(l.fixture_id) ?? 0) + 1);
   }
 
-  const rows = (fixtures ?? []) as any[];
+  const rows = ((fixtures ?? []) as any[]).filter(stillToPlay);
   const notMigrated = !!error && /team_sheets/.test(error.message);
 
   return (
@@ -74,7 +88,7 @@ export default async function ClubTeamSheetsPage() {
 
       {rows.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-lg p-10 text-center text-slate-500">
-          No upcoming fixtures for your club.
+          No matches left to name a side for.
         </div>
       ) : (
         <ul className="grid gap-2">

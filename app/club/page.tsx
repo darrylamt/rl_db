@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -17,7 +18,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 function isPlayed(f: any): boolean {
   const r = Array.isArray(f?.result) ? f.result[0] : f?.result;
   if (r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0)) return true;
-  return f?.status === "completed";
+  return ["completed", "abandoned", "cancelled"].includes(f?.status ?? "");
 }
 
 export default async function ClubOverviewPage() {
@@ -179,9 +180,9 @@ export default async function ClubOverviewPage() {
               <li key={s.partner_id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3">
                 {s.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.logo_url} alt="" className="w-10 h-10 object-contain shrink-0" />
+                  <Avatar src={s.logo_url} name={s.name} size={40} rounded="md" contain />
                 ) : (
-                  <span className="w-10 h-10 rounded bg-slate-100 shrink-0" />
+                  <Avatar src={null} name={s.name} size={40} rounded="md" />
                 )}
                 <span className="min-w-0">
                   <span className="block font-medium text-navy-900 truncate">{s.name}</span>

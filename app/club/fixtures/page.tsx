@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 function isPlayed(f: any): boolean {
   const r = Array.isArray(f?.result) ? f.result[0] : f?.result;
   if (r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0)) return true;
-  return f?.status === "completed";
+  return ["completed", "abandoned", "cancelled"].includes(f?.status ?? "");
 }
 
 export default async function ClubFixturesPage() {

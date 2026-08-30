@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Avatar } from "@/components/Avatar";
 
 /**
  * One club submission, with enough of the player to decide on.
@@ -50,18 +51,7 @@ export function ApprovalCard({
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="flex gap-3">
-        {player.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={player.photo_url}
-            alt=""
-            className="w-14 h-14 rounded object-cover bg-slate-100 shrink-0"
-          />
-        ) : (
-          <span className="w-14 h-14 rounded bg-slate-100 shrink-0 flex items-center justify-center text-slate-400 text-xs">
-            no photo
-          </span>
-        )}
+        <Avatar src={player.photo_url} name={name} size={56} rounded="md" />
 
         <div className="min-w-0 flex-1">
           <p className="font-medium text-navy-900 truncate">{name || "Unnamed"}</p>

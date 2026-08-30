@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { createAdminClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 
@@ -33,11 +34,9 @@ function Crest({ name, logo }: { name: string; logo: string | null }) {
     <span className="inline-flex items-center gap-1.5 min-w-0">
       {logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+        <Avatar src={logo} name={name} size={20} />
       ) : (
-        <span className="w-5 h-5 rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600 grid place-items-center shrink-0">
-          {name.slice(0, 2).toUpperCase()}
-        </span>
+        <Avatar src={null} name={name} size={20} />
       )}
       <span className="truncate">{name}</span>
     </span>

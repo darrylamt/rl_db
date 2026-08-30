@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -282,11 +283,12 @@ export default async function StandingsPage({
                           <Link href={`/admin/teams/${r.team_id}/view`} className="flex items-center gap-2 hover:underline">
                             {r.logo_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
+                              <Avatar
                                 src={r.logo_url}
-                                alt=""
-                                referrerPolicy="no-referrer"
-                                className="h-6 w-6 rounded object-cover border border-slate-200 shrink-0"
+                                name={r.name}
+                                size={24}
+                                rounded="md"
+                                className="border border-slate-200"
                               />
                             ) : (
                               <div className="h-6 w-6 rounded bg-slate-200 shrink-0" />
