@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getAppUser } from "@/lib/auth";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 // Admin pages are per-user (authed) and pull live data — never prerender.
@@ -13,6 +14,7 @@ const navItems = [
   { href: "/admin/player-history", label: "Club History" },
   { href: "/admin/transfers", label: "Transfers" },
   { href: "/admin/club-accounts", label: "Club Accounts" },
+  { href: "/admin/recorders", label: "Match Recorders" },
   { href: "/admin/officials", label: "Officials" },
   { href: "/admin/competitions", label: "Competitions" },
   { href: "/admin/venues", label: "Venues" },
@@ -31,14 +33,17 @@ export default async function ProtectedAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // The middleware routes each role to its own side of the app. This is the
+  // check that holds, the same way /club and /enter check for themselves.
+  const user = await getAppUser();
+  if (!user) redirect("/admin/login?next=/admin/dashboard");
+  if (user.role === "club") redirect("/club");
+  if (user.role === "recorder") redirect("/enter");
+  if (!user.provisioned) redirect("/admin/no-access");
 
   return (
     <div className="min-h-screen md:flex bg-slate-50">
-      <AdminSidebar items={navItems} email={user?.email} />
+      <AdminSidebar items={navItems} email={user.email ?? undefined} />
       <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
     </div>
   );

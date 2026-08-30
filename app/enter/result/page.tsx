@@ -56,6 +56,25 @@ export default function EnterResultPage() {
     })();
   }, [supabase]);
 
+  // Arriving from the match-day list as /enter/result?fixture=<id>. The
+  // fixture picker is filtered by competition, so the competition has to be
+  // chosen before the fixture can be — look it up rather than making the
+  // recorder guess which competition their match belongs to.
+  const [wantedFixture, setWantedFixture] = useState<string | null>(null);
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("fixture");
+    if (!wanted) return;
+    setWantedFixture(wanted);
+    (async () => {
+      const { data } = await supabase
+        .from("fixtures")
+        .select("competition_id")
+        .eq("fixture_id", wanted)
+        .maybeSingle();
+      if (data?.competition_id) setCompetitionId(data.competition_id as string);
+    })();
+  }, [supabase]);
+
   useEffect(() => {
     if (!competitionId) {
       setFixtures([]);
@@ -69,9 +88,15 @@ export default function EnterResultPage() {
         )
         .eq("competition_id", competitionId)
         .order("scheduled_date", { ascending: false });
-      setFixtures((data ?? []) as any);
+      const list = (data ?? []) as any[];
+      setFixtures(list as any);
+      // Only once, and only if it really is in this competition's list.
+      if (wantedFixture && list.some((f) => f.fixture_id === wantedFixture)) {
+        setFixtureId(wantedFixture);
+        setWantedFixture(null);
+      }
     })();
-  }, [supabase, competitionId]);
+  }, [supabase, competitionId, wantedFixture]);
 
   const selectedFixture = useMemo(
     () => fixtures.find((f) => f.fixture_id === fixtureId) || null,

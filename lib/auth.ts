@@ -10,8 +10,8 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 export type AppUser = {
   userId: string;
   email: string | null;
-  role: "federation" | "club";
-  /** The one club a club account speaks for. Null for the federation. */
+  role: "federation" | "club" | "recorder";
+  /** The one club a club account speaks for. Null for the others. */
   teamId: string | null;
   /**
    * False when the account has no row in app_users. Such an account gets
@@ -69,7 +69,10 @@ export async function getAppUser(): Promise<AppUser | null> {
   return {
     userId: user.id,
     email: user.email ?? null,
-    role: data.role === "club" ? "club" : "federation",
+    role:
+      data.role === "club" || data.role === "recorder"
+        ? data.role
+        : "federation",
     teamId: data.team_id ?? null,
     provisioned: true,
   };
@@ -95,5 +98,22 @@ export async function requireFederation(): Promise<AppUser> {
   if (!user) throw new Error("Not signed in");
   if (!user.provisioned) throw new Error("This account has not been set up");
   if (user.role !== "federation") throw new Error("Federation accounts only");
+  return user;
+}
+
+/**
+ * Whoever may type a match in.
+ *
+ * Recorders exist for exactly this and the federation can do everything, so
+ * both pass. A club account does not — it would be recording other people's
+ * matches, and its own club's besides.
+ */
+export async function requireMatchRecorder(): Promise<AppUser> {
+  const user = await getAppUser();
+  if (!user) throw new Error("Not signed in");
+  if (!user.provisioned) throw new Error("This account has not been set up");
+  if (user.role !== "recorder" && user.role !== "federation") {
+    throw new Error("Match entry is for recorders and the federation");
+  }
   return user;
 }

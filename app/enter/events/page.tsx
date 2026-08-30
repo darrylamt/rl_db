@@ -80,8 +80,18 @@ export default function EnterEventsPage() {
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
 
   // ── Load today's fixtures (+ postponed) ─────────────────
+  // A recorder normally arrives from the match-day list with the match
+  // already named: /enter/events?fixture=<id>. That one is pulled in even if
+  // it is not today's, so following the link never lands on an empty picker.
+  // Both go in a single effect: two effects racing to setFixtures would let
+  // the slower one wipe the other's result.
   useEffect(() => {
     (async () => {
+      const wanted =
+        typeof window === "undefined"
+          ? null
+          : new URLSearchParams(window.location.search).get("fixture");
+
       const { data } = await supabase
         .from("fixtures")
         .select(
@@ -89,7 +99,22 @@ export default function EnterEventsPage() {
         )
         .or(`scheduled_date.eq.${today},status.eq.postponed,status.eq.live`)
         .order("scheduled_time", { ascending: true });
-      setFixtures((data ?? []) as any);
+
+      let list = (data ?? []) as any[];
+
+      if (wanted && !list.some((f) => f.fixture_id === wanted)) {
+        const { data: one } = await supabase
+          .from("fixtures")
+          .select(
+            "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season)"
+          )
+          .eq("fixture_id", wanted)
+          .maybeSingle();
+        if (one) list = [one as any, ...list];
+      }
+
+      setFixtures(list as any);
+      if (wanted && list.some((f) => f.fixture_id === wanted)) setFixtureId(wanted);
     })();
   }, [supabase, today]);
 

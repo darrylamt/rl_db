@@ -45,6 +45,11 @@ export async function updateSession(request: NextRequest) {
   // never signed in reaches the form and every save fails silently.
   const isEnterRoute = pathname.startsWith("/enter");
   const isLoginRoute = pathname === "/admin/login";
+  // Signing out lives under /admin but belongs to everyone. Without this it
+  // is treated as the federation's admin and a club or recorder is bounced
+  // back to their own side before the route can clear the session — leaving
+  // them no way to sign out at all.
+  const isLogoutRoute = pathname === "/admin/logout";
 
   if ((isAdminRoute || isClubRoute || isEnterRoute) && !isLoginRoute && !user) {
     const url = request.nextUrl.clone();
@@ -56,9 +61,9 @@ export async function updateSession(request: NextRequest) {
   // What kind of account this is decides which half of the app it sees. The
   // middleware only sorts the traffic; every read and write checks again on
   // the server, because a redirect is a convenience and not a permission.
-  let role: "federation" | "club" | "unprovisioned" = "federation";
+  let role: "federation" | "club" | "recorder" | "unprovisioned" = "federation";
   let hasRoles = true;
-  if (user && (isAdminRoute || isClubRoute || isLoginRoute)) {
+  if (user && (isAdminRoute || isClubRoute || isEnterRoute || isLoginRoute)) {
     const { data, error } = await supabase
       .from("app_users")
       .select("role")
@@ -70,11 +75,15 @@ export async function updateSession(request: NextRequest) {
     } else if (!data) {
       role = "unprovisioned";
     } else {
-      role = data.role === "club" ? "club" : "federation";
+      role =
+        data.role === "club" || data.role === "recorder"
+          ? data.role
+          : "federation";
     }
   }
 
-  const home = role === "club" ? "/club" : "/admin/dashboard";
+  const home =
+    role === "club" ? "/club" : role === "recorder" ? "/enter" : "/admin/dashboard";
 
   if (isLoginRoute && user) {
     const url = request.nextUrl.clone();
@@ -83,7 +92,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && hasRoles) {
+  if (user && hasRoles && !isLogoutRoute) {
     // A club account has no business in the federation admin.
     if (isAdminRoute && !isLoginRoute && role === "club") {
       const url = request.nextUrl.clone();
@@ -95,6 +104,21 @@ export async function updateSession(request: NextRequest) {
     if (isClubRoute && role === "federation") {
       const url = request.nextUrl.clone();
       url.pathname = "/admin/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // A recorder gets the match-day screens and nothing else.
+    if ((isAdminRoute || isClubRoute) && !isLoginRoute && role === "recorder") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/enter";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // Signing in is not the same as being allowed to record a match — a club
+    // account would otherwise be entering other people's results.
+    if (isEnterRoute && (role === "club" || role === "unprovisioned")) {
+      const url = request.nextUrl.clone();
+      url.pathname = role === "club" ? "/club" : "/admin/no-access";
       url.search = "";
       return NextResponse.redirect(url);
     }
