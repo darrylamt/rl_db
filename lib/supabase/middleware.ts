@@ -39,20 +39,74 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAdminRoute = pathname.startsWith("/admin");
+  const isClubRoute = pathname.startsWith("/club");
+  // The quick-entry screens write from the browser, so the database only
+  // accepts them from a signed-in session. Without this gate a phone that has
+  // never signed in reaches the form and every save fails silently.
+  const isEnterRoute = pathname.startsWith("/enter");
   const isLoginRoute = pathname === "/admin/login";
 
-  if (isAdminRoute && !isLoginRoute && !user) {
+  if ((isAdminRoute || isClubRoute || isEnterRoute) && !isLoginRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
+  // What kind of account this is decides which half of the app it sees. The
+  // middleware only sorts the traffic; every read and write checks again on
+  // the server, because a redirect is a convenience and not a permission.
+  let role: "federation" | "club" | "unprovisioned" = "federation";
+  let hasRoles = true;
+  if (user && (isAdminRoute || isClubRoute || isLoginRoute)) {
+    const { data, error } = await supabase
+      .from("app_users")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error && (error as any).code === "42P01") {
+      // Roles have not been introduced yet: behave exactly as before.
+      hasRoles = false;
+    } else if (!data) {
+      role = "unprovisioned";
+    } else {
+      role = data.role === "club" ? "club" : "federation";
+    }
+  }
+
+  const home = role === "club" ? "/club" : "/admin/dashboard";
+
   if (isLoginRoute && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/admin/dashboard";
+    url.pathname = home;
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  if (user && hasRoles) {
+    // A club account has no business in the federation admin.
+    if (isAdminRoute && !isLoginRoute && role === "club") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/club";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // Nor the federation in a club's portal — there is nothing there for it.
+    if (isClubRoute && role === "federation") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // An account nobody has set up gets neither, and is told so.
+    if ((isAdminRoute || isClubRoute) && !isLoginRoute && role === "unprovisioned") {
+      if (pathname !== "/admin/no-access") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin/no-access";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   return supabaseResponse;
