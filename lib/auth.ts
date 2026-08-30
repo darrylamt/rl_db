@@ -18,6 +18,11 @@ export type AppUser = {
    * nothing — not the admin, not a club — rather than defaulting to either.
    */
   provisioned: boolean;
+  /**
+   * A held account keeps its password and its history but cannot get past
+   * the sign-in. Used while a club's registration is unpaid.
+   */
+  onHold: boolean;
 };
 
 /**
@@ -41,7 +46,7 @@ export async function getAppUser(): Promise<AppUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("app_users")
-    .select("role, team_id")
+    .select("role, team_id, status")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -53,6 +58,7 @@ export async function getAppUser(): Promise<AppUser | null> {
       role: "federation",
       teamId: null,
       provisioned: true,
+      onHold: false,
     };
   }
 
@@ -63,6 +69,7 @@ export async function getAppUser(): Promise<AppUser | null> {
       role: "federation",
       teamId: null,
       provisioned: false,
+      onHold: false,
     };
   }
 
@@ -75,6 +82,9 @@ export async function getAppUser(): Promise<AppUser | null> {
         : "federation",
     teamId: data.team_id ?? null,
     provisioned: true,
+    // The column arrives only once account_holds_and_audit.sql has been run;
+    // until then nothing is held, which is how things behaved before.
+    onHold: (data as any).status === "on_hold",
   };
 }
 
@@ -87,6 +97,7 @@ export async function getAppUser(): Promise<AppUser | null> {
 export async function requireClub(): Promise<{ user: AppUser; teamId: string }> {
   const user = await getAppUser();
   if (!user) throw new Error("Not signed in");
+  if (user.onHold) throw new Error("This account is on hold");
   if (user.role !== "club" || !user.teamId) {
     throw new Error("This account is not attached to a club");
   }
@@ -97,6 +108,7 @@ export async function requireFederation(): Promise<AppUser> {
   const user = await getAppUser();
   if (!user) throw new Error("Not signed in");
   if (!user.provisioned) throw new Error("This account has not been set up");
+  if (user.onHold) throw new Error("This account is on hold");
   if (user.role !== "federation") throw new Error("Federation accounts only");
   return user;
 }
@@ -112,6 +124,7 @@ export async function requireMatchRecorder(): Promise<AppUser> {
   const user = await getAppUser();
   if (!user) throw new Error("Not signed in");
   if (!user.provisioned) throw new Error("This account has not been set up");
+  if (user.onHold) throw new Error("This account is on hold");
   if (user.role !== "recorder" && user.role !== "federation") {
     throw new Error("Match entry is for recorders and the federation");
   }

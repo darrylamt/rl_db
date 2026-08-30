@@ -15,6 +15,7 @@ export default async function EnterLayout({
   // convenience.
   const user = await getAppUser();
   if (!user) redirect("/admin/login?next=/enter");
+  if (user.onHold) redirect("/admin/on-hold");
   if (user.role === "club") redirect("/club");
   if (!user.provisioned || (user.role !== "recorder" && user.role !== "federation")) {
     redirect("/admin/no-access");

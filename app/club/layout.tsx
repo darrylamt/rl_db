@@ -21,6 +21,7 @@ export default async function ClubLayout({
 
   // The middleware sorts the traffic; this is the check that actually holds.
   if (!user) redirect("/admin/login?next=/club");
+  if (user.onHold) redirect("/admin/on-hold");
   if (user.role !== "club" || !user.teamId) redirect("/admin/dashboard");
 
   const supabase = createAdminClient();

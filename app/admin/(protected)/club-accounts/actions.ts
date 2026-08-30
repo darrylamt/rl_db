@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation } from "@/lib/auth";
+import { record } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -90,6 +91,12 @@ async function attemptCreate(fd: FormData): Promise<Outcome> {
     return { error: error.message };
   }
 
+  await record({
+    action: "account.create",
+    entity: "app_users",
+    entityId: userId,
+    summary: `Issued a club login to ${email}`,
+  });
   return { created: email };
 }
 
@@ -133,7 +140,7 @@ export async function revokeClubAccount(userId: string) {
 
   const { data: row } = await supabase
     .from("app_users")
-    .select("role")
+    .select("role, email")
     .eq("user_id", userId)
     .maybeSingle();
   // Never let this be turned on a federation account.
@@ -143,6 +150,12 @@ export async function revokeClubAccount(userId: string) {
 
   await supabase.from("app_users").delete().eq("user_id", userId);
   const { error } = await supabase.auth.admin.deleteUser(userId);
+  await record({
+    action: "account.revoke",
+    entity: "app_users",
+    entityId: userId,
+    summary: `Revoked the club login ${(row as any).email ?? ""}`.trim(),
+  });
   revalidatePath("/admin/club-accounts");
   redirect(
     error
@@ -177,4 +190,93 @@ export async function resetClubPassword(userId: string, fd: FormData) {
 
   revalidatePath("/admin/club-accounts");
   redirect(`/admin/club-accounts?${new URLSearchParams(outcome as any)}`);
+}
+
+/**
+ * Stops an account signing in without destroying it.
+ *
+ * The case this exists for: a club's login is issued before the season so
+ * they can enter a squad, but must not work until they have paid. Deleting
+ * and re-issuing would lose the password already handed over and everything
+ * the account has done, so the account stays and the sign-in stops.
+ */
+export async function holdAccount(userId: string, fd: FormData) {
+  await requireFederation();
+  const reason = ((fd.get("reason") as string) ?? "").trim();
+  const supabase = createAdminClient();
+
+  const { data: row } = await supabase
+    .from("app_users")
+    .select("role, email")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  let outcome: Outcome;
+  if (!row || row.role !== "club") {
+    outcome = { error: "That is not a club account." };
+  } else {
+    const { error } = await supabase
+      .from("app_users")
+      .update({ status: "on_hold", held_reason: reason || null, held_at: new Date().toISOString() })
+      .eq("user_id", userId);
+    if (error) {
+      outcome = { error: missingHoldColumns(error.message) };
+    } else {
+      await record({
+        action: "account.hold",
+        entity: "app_users",
+        entityId: userId,
+        summary: `Put ${row.email ?? "an account"} on hold`,
+        detail: { reason: reason || null },
+      });
+      outcome = { note: `${row.email ?? "That account"} is on hold and cannot sign in.` };
+    }
+  }
+
+  revalidatePath("/admin/club-accounts");
+  redirect(`/admin/club-accounts?${new URLSearchParams(outcome as any)}`);
+}
+
+/** Lets a held account sign in again — the club has paid. */
+export async function releaseAccount(userId: string) {
+  await requireFederation();
+  const supabase = createAdminClient();
+
+  const { data: row } = await supabase
+    .from("app_users")
+    .select("role, email")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  let outcome: Outcome;
+  if (!row || row.role !== "club") {
+    outcome = { error: "That is not a club account." };
+  } else {
+    const { error } = await supabase
+      .from("app_users")
+      .update({ status: "active", held_reason: null, held_at: null })
+      .eq("user_id", userId);
+    if (error) {
+      outcome = { error: missingHoldColumns(error.message) };
+    } else {
+      await record({
+        action: "account.release",
+        entity: "app_users",
+        entityId: userId,
+        summary: `Released ${row.email ?? "an account"} from hold`,
+      });
+      outcome = { note: `${row.email ?? "That account"} can sign in again.` };
+    }
+  }
+
+  revalidatePath("/admin/club-accounts");
+  redirect(`/admin/club-accounts?${new URLSearchParams(outcome as any)}`);
+}
+
+/** The one database error here worth explaining. */
+function missingHoldColumns(message: string) {
+  if (/status|held_reason|held_at/.test(message) && /column/i.test(message)) {
+    return "Holds need supabase/account_holds_and_audit.sql to be run first.";
+  }
+  return message;
 }

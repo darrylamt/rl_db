@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
-import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
-import { createRecorderAccount, revokeRecorderAccount } from "./actions";
+import { AccountRowActions } from "@/components/admin/AccountRowActions";
+import {
+  createRecorderAccount,
+  revokeRecorderAccount,
+  holdAccount,
+  releaseAccount,
+  resetRecorderPassword,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +26,7 @@ export default async function RecordersPage({
 
   const { data: accounts, error } = await supabase
     .from("app_users")
-    .select("user_id, role, email, created_at")
+    .select("user_id, role, email, created_at, status, held_reason")
     .eq("role", "recorder")
     .order("created_at", { ascending: false });
 
@@ -118,16 +124,27 @@ export default async function RecordersPage({
             ) : (
               rows.map((a) => (
                 <tr key={a.user_id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-medium text-navy-900">{a.email ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-medium text-navy-900">
+                    {a.email ?? "—"}
+                    {a.status === "on_hold" && (
+                      <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                        on hold
+                      </span>
+                    )}
+                  </td>
                   <td className="hidden sm:table-cell px-4 py-2.5 text-slate-500 text-xs">
                     {a.created_at ? String(a.created_at).slice(0, 10) : "—"}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <DeleteRowButton
-                      id={a.user_id}
-                      action={revokeRecorderAccount}
-                      label="Revoke"
-                      confirmText="Remove this recorder's login? They will be signed out and cannot sign in again."
+                    <AccountRowActions
+                      userId={a.user_id}
+                      email={a.email ?? "this account"}
+                      onHold={a.status === "on_hold"}
+                      heldReason={a.held_reason}
+                      hold={holdAccount}
+                      release={releaseAccount}
+                      resetPassword={resetRecorderPassword}
+                      revoke={revokeRecorderAccount}
                     />
                   </td>
                 </tr>

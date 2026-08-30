@@ -40,18 +40,15 @@ where f.slug = 'african-warriors-skolars-14-04-24-youth'
 
 -- ── 2. Highlight links ──────────────────────────────────────
 
-drop table if exists _seed_highlights;
+-- The links, carried inline rather than staged in a table. A temp table
+-- would work, but creating one trips the SQL editor's "table without RLS"
+-- and "destructive operation" warnings for something that only ever exists
+-- inside this statement.
 
-create temp table _seed_highlights (
-  comp   text,
-  season text,
-  home   text,
-  away   text,
-  dt     date,
-  url    text
-);
-
-insert into _seed_highlights values
+-- Only fills a gap; a link already recorded is left alone.
+update match_results r
+set video_url = s.url
+from (values
   ('Men''s 13s Championship', '2024', 'Accra Majestics', 'Accra Panthers', '2024-01-28', 'https://www.youtube.com/embed/MF8VM66ptPA?si=sBb6_h047AMaeXdV'),
   ('Youth 13s Championship', '2024', 'African Warriors', 'Accra Panthers', '2024-03-10', 'https://www.youtube.com/embed/6oyzo6tYzyQ?si=7D-04qM20-z1QDfd'),
   ('Youth 13s Championship', '2024', 'Accra Panthers', 'African Warriors', '2024-04-07', 'https://www.youtube.com/embed/QDl36WW-PB8?si=abvk65bKWG49dZ8f'),
@@ -100,12 +97,8 @@ insert into _seed_highlights values
   ('Youth 13s Championship', '2025', 'Accra Panthers', 'Skolars', '2025-09-12', 'https://youtube.com/shorts/57yWLEfk25A?si=HKTXUNUxAl-6xF72'),
   ('Men''s 13s Championship', '2026', 'Bulls', 'Titans', '2026-04-12', 'https://www.youtube.com/embed/LSJDrxSCQvg?si=1lHed1pgHS3xHlWd'),
   ('Men''s 13s Championship', '2026', 'Dragons', 'Nungua Tigers', '2026-04-12', 'https://www.youtube.com/embed/_kPnbfzm9L4?si=VM5k9zwd3FPQlEVi'),
-  ('Men''s 13s Championship', '2026', 'Accra Panthers', 'Skolars', '2026-04-12', 'https://www.youtube.com/embed/0-Xy3qHjhi0?si=9DOH5pODYJ_NMCyG');
-
--- Only fills a gap; a link already recorded is left alone.
-update match_results r
-set video_url = s.url
-from _seed_highlights s
+  ('Men''s 13s Championship', '2026', 'Accra Panthers', 'Skolars', '2026-04-12', 'https://www.youtube.com/embed/0-Xy3qHjhi0?si=9DOH5pODYJ_NMCyG')
+) as s(comp, season, home, away, dt, url)
 join competitions c on c.name = s.comp and c.season = s.season
 join teams h on h.name = s.home
 join teams a on a.name = s.away
@@ -113,8 +106,7 @@ join fixtures f
   on f.competition_id = c.competition_id
  and f.home_team_id = h.team_id
  and f.away_team_id = a.team_id
- and f.scheduled_date = s.dt
+ and f.scheduled_date = s.dt::date
 where r.fixture_id = f.fixture_id
   and (r.video_url is null or r.video_url = '');
 
-drop table _seed_highlights;

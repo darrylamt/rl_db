@@ -63,10 +63,11 @@ export async function updateSession(request: NextRequest) {
   // the server, because a redirect is a convenience and not a permission.
   let role: "federation" | "club" | "recorder" | "unprovisioned" = "federation";
   let hasRoles = true;
+  let onHold = false;
   if (user && (isAdminRoute || isClubRoute || isEnterRoute || isLoginRoute)) {
     const { data, error } = await supabase
       .from("app_users")
-      .select("role")
+      .select("role, status")
       .eq("user_id", user.id)
       .maybeSingle();
     if (error && (error as any).code === "42P01") {
@@ -79,6 +80,9 @@ export async function updateSession(request: NextRequest) {
         data.role === "club" || data.role === "recorder"
           ? data.role
           : "federation";
+      // The column only exists once account_holds_and_audit.sql has run;
+      // before that nothing is held, exactly as before.
+      onHold = (data as any).status === "on_hold";
     }
   }
 
@@ -88,6 +92,15 @@ export async function updateSession(request: NextRequest) {
   if (isLoginRoute && user) {
     const url = request.nextUrl.clone();
     url.pathname = home;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // A held account keeps its password and its history but gets no further
+  // than this. It is how a club login can exist before their fees are paid.
+  if (user && onHold && !isLogoutRoute && pathname !== "/admin/on-hold") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin/on-hold";
     url.search = "";
     return NextResponse.redirect(url);
   }

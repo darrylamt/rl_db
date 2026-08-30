@@ -25,6 +25,7 @@ const navItems = [
   { href: "/admin/documents", label: "Documents", divider: true },
   { href: "/admin/people", label: "Board & Committee" },
   { href: "/admin/partners", label: "Partners" },
+  { href: "/admin/audit", label: "Audit Trail" },
   { href: "/docs", label: "API Docs", divider: true, external: true },
 ];
 
@@ -37,6 +38,7 @@ export default async function ProtectedAdminLayout({
   // check that holds, the same way /club and /enter check for themselves.
   const user = await getAppUser();
   if (!user) redirect("/admin/login?next=/admin/dashboard");
+  if (user.onHold) redirect("/admin/on-hold");
   if (user.role === "club") redirect("/club");
   if (user.role === "recorder") redirect("/enter");
   if (!user.provisioned) redirect("/admin/no-access");
