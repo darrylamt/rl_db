@@ -50,15 +50,27 @@ export function elapsedSeconds(f: MatchClock, now: number = Date.now()): number 
   return Math.max(0, Math.floor((upTo - kickoff - stoppage) / 1000));
 }
 
-/** The minute a viewer sees. Minute 1 from the first second, as in football. */
+/**
+ * The minute a viewer sees.
+ *
+ * Rounded up, so the first second of play is the 1st minute and 40:00 on the
+ * clock is the 40th — not the 41st, which is what flooring and adding one
+ * gives you and which made the second half appear to start a minute late.
+ */
 export function displayMinute(f: MatchClock, now: number = Date.now()): number {
   const secs = elapsedSeconds(f, now);
-  return secs === 0 ? 0 : Math.floor(secs / 60) + 1;
+  return secs === 0 ? 0 : Math.ceil(secs / 60);
 }
 
-/** Which half the clock is in, by elapsed time. */
+/**
+ * Which half the clock is in.
+ *
+ * Measured in seconds rather than in displayed minutes: at exactly 40:00 the
+ * second half has begun, and comparing rounded minutes would leave that
+ * moment in the first.
+ */
 export function currentHalf(f: MatchClock, now: number = Date.now()): 1 | 2 {
-  return displayMinute(f, now) > HALF_MINUTES ? 2 : 1;
+  return elapsedSeconds(f, now) >= HALF_MINUTES * 60 ? 2 : 1;
 }
 
 /** Short label for a scoreboard: 23', HT, FT. */
@@ -104,6 +116,35 @@ export function resumeFields(f: MatchClock) {
     clock_state: "running" as const,
     paused_at: null,
     stoppage_seconds: (f.stoppage_seconds ?? 0) + extra,
+  };
+}
+
+/**
+ * The fields to write when the second half kicks off.
+ *
+ * The second half starts at 40:00 whatever the clock actually read when the
+ * referee blew for half time — a half ended on 38:20 still gives a second
+ * half beginning on 40, so the match reads 40 to 80 as it should.
+ *
+ * Only ever forward. If the first half over-ran — 41:30 when the whistle
+ * went — winding back to 40 would put events already recorded in the future,
+ * so the clock is left where it is and simply carries on.
+ */
+export function resumeFromHalfTimeFields(f: MatchClock) {
+  const kickoff = f.kickoff_at ? new Date(f.kickoff_at).getTime() : NaN;
+  if (Number.isNaN(kickoff)) return resumeFields(f);
+
+  const played = elapsedSeconds(f);
+  if (played >= HALF_MINUTES * 60) return resumeFields(f);
+
+  // elapsed = now - kickoff - stoppage, so the stoppage that puts elapsed at
+  // exactly 40:00 right now is what is left when you take 40 minutes off the
+  // real time since kick-off.
+  const sinceKickoff = Math.floor((Date.now() - kickoff) / 1000);
+  return {
+    clock_state: "running" as const,
+    paused_at: null,
+    stoppage_seconds: Math.max(0, sinceKickoff - HALF_MINUTES * 60),
   };
 }
 

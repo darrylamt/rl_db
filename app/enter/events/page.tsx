@@ -378,7 +378,10 @@ export default function EnterEventsPage() {
             </div>
           </div>
 
-          {/* Team selector */}
+          {/* Scoring and cards — the form below opens once a side is picked */}
+          <h3 className="text-gold-400 font-display text-sm tracking-widest mb-2">
+            SCORING &amp; CARDS
+          </h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {(["home", "away"] as const).map((side) => {
               const teamName = side === "home"
@@ -548,6 +551,13 @@ export default function EnterEventsPage() {
                 {loading ? "Recording..." : eventType ? `Record ${eventType.replace(/_/g, " ")}` : "Select an event"}
               </button>
             </>
+          )}
+
+          {!selectedTeam && (
+            <p className="bg-navy-800/60 border border-navy-600 border-dashed rounded-lg px-4 py-5 text-center text-sm text-navy-300 mb-2">
+              Pick a side above to record a try, conversion, card or missed
+              conversion.
+            </p>
           )}
 
           {/* Live event feed */}

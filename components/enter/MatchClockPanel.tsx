@@ -8,6 +8,7 @@ import {
   displayMinute,
   pauseFields,
   resumeFields,
+  resumeFromHalfTimeFields,
   currentHalf,
   WALKOVER_SCORE,
   type MatchClock,
@@ -82,6 +83,8 @@ export function MatchClockPanel({
     });
 
   const resume = () => write(resumeFields(fixture));
+  // The second half begins on 40, whatever the whistle actually went on.
+  const secondHalf = () => write(resumeFromHalfTimeFields(fixture));
   const pause = () => write(pauseFields("paused"));
   const halfTime = () => write(pauseFields("half_time"));
   const fullTime = () => write({ ...pauseFields("finished"), status: "completed" });
@@ -155,13 +158,20 @@ export function MatchClockPanel({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-2">
           <span className="font-display tabular-nums text-3xl text-ghanaYellow-500">
-            {state === "not_started" ? "—" : clockTime(fixture)}
+            {state === "not_started"
+              ? "—"
+              : state === "half_time"
+              ? "HT"
+              : state === "finished"
+              ? "FT"
+              : clockTime(fixture)}
           </span>
           <span className="text-xs text-slate-400">
             {state === "not_started" && "not started"}
             {state === "running" && `${displayMinute(fixture)}' · half ${currentHalf(fixture)}`}
             {state === "paused" && "paused"}
-            {state === "half_time" && "half time"}
+            {state === "half_time" &&
+              `half time · ${clockTime(fixture)} played · second half starts on 40'`}
             {state === "finished" && "full time"}
           </span>
         </div>
@@ -188,7 +198,7 @@ export function MatchClockPanel({
           )}
           {state === "half_time" && (
             <>
-              <Btn onClick={resume} tone="go">Start second half</Btn>
+              <Btn onClick={secondHalf} tone="go">Start second half</Btn>
               <Btn onClick={fullTime}>Full time</Btn>
             </>
           )}
