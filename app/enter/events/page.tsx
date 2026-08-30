@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MatchClockPanel } from "@/components/enter/MatchClockPanel";
+import { TallyPad } from "@/components/enter/TallyPad";
 import { clockState, displayMinute, currentHalf } from "@/lib/matchClock";
 
 type Fixture = {
@@ -49,14 +50,13 @@ function newId() {
 const SCORE_EVENTS: { type: string; label: string; points: number; color: string }[] = [
   { type: "try",        label: "Try",        points: 4, color: "bg-emerald-600 hover:bg-emerald-700" },
   { type: "conversion", label: "Conversion", points: 2, color: "bg-blue-600 hover:bg-blue-700" },
-  { type: "penalty",    label: "Penalty",    points: 2, color: "bg-amber-600 hover:bg-amber-700" },
+  { type: "penalty_goal", label: "Penalty", points: 2, color: "bg-amber-600 hover:bg-amber-700" },
   { type: "drop_goal",  label: "Drop Goal",  points: 1, color: "bg-purple-600 hover:bg-purple-700" },
 ];
 
 const OTHER_EVENTS: { type: string; label: string; color: string }[] = [
+  { type: "missed_conversion", label: "Missed Conv.", color: "bg-slate-600 hover:bg-slate-700" },
   { type: "try_assist",  label: "Try Assist", color: "bg-slate-600 hover:bg-slate-700" },
-  { type: "line_break",  label: "Line Break", color: "bg-slate-600 hover:bg-slate-700" },
-  { type: "tackle",      label: "Tackle",     color: "bg-slate-600 hover:bg-slate-700" },
   { type: "sin_bin",     label: "Sin Bin",    color: "bg-yellow-500 hover:bg-yellow-600" },
   { type: "yellow_card", label: "Yellow Card",color: "bg-yellow-500 hover:bg-yellow-600" },
   { type: "red_card",    label: "Red Card",   color: "bg-red-600 hover:bg-red-700" },
@@ -551,6 +551,18 @@ export default function EnterEventsPage() {
           )}
 
           {/* Live event feed */}
+          {/* The counting stats. Kept apart from the form above because they
+              are a different job: one tap each, hundreds of times. */}
+          <section className="mt-6">
+            <TallyPad
+              fixtureId={fixtureId}
+              fixture={fixture}
+              players={players}
+              events={events}
+              onRecorded={loadEvents}
+            />
+          </section>
+
           {events.length > 0 && (
             <section className="mt-6">
               <h2 className="text-gold-400 font-display text-sm tracking-widest mb-2">
