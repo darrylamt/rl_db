@@ -12,6 +12,7 @@ const navItems = [
   { href: "/admin/registrations", label: "Registrations" },
   { href: "/admin/player-history", label: "Club History" },
   { href: "/admin/transfers", label: "Transfers" },
+  { href: "/admin/club-accounts", label: "Club Accounts" },
   { href: "/admin/officials", label: "Officials" },
   { href: "/admin/competitions", label: "Competitions" },
   { href: "/admin/venues", label: "Venues" },
