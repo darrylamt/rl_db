@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const NAV = [
   { href: "/club", label: "Overview" },
   { href: "/club/players", label: "Squad" },
+  { href: "/club/team-sheets", label: "Team Sheets" },
   { href: "/club/fixtures", label: "Fixtures" },
 ];
 
