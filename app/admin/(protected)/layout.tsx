@@ -35,6 +35,7 @@ const navSections = [
       { href: "/admin/players", label: "Players" },
       { href: "/admin/player-approvals", label: "Player Approvals" },
       { href: "/admin/registrations", label: "Registrations" },
+      { href: "/admin/transfer-requests", label: "Transfer Requests" },
       { href: "/admin/transfers", label: "Transfers" },
       { href: "/admin/player-history", label: "Club History" },
       { href: "/admin/suspensions", label: "Suspensions" },
@@ -93,7 +94,7 @@ export default async function ProtectedAdminLayout({
   // rather than needing a visit to find out they are empty. Both degrade to
   // no badge if their migration has not been run.
   const supabase = createAdminClient();
-  const [pendingPlayers, pendingSheets] = await Promise.all([
+  const [pendingPlayers, pendingSheets, pendingTransfers] = await Promise.all([
     supabase
       .from("players")
       .select("player_id", { count: "exact", head: true })
@@ -102,11 +103,16 @@ export default async function ProtectedAdminLayout({
       .from("team_sheets")
       .select("sheet_id", { count: "exact", head: true })
       .eq("status", "submitted"),
+    supabase
+      .from("transfer_requests")
+      .select("request_id", { count: "exact", head: true })
+      .eq("status", "with_federation"),
   ]);
 
   const badges: Record<string, number> = {
     "/admin/player-approvals": pendingPlayers.count ?? 0,
     "/admin/team-sheets": pendingSheets.count ?? 0,
+    "/admin/transfer-requests": pendingTransfers.count ?? 0,
   };
 
   const sections = navSections.map((section) => ({

@@ -11,6 +11,7 @@ const NAV = [
   { href: "/club/players", label: "Squad" },
   { href: "/club/team-sheets", label: "Team Sheets" },
   { href: "/club/fixtures", label: "Fixtures" },
+  { href: "/club/transfers", label: "Transfers" },
 ];
 
 export default async function ClubLayout({
