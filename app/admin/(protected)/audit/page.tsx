@@ -6,18 +6,39 @@ export const dynamic = "force-dynamic";
 
 const PER_PAGE = 25;
 
-const TONE: Record<string, string> = {
-  "account.create": "bg-emerald-100 text-emerald-800",
-  "account.revoke": "bg-red-100 text-red-800",
-  "account.hold": "bg-amber-100 text-amber-800",
-  "account.release": "bg-emerald-100 text-emerald-800",
-  "account.password_reset": "bg-slate-100 text-slate-700",
-};
+/** The tables worth offering as a filter, in the order they get asked about. */
+const ENTITIES = [
+  "app_users", "match_events", "match_results", "match_lineups",
+  "fixtures", "players", "player_registrations", "teams",
+  "suspensions", "articles",
+];
+
+function tone(action: string) {
+  if (action.endsWith(".delete")) return "bg-red-100 text-red-800";
+  if (action.endsWith(".insert")) return "bg-emerald-100 text-emerald-800";
+  if (action.endsWith(".update")) return "bg-sky-100 text-sky-800";
+  return "bg-slate-100 text-slate-700";
+}
+
+/** "match_events.insert" reads better as "added". */
+function verb(action: string) {
+  if (action.endsWith(".insert")) return "added";
+  if (action.endsWith(".update")) return "changed";
+  if (action.endsWith(".delete")) return "removed";
+  return action.replace(/^account\./, "").replace(/_/g, " ");
+}
+
+/** The fields an update actually touched, minus the noise. */
+function changedFields(detail: any): string[] {
+  const changed = detail?.changed;
+  if (!changed || typeof changed !== "object") return [];
+  return Object.keys(changed).filter((k) => k !== "updated_at");
+}
 
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams?: { page?: string; actor?: string };
+  searchParams?: { page?: string; actor?: string; entity?: string };
 }) {
   const supabase = createAdminClient();
   const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
@@ -32,6 +53,7 @@ export default async function AuditPage({
     .range(from, from + PER_PAGE - 1);
 
   if (searchParams?.actor) query = query.eq("actor_email", searchParams.actor);
+  if (searchParams?.entity) query = query.eq("entity", searchParams.entity);
 
   const { data, error, count } = await query;
   const rows = (data ?? []) as any[];
@@ -43,9 +65,10 @@ export default async function AuditPage({
       <ListHeader title="Audit Trail" />
 
       <p className="text-sm text-slate-500 -mt-3 mb-5 max-w-2xl">
-        Who did what, and when. Logins issued, held, released and revoked are
-        recorded here. Entries are kept even after the account they describe
-        is deleted — that is usually the one you want to look back on.
+        Every change, whoever made it — the admin, a club in their portal, a
+        recorder on a phone at a ground, or a migration run in the SQL editor.
+        Recorded by the database itself, so nothing is written without leaving
+        a line here.
       </p>
 
       {error && (
@@ -53,10 +76,37 @@ export default async function AuditPage({
           {error.message}
           <span className="block text-xs mt-1">
             If this says audit_log does not exist, run
-            supabase/account_holds_and_audit.sql first.
+            supabase/account_holds_and_audit.sql, then
+            supabase/audit_all_changes.sql.
           </span>
         </div>
       )}
+
+      <div className="flex flex-wrap gap-1.5 mb-4 text-xs">
+        <Link
+          href="/admin/audit"
+          className={`px-2.5 py-1 rounded border ${
+            !searchParams?.entity && !searchParams?.actor
+              ? "bg-navy-900 text-white border-navy-900"
+              : "border-slate-300 text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          Everything
+        </Link>
+        {ENTITIES.map((e) => (
+          <Link
+            key={e}
+            href={`/admin/audit?entity=${e}`}
+            className={`px-2.5 py-1 rounded border ${
+              searchParams?.entity === e
+                ? "bg-navy-900 text-white border-navy-900"
+                : "border-slate-300 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {e.replace(/_/g, " ")}
+          </Link>
+        ))}
+      </div>
 
       {searchParams?.actor && (
         <p className="text-sm mb-3">
@@ -96,13 +146,20 @@ export default async function AuditPage({
                   </td>
                   <td className="px-4 py-2.5">
                     <span
-                      className={`inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded mr-2 ${
-                        TONE[r.action] ?? "bg-slate-100 text-slate-700"
-                      }`}
+                      className={`inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded mr-2 ${tone(
+                        r.action
+                      )}`}
                     >
-                      {r.action.replace(/^account\./, "")}
+                      {verb(r.action)}
                     </span>
-                    <span className="text-navy-900">{r.summary ?? r.action}</span>
+                    <span className="text-navy-900">
+                      {r.summary ?? (r.entity ?? "").replace(/_/g, " ")}
+                    </span>
+                    {changedFields(r.detail).length > 0 && (
+                      <span className="block text-xs text-slate-500 mt-0.5">
+                        {changedFields(r.detail).slice(0, 6).join(", ")}
+                      </span>
+                    )}
                     {r.detail?.reason && (
                       <span className="block text-xs text-slate-500 mt-0.5">
                         {r.detail.reason}
@@ -118,7 +175,7 @@ export default async function AuditPage({
                         {r.actor_email}
                       </Link>
                     ) : (
-                      "—"
+                      <span className="text-slate-400">not signed in</span>
                     )}
                     {r.actor_role && (
                       <span className="block text-slate-400">{r.actor_role}</span>

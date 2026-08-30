@@ -93,12 +93,6 @@ async function attemptCreate(fd: FormData): Promise<Outcome> {
     return { error: describe(error.message) };
   }
 
-  await record({
-    action: "account.create",
-    entity: "app_users",
-    entityId: userId,
-    summary: `Issued a recorder login to ${email}`,
-  });
   return { created: email };
 }
 
@@ -135,12 +129,6 @@ export async function revokeRecorderAccount(userId: string) {
 
   await supabase.from("app_users").delete().eq("user_id", userId);
   const { error } = await supabase.auth.admin.deleteUser(userId);
-  await record({
-    action: "account.revoke",
-    entity: "app_users",
-    entityId: userId,
-    summary: `Revoked the recorder login ${(row as any).email ?? ""}`.trim(),
-  });
   revalidatePath("/admin/recorders");
   redirect(
     error
@@ -168,6 +156,16 @@ export async function resetRecorderPassword(userId: string, fd: FormData) {
     outcome = { error: "That is not a recorder account." };
   } else {
     const { error } = await supabase.auth.admin.updateUserById(userId, { password });
+    if (!error) {
+      // The one account change with no row for a trigger to see: the
+      // password lives in auth.users, which the audit triggers do not cover.
+      await record({
+        action: "account.password_reset",
+        entity: "app_users",
+        entityId: userId,
+        summary: `Set a new password for ${row.email ?? "an account"}`,
+      });
+    }
     outcome = error
       ? { error: error.message }
       : { note: `New password set for ${row.email ?? "that recorder"}.` };
@@ -207,13 +205,6 @@ export async function holdAccount(userId: string, fd: FormData) {
     if (error) {
       outcome = { error: missingHoldColumns(error.message) };
     } else {
-      await record({
-        action: "account.hold",
-        entity: "app_users",
-        entityId: userId,
-        summary: `Put ${row.email ?? "an account"} on hold`,
-        detail: { reason: reason || null },
-      });
       outcome = { note: `${row.email ?? "That account"} is on hold and cannot sign in.` };
     }
   }
@@ -244,12 +235,6 @@ export async function releaseAccount(userId: string) {
     if (error) {
       outcome = { error: missingHoldColumns(error.message) };
     } else {
-      await record({
-        action: "account.release",
-        entity: "app_users",
-        entityId: userId,
-        summary: `Released ${row.email ?? "an account"} from hold`,
-      });
       outcome = { note: `${row.email ?? "That account"} can sign in again.` };
     }
   }

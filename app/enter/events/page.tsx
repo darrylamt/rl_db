@@ -32,6 +32,13 @@ type Event = {
   team: { name: string } | null;
 };
 
+/** A client-side id, so a retry cannot become a second event. */
+function newId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 const SCORE_EVENTS: { type: string; label: string; points: number; color: string }[] = [
   { type: "try",        label: "Try",        points: 4, color: "bg-emerald-600 hover:bg-emerald-700" },
   { type: "conversion", label: "Conversion", points: 2, color: "bg-blue-600 hover:bg-blue-700" },
@@ -78,6 +85,8 @@ export default function EnterEventsPage() {
   const [half, setHalf] = useState<"1" | "2">("1");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+  // The id this event will carry, held across retries — see submitEvent.
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   // ── Load today's fixtures (+ postponed) ─────────────────
   // A recorder normally arrives from the match-day list with the match
@@ -187,13 +196,31 @@ export default function EnterEventsPage() {
   const awayScore = fixture ? calcScore(events, fixture.away_team_id, players) : 0;
 
   // ── Submit event ─────────────────────────────────────────
+  /**
+   * Records one event, once.
+   *
+   * A tap on a phone at a ground is easy to repeat — a slow response, a
+   * fat finger, a lost signal and a retry — and a try entered twice puts
+   * the score wrong on the public page.
+   *
+   * The id is generated here rather than by the database, so a second send
+   * of the same event carries the same primary key and the database refuses
+   * it. That is what makes this safe to press twice; disabling the button
+   * only narrows the window, it does not close it. A fresh id is taken once
+   * a recording has actually landed, so the next event is a new one.
+   */
   async function submitEvent() {
-    if (!fixtureId || !playerId || !eventType) return;
+    if (!fixtureId || !playerId || !eventType || loading) return;
     const p = players.find((x) => x.player_id === playerId);
     if (!p) return;
+
+    const id = pendingId ?? newId();
+    if (!pendingId) setPendingId(id);
+
     setLoading(true);
     setNotice(null);
     const { error } = await supabase.from("match_events").insert({
+      event_id: id,
       fixture_id: fixtureId,
       player_id: playerId,
       team_id: p.team_id,
@@ -202,12 +229,44 @@ export default function EnterEventsPage() {
       half: parseInt(half, 10),
     });
     setLoading(false);
-    if (error) { setNotice({ kind: "err", msg: error.message }); return; }
+
+    // 23505 is a duplicate key: this exact event is already recorded, which
+    // is the outcome the recorder wanted. Reporting it as a failure would
+    // invite them to press again.
+    if (error && (error as any).code !== "23505") {
+      setNotice({ kind: "err", msg: error.message });
+      return;
+    }
+
     setNotice({ kind: "ok", msg: `✓ ${eventType.replace("_", " ")} recorded` });
+    setPendingId(null);
     setPlayerId("");
     setPlayerSearch("");
     setEventType("");
     setMinute("");
+    setTimeout(() => setNotice(null), 3000);
+  }
+
+  /**
+   * Removes an event that should not have been recorded.
+   *
+   * Entered in the wrong minute, against the wrong player, or twice from two
+   * devices — whatever the reason, the recorder is the one standing there and
+   * the public page is showing it, so they can take it straight back out.
+   */
+  async function deleteEvent(ev: Event) {
+    const who = [ev.player?.first_name, ev.player?.last_name].filter(Boolean).join(" ");
+    const what = ev.event_type.replace(/_/g, " ");
+    if (!confirm(`Remove the ${what}${who ? ` by ${who}` : ""}? The live page updates straight away.`)) {
+      return;
+    }
+    const { error } = await supabase
+      .from("match_events")
+      .delete()
+      .eq("event_id", ev.event_id);
+    if (error) { setNotice({ kind: "err", msg: error.message }); return; }
+    setNotice({ kind: "ok", msg: `✓ ${what} removed` });
+    loadEvents();
     setTimeout(() => setNotice(null), 3000);
   }
 
@@ -475,6 +534,14 @@ export default function EnterEventsPage() {
                       {t?.name && (
                         <span className="text-navy-400 text-xs ml-auto shrink-0">{t.name}</span>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => deleteEvent(ev)}
+                        aria-label="Remove this event"
+                        className={`shrink-0 text-navy-400 hover:text-red-400 px-1.5 ${t?.name ? "" : "ml-auto"}`}
+                      >
+                        &times;
+                      </button>
                     </div>
                   );
                 })}
