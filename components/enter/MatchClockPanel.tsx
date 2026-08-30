@@ -13,6 +13,7 @@ import {
   WALKOVER_SCORE,
   type MatchClock,
 } from "@/lib/matchClock";
+import { EVENT_POINTS, normaliseType } from "@/lib/matchStats";
 
 type Fixture = MatchClock & {
   fixture_id: string;
@@ -87,7 +88,79 @@ export function MatchClockPanel({
   const secondHalf = () => write(resumeFromHalfTimeFields(fixture));
   const pause = () => write(pauseFields("paused"));
   const halfTime = () => write(pauseFields("half_time"));
-  const fullTime = () => write({ ...pauseFields("finished"), status: "completed" });
+  /**
+   * Full time, and the result that goes with it.
+   *
+   * Marking the fixture completed was not enough: the admin's Results page
+   * joins match_results, so a match with no row there simply was not in the
+   * list. Every event had been recorded and the result still had to be typed
+   * in a second time by hand.
+   *
+   * The score is added up from the events, which are the same numbers the
+   * live page has been showing all match. A result already entered is left
+   * alone — someone has typed it deliberately and it outranks a tally.
+   */
+  async function fullTime() {
+    setBusy(true);
+    setError(null);
+
+    const { data: events, error: eventsError } = await supabase
+      .from("match_events")
+      .select("event_type, team_id, player:player_id(team_id)")
+      .eq("fixture_id", fixture.fixture_id);
+
+    if (eventsError) {
+      setBusy(false);
+      setError(eventsError.message);
+      return;
+    }
+
+    // An event can land without a team_id; the player it is credited to says
+    // which side it belongs to.
+    const points = (teamId: string) =>
+      (events ?? []).reduce((sum: number, e: any) => {
+        const side = e.team_id ?? (Array.isArray(e.player) ? e.player[0] : e.player)?.team_id;
+        if (side !== teamId) return sum;
+        return sum + (EVENT_POINTS[normaliseType(e.event_type)] ?? 0);
+      }, 0);
+
+    const count = (teamId: string, type: string) =>
+      (events ?? []).filter((e: any) => {
+        const side = e.team_id ?? (Array.isArray(e.player) ? e.player[0] : e.player)?.team_id;
+        return side === teamId && normaliseType(e.event_type) === type;
+      }).length;
+
+    const { data: existing } = await supabase
+      .from("match_results")
+      .select("result_id")
+      .eq("fixture_id", fixture.fixture_id)
+      .maybeSingle();
+
+    if (!existing) {
+      const { error: resultError } = await supabase.from("match_results").insert({
+        fixture_id: fixture.fixture_id,
+        home_score: points(fixture.home_team_id),
+        away_score: points(fixture.away_team_id),
+        home_tries: count(fixture.home_team_id, "try"),
+        away_tries: count(fixture.away_team_id, "try"),
+        home_conversions: count(fixture.home_team_id, "conversion"),
+        away_conversions: count(fixture.away_team_id, "conversion"),
+        home_penalties: count(fixture.home_team_id, "penalty_goal"),
+        away_penalties: count(fixture.away_team_id, "penalty_goal"),
+        home_drop_goals: count(fixture.home_team_id, "drop_goal"),
+        away_drop_goals: count(fixture.away_team_id, "drop_goal"),
+        recorded_by: "match day entry",
+      });
+      if (resultError) {
+        setBusy(false);
+        setError(resultError.message);
+        return;
+      }
+    }
+
+    setBusy(false);
+    await write({ ...pauseFields("finished"), status: "completed" });
+  }
 
   /** The side that turned up is awarded the match; nothing is played. */
   async function walkover(forfeitingTeamId: string) {

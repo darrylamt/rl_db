@@ -82,6 +82,8 @@ export default function EnterEventsPage() {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [fixtureId, setFixtureId] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
+  // Who is actually named on the team sheet, so they can lead the lists.
+  const [namedIds, setNamedIds] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<Event[]>([]);
 
   // form state
@@ -174,17 +176,55 @@ export default function EnterEventsPage() {
   }, [fixture, minuteTouched]);
 
   // ── Load players for the selected fixture ────────────────
+  // The team sheet first, then the rest of the squad behind it.
+  //
+  // Loading the squad alone happened to cover the sheet, but only because
+  // it is usually a superset. It stops being one the moment a named player
+  // is not marked active, or a club names someone on loan from elsewhere —
+  // and the recorder would have no way to record them. So the sheet is read
+  // directly and merged in, which makes "everyone named is available" true
+  // by construction rather than by luck.
   useEffect(() => {
-    if (!fixture) { setPlayers([]); return; }
+    if (!fixture) { setPlayers([]); setNamedIds(new Set()); return; }
     const teamIds = [fixture.home_team_id, fixture.away_team_id].filter(Boolean);
     (async () => {
-      const { data } = await supabase
-        .from("players")
-        .select("player_id, first_name, last_name, team_id, jersey_number")
-        .in("team_id", teamIds)
-        .eq("playing_status", "active")
-        .order("last_name");
-      setPlayers((data ?? []) as any);
+      const [{ data: squad }, { data: sheet }] = await Promise.all([
+        supabase
+          .from("players")
+          .select("player_id, first_name, last_name, team_id, jersey_number")
+          .in("team_id", teamIds)
+          .eq("playing_status", "active")
+          .order("last_name"),
+        supabase
+          .from("match_lineups")
+          .select(
+            "team_id, jersey_number, player:player_id(player_id, first_name, last_name)"
+          )
+          .eq("fixture_id", fixture.fixture_id),
+      ]);
+
+      const named = new Map<string, any>();
+      for (const l of (sheet ?? []) as any[]) {
+        const pl = Array.isArray(l.player) ? l.player[0] : l.player;
+        if (!pl?.player_id) continue;
+        named.set(pl.player_id, {
+          player_id: pl.player_id,
+          first_name: pl.first_name,
+          last_name: pl.last_name,
+          // The sheet says which side they turned out for today, which is
+          // the answer that matters — not which club holds their registration.
+          team_id: l.team_id,
+          jersey_number: l.jersey_number,
+        });
+      }
+
+      const merged = Array.from(named.values());
+      for (const p of (squad ?? []) as any[]) {
+        if (!named.has(p.player_id)) merged.push(p);
+      }
+
+      setPlayers(merged as any);
+      setNamedIds(new Set(Array.from(named.keys())));
     })();
   }, [supabase, fixture]);
 
@@ -221,14 +261,24 @@ export default function EnterEventsPage() {
     [players, teamId]
   );
   const filteredPlayers = useMemo(() => {
-    if (!playerSearch.trim()) return teamPlayers;
+    // Whoever is on the team sheet comes first — they are the ones who can
+    // actually do anything worth recording.
+    const bySheet = (list: Player[]) =>
+      [...list].sort((a, b) => {
+        const an = namedIds.has(a.player_id) ? 0 : 1;
+        const bn = namedIds.has(b.player_id) ? 0 : 1;
+        return an - bn;
+      });
+    if (!playerSearch.trim()) return bySheet(teamPlayers);
     const q = playerSearch.toLowerCase();
-    return teamPlayers.filter(
-      (p) =>
-        `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-        String(p.jersey_number ?? "").includes(q)
+    return bySheet(
+      teamPlayers.filter(
+        (p) =>
+          `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
+          String(p.jersey_number ?? "").includes(q)
+      )
     );
-  }, [teamPlayers, playerSearch]);
+  }, [teamPlayers, playerSearch, namedIds]);
 
   const selectedPlayer = players.find((p) => p.player_id === playerId);
 
@@ -574,6 +624,7 @@ export default function EnterEventsPage() {
               fixtureId={fixtureId}
               fixture={fixture}
               players={players}
+              namedIds={namedIds}
               events={events}
               onRecorded={loadEvents}
             />

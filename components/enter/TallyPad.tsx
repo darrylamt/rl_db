@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { displayMinute, currentHalf, clockState } from "@/lib/matchClock";
+
 
 type Player = {
   player_id: string;
@@ -25,7 +25,6 @@ const COUNTS: { type: string; label: string; short: string }[] = [
   { type: "line_break", label: "Line break", short: "LB" },
   { type: "offload", label: "Offload", short: "OFF" },
   { type: "turnover_won", label: "Turnover won", short: "TO" },
-  { type: "try_assist", label: "Try assist", short: "TA" },
   { type: "completed_set", label: "Completed set", short: "SET" },
 ];
 
@@ -45,12 +44,15 @@ export function TallyPad({
   fixtureId,
   fixture,
   players,
+  namedIds,
   events,
   onRecorded,
 }: {
   fixtureId: string;
   fixture: any;
   players: Player[];
+  /** Who is on the team sheet — they lead the pad and the rest sit behind. */
+  namedIds?: Set<string>;
   events: any[];
   onRecorded: () => void;
 }) {
@@ -66,9 +68,19 @@ export function TallyPad({
     () =>
       players
         .filter((p) => p.team_id === teamId)
-        .sort((a, b) => (a.jersey_number ?? 99) - (b.jersey_number ?? 99)),
-    [players, teamId]
+        .sort((a, b) => {
+          // The named side first, then by shirt number within each group.
+          const an = namedIds?.has(a.player_id) ? 0 : 1;
+          const bn = namedIds?.has(b.player_id) ? 0 : 1;
+          if (an !== bn) return an - bn;
+          return (a.jersey_number ?? 99) - (b.jersey_number ?? 99);
+        }),
+    [players, teamId, namedIds]
   );
+
+  // Where a team sheet exists, everyone behind it is a substitute nobody
+  // named — worth separating rather than mixing into the same grid.
+  const namedCount = squad.filter((p) => namedIds?.has(p.player_id)).length;
 
   /** How many of the chosen stat each player already has in this match. */
   const counts = useMemo(() => {
@@ -92,15 +104,17 @@ export function TallyPad({
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-    const running = clockState(fixture) !== "not_started";
+    // No minute, deliberately. These happen faster than anyone can time
+    // them, and a minute nobody actually observed would put them in the
+    // timeline and misreport when a player did their work.
     const { error } = await supabase.from("match_events").insert({
       event_id: id,
       fixture_id: fixtureId,
       player_id: player.player_id,
       team_id: player.team_id,
       event_type: type,
-      minute: running ? displayMinute(fixture) : null,
-      half: running ? currentHalf(fixture) : null,
+      minute: null,
+      half: null,
     });
 
     setBusy(null);
@@ -191,7 +205,11 @@ export function TallyPad({
                 type="button"
                 onClick={() => add(p)}
                 disabled={busy !== null}
-                className="flex items-center gap-2 px-2.5 py-2.5 rounded bg-neutral-900 border border-white/10 hover:border-ghanaYellow-500/60 active:bg-neutral-800 disabled:opacity-50 text-left"
+                className={`flex items-center gap-2 px-2.5 py-2.5 rounded border active:bg-neutral-800 disabled:opacity-50 text-left ${
+                  namedIds && namedCount > 0 && !namedIds.has(p.player_id)
+                    ? "bg-neutral-900/40 border-white/5 opacity-60 hover:border-white/20"
+                    : "bg-neutral-900 border-white/10 hover:border-ghanaYellow-500/60"
+                }`}
               >
                 <span className="text-[10px] text-slate-500 w-5 shrink-0 tabular-nums">
                   {p.jersey_number ?? "—"}
@@ -216,7 +234,7 @@ export function TallyPad({
               total === 1 ? "" : "s"
             } recorded this match.`
           : "Tap a player to add one. These fill the Stats tab on the live page."}
-        {clockState(fixture) === "not_started" && " The clock is not running, so these are recorded without a minute."}
+        {" These are counts — they carry no minute, so they never clutter the timeline."}
       </p>
 
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}

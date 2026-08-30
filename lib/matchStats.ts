@@ -161,3 +161,32 @@ export function byMatchTime(
 export function halfForMinute(minute: number): 1 | 2 {
   return minute > 40 ? 2 : 1;
 }
+
+/**
+ * The counting stats — the ones that happen too fast to time.
+ *
+ * A tackle is made and the next is under way before anyone could type a
+ * minute, so these are recorded as a count and carry no minute at all. A
+ * made-up minute would be worse than none: it would put them in the
+ * timeline, and it would make a player's match read as though every tackle
+ * happened in the seventeenth.
+ *
+ * Tries, conversions, missed conversions and cards are the opposite — there
+ * is a pause after each one, and when they happened is the point.
+ */
+export const UNTIMED_EVENTS = new Set([
+  "tackle",
+  "missed_tackle",
+  "tackle_break",
+  "line_break",
+  "clean_break",
+  "offload",
+  "turnover_won",
+  "completed_set",
+  "metres_gained",
+]);
+
+/** Whether this kind of event is worth a minute. */
+export function carriesMinute(type: string | null | undefined): boolean {
+  return !UNTIMED_EVENTS.has(normaliseType(type));
+}
