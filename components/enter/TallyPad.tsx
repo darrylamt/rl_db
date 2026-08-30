@@ -211,7 +211,11 @@ export function TallyPad({
                     : "bg-neutral-900 border-white/10 hover:border-ghanaYellow-500/60"
                 }`}
               >
-                <span className="text-[10px] text-slate-500 w-5 shrink-0 tabular-nums">
+                <span
+                  className={`text-xs w-6 shrink-0 tabular-nums font-display ${
+                    p.jersey_number != null ? "text-ghanaYellow-500" : "text-slate-600"
+                  }`}
+                >
                   {p.jersey_number ?? "—"}
                 </span>
                 <span className="text-xs text-white truncate flex-1">

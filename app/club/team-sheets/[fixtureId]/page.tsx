@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { inDivision } from "@/lib/positions";
 import { TeamSheetPicker } from "@/components/club/TeamSheetPicker";
 import { saveTeamSheet, submitTeamSheet, withdrawTeamSheet } from "../actions";
 
@@ -23,13 +24,13 @@ export default async function BuildTeamSheetPage({
       supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, scheduled_time, home_team_id, away_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)"
+          "fixture_id, scheduled_date, scheduled_time, home_team_id, away_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season, division)"
         )
         .eq("fixture_id", fixtureId)
         .maybeSingle(),
       supabase
         .from("players")
-        .select("player_id, first_name, last_name, position, jersey_number, photo_url")
+        .select("player_id, first_name, last_name, position, jersey_number, photo_url, category")
         .eq("team_id", teamId)
         .order("last_name"),
       supabase
@@ -54,6 +55,15 @@ export default async function BuildTeamSheetPage({
 
   const namedBy = new Map(
     ((named ?? []) as any[]).map((l) => [l.player_id, l])
+  );
+
+  // Only the grade this competition is for. A club fields men's, women's and
+  // youth from one team row, so the whole club would otherwise be offered for
+  // a men's match. Anyone already named stays visible whatever their grade —
+  // hiding them would drop them from the side on the next save.
+  const division = (f.competition as any)?.division;
+  const eligible = ((squad ?? []) as any[]).filter(
+    (p) => namedBy.has(p.player_id) || inDivision(p.category, division)
   );
 
   return (
@@ -109,9 +119,9 @@ export default async function BuildTeamSheetPage({
 
       <form action={saveTeamSheet.bind(null, fixtureId)}>
         <fieldset disabled={locked} className="disabled:opacity-60 border-0 p-0 m-0 min-w-0">
-          {(squad ?? []).length === 0 ? (
+          {eligible.length === 0 ? (
             <p className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
-              No players on your squad yet.{" "}
+              No {division ? `${division}’s ` : ""}players on your squad yet.{" "}
               <Link href="/club/players/new" className="text-navy-700 hover:underline">
                 Add one
               </Link>
@@ -119,13 +129,13 @@ export default async function BuildTeamSheetPage({
             </p>
           ) : (
             <TeamSheetPicker
-              squad={(squad ?? []) as any}
+              squad={eligible as any}
               named={(named ?? []) as any}
               locked={locked}
             />
           )}
 
-          {!locked && (squad ?? []).length > 0 && (
+          {!locked && eligible.length > 0 && (
             <button className="mt-4 bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2.5 rounded">
               Save side
             </button>

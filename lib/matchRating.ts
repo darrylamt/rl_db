@@ -26,7 +26,21 @@ import { positionGroup } from "@/lib/positions";
 
 export type RatedEvent = { event_type?: string | null };
 
-/** What one of each event is worth, before the role weighting. */
+/**
+ * What one of each event is worth, before the role weighting.
+ *
+ * The volume figures are set for the game as it is played here, not for the
+ * NRL. A forward in Ghana does not make forty tackles, so pricing a tackle
+ * as though they might left an honest defensive shift barely moving the
+ * number — twelve tackles read as 6.7, which is not what a shift like that
+ * deserves. The volume actions are worth roughly double what they would be
+ * in a professional game, so a real workload lands where it should.
+ *
+ * Scoring is untouched by that reasoning: a try is a try at any level.
+ *
+ * These are meant to be revisited once a season has been recorded through
+ * them and there is something to check them against.
+ */
 const CREDIT: Record<string, number> = {
   // Scoring — the clearest evidence there is.
   try: 1.2,
@@ -38,17 +52,17 @@ const CREDIT: Record<string, number> = {
   // Attacking work that does not show on the scoreboard.
   line_break: 0.45,
   clean_break: 0.45,
-  tackle_break: 0.2,
-  offload: 0.2,
+  tackle_break: 0.3,
+  offload: 0.3,
 
   // Defence and control.
-  tackle: 0.06,
+  tackle: 0.12,
   turnover_won: 0.4,
-  completed_set: 0.05,
+  completed_set: 0.1,
 
   // Costs. A missed kick is a smaller fault than a missed tackle, because
   // only the goal kicker is ever charged with one.
-  missed_tackle: -0.18,
+  missed_tackle: -0.25,
   missed_conversion: -0.12,
   sin_bin: -0.8,
   yellow_card: -0.8,

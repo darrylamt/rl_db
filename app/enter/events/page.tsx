@@ -6,6 +6,7 @@ import { MatchClockPanel } from "@/components/enter/MatchClockPanel";
 import { TallyPad } from "@/components/enter/TallyPad";
 import { clockState, displayMinute, currentHalf } from "@/lib/matchClock";
 import { byMatchTime, halfForMinute } from "@/lib/matchStats";
+import { inDivision } from "@/lib/positions";
 
 type Fixture = {
   fixture_id: string;
@@ -20,7 +21,7 @@ type Fixture = {
   away_team_id: string;
   home_team: { name: string };
   away_team: { name: string };
-  competition: { name: string; season: string | null } | null;
+  competition: { name: string; season: string | null; division?: string | null } | null;
   status: string;
 };
 
@@ -114,7 +115,7 @@ export default function EnterEventsPage() {
       const { data } = await supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
+          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season, division), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
         )
         .or(`scheduled_date.eq.${today},status.eq.postponed,status.eq.live`)
         .order("scheduled_time", { ascending: true });
@@ -125,7 +126,7 @@ export default function EnterEventsPage() {
         const { data: one } = await supabase
           .from("fixtures")
           .select(
-            "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
+            "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season, division), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
           )
           .eq("fixture_id", wanted)
           .maybeSingle();
@@ -148,7 +149,7 @@ export default function EnterEventsPage() {
     const { data } = await supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
+        "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season, division), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
       )
       .eq("fixture_id", fixtureId)
       .maybeSingle();
@@ -191,7 +192,7 @@ export default function EnterEventsPage() {
       const [{ data: squad }, { data: sheet }] = await Promise.all([
         supabase
           .from("players")
-          .select("player_id, first_name, last_name, team_id, jersey_number")
+          .select("player_id, first_name, last_name, team_id, jersey_number, category")
           .in("team_id", teamIds)
           .eq("playing_status", "active")
           .order("last_name"),
@@ -218,9 +219,15 @@ export default function EnterEventsPage() {
         });
       }
 
+      // Only players of this competition's grade. A club fields its men's,
+      // women's and youth sides from one team row, so without this a men's
+      // match offers every woman and junior at the club.
+      const division = (fixture.competition as any)?.division;
       const merged = Array.from(named.values());
       for (const p of (squad ?? []) as any[]) {
-        if (!named.has(p.player_id)) merged.push(p);
+        if (named.has(p.player_id)) continue;
+        if (!inDivision(p.category, division)) continue;
+        merged.push(p);
       }
 
       setPlayers(merged as any);
@@ -261,17 +268,33 @@ export default function EnterEventsPage() {
     [players, teamId]
   );
   const filteredPlayers = useMemo(() => {
-    // Whoever is on the team sheet comes first — they are the ones who can
-    // actually do anything worth recording.
-    const bySheet = (list: Player[]) =>
+    const q = playerSearch.trim().toLowerCase();
+
+    /**
+     * Order for a recorder in a hurry.
+     *
+     * Shirt numbers are handed out per match on the team sheet, not owned by
+     * a player, so the number is what a recorder reads off the pitch and it
+     * has to be the fastest way in. An exact number match leads — typing 7
+     * should not put 17 first — then whoever is on the team sheet, then the
+     * rest by name.
+     */
+    const rank = (p: Player) => {
+      const exact = q && String(p.jersey_number ?? "") === q ? 0 : 1;
+      const named = namedIds.has(p.player_id) ? 0 : 1;
+      return exact * 2 + named;
+    };
+
+    const sorted = (list: Player[]) =>
       [...list].sort((a, b) => {
-        const an = namedIds.has(a.player_id) ? 0 : 1;
-        const bn = namedIds.has(b.player_id) ? 0 : 1;
-        return an - bn;
+        const d = rank(a) - rank(b);
+        if (d !== 0) return d;
+        return (a.jersey_number ?? 999) - (b.jersey_number ?? 999);
       });
-    if (!playerSearch.trim()) return bySheet(teamPlayers);
-    const q = playerSearch.toLowerCase();
-    return bySheet(
+
+    if (!q) return sorted(teamPlayers);
+
+    return sorted(
       teamPlayers.filter(
         (p) =>
           `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
@@ -459,7 +482,7 @@ export default function EnterEventsPage() {
               {/* Player search */}
               <div className="mb-3">
                 <label className="block text-xs uppercase tracking-wider text-navy-400 mb-1">
-                  Search Player
+                  Find player — number or name
                 </label>
                 <input
                   type="text"

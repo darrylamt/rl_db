@@ -37,3 +37,27 @@ export function positionGroup(position?: string | null) {
   if (!position) return null;
   return POSITION_GROUP[position] ?? null;
 }
+
+/**
+ * Whether a player belongs in a competition of this division.
+ *
+ * Six clubs field men's, women's and youth sides from a single team row —
+ * the grade is on the player, not the team — so loading a squad by team_id
+ * alone hands a men's match every woman and every junior at the club.
+ *
+ * A handful of rows carry "Senior Men" and "Male" rather than the snake_case
+ * the rest use, so the value is normalised before comparing. An unknown
+ * division filters nothing: better every name than the wrong ones missing.
+ */
+export function inDivision(
+  category: string | null | undefined,
+  division: string | null | undefined
+): boolean {
+  const c = (category ?? "").toLowerCase().replace(/\s+/g, "_");
+  const d = (division ?? "").toLowerCase().trim();
+
+  if (d === "women") return c === "senior_women";
+  if (d === "youth") return c === "youth";
+  if (d === "men") return c === "senior_men";
+  return true;
+}
