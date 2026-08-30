@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
+import { getTransferWindow } from "@/lib/transferWindow";
 
 type Outcome = { error: string } | { note: string };
 
@@ -47,6 +48,13 @@ export async function requestPlayer(fd: FormData) {
 
   let outcome: Outcome;
   try {
+    // Checked here rather than only in the page. Hiding the button stops the
+    // honest route in; this stops the rest.
+    const market = await getTransferWindow();
+    if (!market.open) {
+      throw new Error(`The transfer market is closed. ${market.reason}`);
+    }
+
     if (!playerId) throw new Error("Pick a player.");
     if (kind !== "transfer" && kind !== "loan") throw new Error("Unknown request.");
     if (kind === "loan" && !loanUntil) throw new Error("A loan needs a date to run until.");

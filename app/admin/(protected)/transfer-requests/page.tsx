@@ -2,7 +2,10 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { TransferCard } from "@/components/admin/TransferCard";
+import { TransferWindowPanel } from "@/components/admin/TransferWindowPanel";
+import { getTransferWindow } from "@/lib/transferWindow";
 import { approveTransfer, declineTransfer } from "./actions";
+import { setTransferMode, addTransferWindow, removeTransferWindow } from "./window-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +18,7 @@ export default async function TransferRequestsPage({
   searchParams?: { error?: string; note?: string };
 }) {
   const supabase = createAdminClient();
+  const market = await getTransferWindow();
 
   const { data, error } = await supabase
     .from("transfer_requests")
@@ -51,6 +55,13 @@ export default async function TransferRequestsPage({
           {searchParams.note}
         </div>
       )}
+
+      <TransferWindowPanel
+        state={market}
+        setMode={setTransferMode}
+        addWindow={addTransferWindow}
+        removeWindow={removeTransferWindow}
+      />
 
       {notMigrated ? (
         <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2.5 rounded">

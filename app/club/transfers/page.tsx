@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TransferMarket } from "@/components/club/TransferMarket";
+import { getTransferWindow } from "@/lib/transferWindow";
 import { requestPlayer, withdrawRequest, answerRequest } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function ClubTransfersPage({
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
   const tab = searchParams?.tab ?? "market";
+  const market = await getTransferWindow();
 
   const [{ data: teams }, { data: players }, { data: sent, error }, { data: received }] =
     await Promise.all([
@@ -167,6 +169,17 @@ export default async function ClubTransfersPage({
           Ask another club about a player. They answer, and the federation
           signs off anything they agree to — nobody moves before that.
         </p>
+        <p className="text-xs mt-1.5">
+          <span
+            className={`inline-block w-2 h-2 rounded-full mr-1.5 align-middle ${
+              market.open ? "bg-emerald-500" : "bg-red-500"
+            }`}
+          />
+          <span className={market.open ? "text-emerald-800" : "text-red-800"}>
+            {market.open ? "Market open" : "Market closed"}
+          </span>
+          {market.reason && <span className="text-slate-500"> — {market.reason}</span>}
+        </p>
       </div>
 
       {searchParams?.error && (
@@ -193,7 +206,21 @@ export default async function ClubTransfersPage({
             <Tab id="sent" label="Your enquiries" />
           </div>
 
-          {tab === "market" && (
+          {tab === "market" && !market.open && (
+            <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
+              <p className="font-display text-lg text-navy-900">
+                The transfer market is closed
+              </p>
+              <p className="text-sm text-slate-500 mt-1.5 max-w-md mx-auto">
+                {market.reason}
+              </p>
+              <p className="text-xs text-slate-400 mt-3">
+                Requests already made can still be answered while it is shut.
+              </p>
+            </div>
+          )}
+
+          {tab === "market" && market.open && (
             <TransferMarket
               teams={(teams ?? []) as any}
               players={(players ?? []) as any}
