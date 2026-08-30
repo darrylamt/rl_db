@@ -64,11 +64,7 @@ export function LoginForm() {
       <Link href="/" className="text-gold-400 text-sm font-display tracking-widest hover:underline">
         ← RLFG
       </Link>
-      <h1 className="font-display text-3xl font-bold mt-4 mb-1 text-white">Sign In</h1>
-      <p className="text-navy-200 text-sm mb-6">
-        Federation, clubs and match-day recorders. One door — you land where
-        your account belongs.
-      </p>
+      <h1 className="font-display text-3xl font-bold mt-4 mb-6 text-white">Sign In</h1>
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div>

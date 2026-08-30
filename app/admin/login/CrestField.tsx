@@ -1,38 +1,40 @@
 /**
- * The club crests, drifting behind the sign-in card.
+ * The club crests, running behind the sign-in card as three reels.
  *
  * Server-rendered and animated in CSS alone — no client component, no
  * JavaScript, nothing to hydrate on the one screen that should come up
  * instantly on a phone at a ground.
  *
- * Each row is its own marquee: the crests are laid out twice and the row
- * slides exactly half its width, so the loop has no seam. Rows alternate
- * direction and run at different speeds, which stops the whole field reading
- * as one sliding sheet.
+ * Each reel lists its crests twice and travels exactly half its own height,
+ * so the loop has no seam. The three run at different speeds, which is what
+ * stops them reading as one sliding sheet.
  */
-const ROWS = 6;
-const PER_ROW = 9;
+const REELS = 3;
+const PER_REEL = 7;
 
 export function CrestField({ logos }: { logos: string[] }) {
   if (logos.length === 0) return null;
 
-  // Repeat the crests until each row is full. A federation with six clubs and
-  // one with thirty should both get a full field.
-  const rows = Array.from({ length: ROWS }, (_, r) =>
-    Array.from({ length: PER_ROW }, (_, i) => logos[(r * PER_ROW + i) % logos.length])
+  // Each reel starts at a different point in the list so neighbouring reels
+  // are not showing the same crest at the same height.
+  const reels = Array.from({ length: REELS }, (_, c) =>
+    Array.from(
+      { length: PER_REEL },
+      (_, i) => logos[(c * 3 + i) % logos.length]
+    )
   );
 
   return (
     <div className="crest-field" aria-hidden="true">
-      <div className="crest-plane">
-        {rows.map((row, r) => (
+      <div className="crest-reels">
+        {reels.map((reel, c) => (
           <div
-            key={r}
-            className={`crest-row ${r % 2 ? "crest-row--rtl" : "crest-row--ltr"}`}
-            style={{ animationDuration: `${70 + r * 13}s` }}
+            key={c}
+            className="crest-reel"
+            style={{ animationDuration: `${34 + c * 11}s` }}
           >
-            {/* Laid out twice — the second copy is what the first slides into. */}
-            {[...row, ...row].map((src, i) => (
+            {/* Listed twice — the second copy is what the first travels into. */}
+            {[...reel, ...reel].map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img key={i} src={src} alt="" className="crest" loading="lazy" />
             ))}
@@ -52,60 +54,58 @@ export function crestFieldStyles() {
   overflow: hidden;
   pointer-events: none;
 }
-/* Tilted and oversized so no row ever shows an end. */
-.crest-plane {
+/* Taller than the screen, so a crest is always part-way in at top and bottom
+   rather than the reels appearing to start and stop at the edges. */
+.crest-reels {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 190vmax;
-  height: 150vmax;
-  transform: translate(-50%, -50%) rotate(-14deg);
+  top: -20%;
+  left: 0;
+  right: 0;
+  height: 140%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: start;
+  justify-items: center;
+}
+.crest-reel {
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
-}
-.crest-row {
-  display: flex;
   align-items: center;
-  gap: 7vmin;
-  width: max-content;
   will-change: transform;
+  animation-name: crest-reel-up;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
-.crest-row--ltr { animation-name: crest-drift-left; }
-.crest-row--rtl { animation-name: crest-drift-right; }
 .crest {
-  width: 11vmin;
-  height: 11vmin;
+  width: min(30vmin, 30vw);
+  height: min(30vmin, 30vw);
   object-fit: contain;
-  opacity: 0.13;
-  filter: grayscale(1) brightness(2.4);
+  /* The spacing is margin rather than a flex gap on purpose: it makes one
+     copy of the list exactly half the reel's height, which is what lets the
+     50% travel below loop without a jump. */
+  margin-bottom: 7vmin;
+  opacity: 0.17;
+  filter: grayscale(1) brightness(2.2);
   flex: none;
 }
-/* Half the row's width is exactly one full copy of the crests. */
-@keyframes crest-drift-left {
+@keyframes crest-reel-up {
   from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, -50%, 0); }
 }
-@keyframes crest-drift-right {
-  from { transform: translate3d(-50%, 0, 0); }
-  to   { transform: translate3d(0, 0, 0); }
-}
-/* Keeps the card legible over whatever happens to drift behind it. */
+/* Keeps the card legible over whatever happens to be passing behind it. */
 .crest-veil {
   position: absolute;
   inset: 0;
   background: radial-gradient(
     ellipse at center,
-    rgba(3, 10, 26, 0.82) 0%,
-    rgba(3, 10, 26, 0.62) 45%,
-    rgba(3, 10, 26, 0.9) 100%
+    rgba(4, 11, 26, 0.88) 0%,
+    rgba(4, 11, 26, 0.7) 42%,
+    rgba(4, 11, 26, 0.95) 100%
   );
 }
-/* Motion is decoration here — if it is unwelcome, the pattern still stands. */
+/* Motion is decoration here — without it the crests still stand as a pattern. */
 @media (prefers-reduced-motion: reduce) {
-  .crest-row { animation: none; }
+  .crest-reel { animation: none; }
 }
 `;
 }
