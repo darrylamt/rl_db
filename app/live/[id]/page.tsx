@@ -4,6 +4,9 @@ import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { LiveClock } from "@/components/LiveClock";
+import { MatchTabs } from "@/components/live/MatchTabs";
+import { TeamSwitch } from "@/components/live/TeamSwitch";
+import { EventIcon } from "@/components/live/EventIcon";
 import { TeamBadge, StatusPill } from "../MatchCard";
 import {
   TEAM_STAT_ROWS,
@@ -19,6 +22,15 @@ import {
 } from "@/lib/matchStats";
 
 export const dynamic = "force-dynamic";
+
+/** One side named, the other not — say so rather than showing a blank panel. */
+function NoSheet({ team }: { team?: string | null }) {
+  return (
+    <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-6 text-center text-slate-500 text-sm">
+      No team sheet for {team ?? "this side"} yet.
+    </p>
+  );
+}
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (Array.isArray(v)) return v[0] ?? null;
@@ -61,21 +73,21 @@ export default async function MatchCentrePage({
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
+        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id",
       )
       .eq("fixture_id", fixtureId)
       .maybeSingle(),
     supabase
       .from("match_results")
       .select(
-        "home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, video_url"
+        "home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, video_url",
       )
       .eq("fixture_id", fixtureId)
       .maybeSingle(),
     supabase
       .from("match_events")
       .select(
-        "event_id, event_type, minute, half, team_id, player:player_id(player_id, first_name, last_name, jersey_number)"
+        "event_id, event_type, minute, half, team_id, player:player_id(player_id, first_name, last_name, jersey_number)",
       )
       .eq("fixture_id", fixtureId)
       .order("half", { ascending: true })
@@ -83,7 +95,7 @@ export default async function MatchCentrePage({
     supabase
       .from("match_lineups")
       .select(
-        "lineup_id, team_id, jersey_number, position, is_starter, player:player_id(player_id, first_name, last_name, photo_url)"
+        "lineup_id, team_id, jersey_number, position, is_starter, player:player_id(player_id, first_name, last_name, photo_url)",
       )
       .eq("fixture_id", fixtureId)
       .order("is_starter", { ascending: false })
@@ -153,7 +165,7 @@ export default async function MatchCentrePage({
   }
 
   const timeline = allEvents.filter((e) =>
-    TIMELINE_EVENTS.has(normaliseType(e.event_type))
+    TIMELINE_EVENTS.has(normaliseType(e.event_type)),
   );
 
   const statRows = TEAM_STAT_ROWS.map((row) => ({
@@ -186,13 +198,52 @@ export default async function MatchCentrePage({
 
   const lineupFor = (teamId: string | undefined, starter: boolean) =>
     ((lineup ?? []) as any[]).filter(
-      (l) => l.team_id === teamId && !!l.is_starter === starter
+      (l) => l.team_id === teamId && !!l.is_starter === starter,
     );
+
+  /** One club's team sheet: starters, then bench. */
+  const sideLineup = (id: string | undefined) => {
+    const starters = lineupFor(id, true);
+    const bench = lineupFor(id, false);
+    if (starters.length === 0 && bench.length === 0) return null;
+    return (
+      <div className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden">
+        <PlayerList
+          rows={starters}
+          statsByPlayer={statsByPlayer}
+          ratingByPlayer={ratingByPlayer}
+        />
+        {bench.length > 0 && (
+          <>
+            <div className="px-4 py-1.5 bg-white/5 text-[11px] uppercase tracking-wider text-slate-400">
+              Bench
+            </div>
+            <PlayerList
+              rows={bench}
+              statsByPlayer={statsByPlayer}
+              ratingByPlayer={ratingByPlayer}
+            />
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const homeSheet = sideLineup(homeId);
+  const awaySheet = sideLineup(awayId);
 
   return (
     <>
       {/* Only tables in the supabase_realtime publication (see supabase/realtime.sql). */}
-      <LiveRefresh tables={["match_events", "match_results", "fixtures", "match_lineups", "match_player_ratings"]} />
+      <LiveRefresh
+        tables={[
+          "match_events",
+          "match_results",
+          "fixtures",
+          "match_lineups",
+          "match_player_ratings",
+        ]}
+      />
 
       <Link
         href="/live"
@@ -211,7 +262,10 @@ export default async function MatchCentrePage({
           </span>
           <StatusPill status={f.status} />
           {/* The minute, for anyone watching along. */}
-          <LiveClock fixture={f} className="text-ghanaYellow-500 text-sm ml-2" />
+          <LiveClock
+            fixture={f}
+            className="text-ghanaYellow-500 text-sm ml-2"
+          />
           {f.forfeited_by_team_id && (
             <span className="ml-2 text-[10px] uppercase tracking-wider bg-white/10 text-slate-300 px-1.5 py-0.5 rounded">
               walkover
@@ -265,159 +319,160 @@ export default async function MatchCentrePage({
         </a>
       )}
 
-      {/* Scoring timeline */}
-      <section className="mb-6">
-        <h2 className="font-display text-xl mb-3">Match Timeline</h2>
-        {timeline.length === 0 ? (
-          <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-6 text-center text-slate-500 text-sm">
-            No scoring events recorded yet.
-          </p>
-        ) : (
-          <ol className="bg-neutral-900 border border-white/10 rounded-lg divide-y divide-white/5">
-            {timeline.map((e) => {
-              const p = one<any>(e.player);
-              const isHome = teamOf(e) === homeId;
-              const type = normaliseType(e.event_type);
-              const tone =
-                type === "red_card"
-                  ? "text-ghanaRed-400"
-                  : type === "yellow_card" || type === "sin_bin"
-                  ? "text-ghanaYellow-500"
-                  : "text-emerald-400";
-              return (
-                <li
-                  key={e.event_id}
-                  className={`px-4 py-2.5 flex items-center gap-3 text-sm ${
-                    isHome ? "" : "flex-row-reverse text-right"
-                  }`}
-                >
-                  <span className="w-10 shrink-0 text-slate-500 tabular-nums text-xs">
-                    {e.minute != null ? `${e.minute}'` : "—"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">
-                    {p?.player_id ? (
-                      <Link
-                        href={`/live/player/${p.player_id}`}
-                        className="font-medium hover:text-ghanaYellow-500"
-                      >
-                        {p.first_name} {p.last_name}
-                      </Link>
-                    ) : (
-                      <span className="font-medium">Unknown player</span>
-                    )}
-                    <span className={`ml-2 text-xs ${tone}`}>
-                      {eventLabel(e.event_type)}
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </section>
+      {/* Timeline, line-ups and stats, one at a time */}
+      <MatchTabs
+        tabs={[
+          {
+            key: "timeline",
+            label: "Timeline",
+            count: timeline.length || undefined,
+            content: (
+              <section className="mb-6">
+                {timeline.length === 0 ? (
+                  <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-6 text-center text-slate-500 text-sm">
+                    No scoring events recorded yet.
+                  </p>
+                ) : (
+                  <ol className="bg-neutral-900 border border-white/10 rounded-lg divide-y divide-white/5">
+                    {timeline.map((e) => {
+                      const p = one<any>(e.player);
+                      const isHome = teamOf(e) === homeId;
+                      const type = normaliseType(e.event_type);
+                      const tone =
+                        type === "red_card"
+                          ? "text-ghanaRed-400"
+                          : type === "yellow_card" || type === "sin_bin"
+                            ? "text-ghanaYellow-500"
+                            : "text-emerald-400";
+                      return (
+                        <li
+                          key={e.event_id}
+                          className={`px-4 py-2.5 flex items-center gap-3 text-sm ${
+                            isHome ? "" : "flex-row-reverse text-right"
+                          }`}
+                        >
+                          <span className="w-10 shrink-0 text-slate-500 tabular-nums text-xs">
+                            {e.minute != null ? `${e.minute}'` : "—"}
+                          </span>
+                          {/* The same icons the public website uses. */}
+                          <EventIcon
+                            type={e.event_type}
+                            className="text-lg shrink-0"
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {p?.player_id ? (
+                              <Link
+                                href={`/live/player/${p.player_id}`}
+                                className="font-medium hover:text-ghanaYellow-500"
+                              >
+                                {p.first_name} {p.last_name}
+                              </Link>
+                            ) : (
+                              <span className="font-medium">
+                                Unknown player
+                              </span>
+                            )}
+                            <span className={`ml-2 text-xs ${tone}`}>
+                              {eventLabel(e.event_type)}
+                            </span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </section>
+            ),
+          },
+          {
+            key: "lineups",
+            label: "Line-ups",
+            content:
+              homeSheet || awaySheet ? (
+                <TeamSwitch
+                  homeName={home?.name ?? "Home"}
+                  awayName={away?.name ?? "Away"}
+                  homeLogo={home?.logo_url}
+                  awayLogo={away?.logo_url}
+                  home={homeSheet ?? <NoSheet team={home?.name} />}
+                  away={awaySheet ?? <NoSheet team={away?.name} />}
+                />
+              ) : null,
+          },
+          {
+            key: "stats",
+            label: "Stats",
+            content: (
+              <>
+                {/* Score breakdown from the recorded result */}
+                {scoreBreakdown.length > 0 && (
+                  <section className="mb-6">
+                    <h2 className="font-display text-xl mb-3">
+                      Score Breakdown
+                    </h2>
+                    <div className="bg-neutral-900 border border-white/10 rounded-lg divide-y divide-white/5">
+                      {scoreBreakdown.map((row) => (
+                        <div
+                          key={row.label}
+                          className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3 px-4 py-2.5 text-sm"
+                        >
+                          <span className="font-display text-lg tabular-nums">
+                            {row.home ?? 0}
+                          </span>
+                          <span className="text-center text-xs uppercase tracking-wider text-slate-400">
+                            {row.label}
+                          </span>
+                          <span className="font-display text-lg tabular-nums text-right">
+                            {row.away ?? 0}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-      {/* Score breakdown from the recorded result */}
-      {scoreBreakdown.length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-display text-xl mb-3">Score Breakdown</h2>
-          <div className="bg-neutral-900 border border-white/10 rounded-lg divide-y divide-white/5">
-            {scoreBreakdown.map((row) => (
-              <div
-                key={row.label}
-                className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3 px-4 py-2.5 text-sm"
-              >
-                <span className="font-display text-lg tabular-nums">
-                  {row.home ?? 0}
-                </span>
-                <span className="text-center text-xs uppercase tracking-wider text-slate-400">
-                  {row.label}
-                </span>
-                <span className="font-display text-lg tabular-nums text-right">
-                  {row.away ?? 0}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Team stats from events */}
-      {statRows.length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-display text-xl mb-3">Team Stats</h2>
-          <div className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 space-y-3">
-            {statRows.map((row) => {
-              const total = row.home + row.away;
-              const homePct = total ? (row.home / total) * 100 : 50;
-              return (
-                <div key={row.label}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold tabular-nums">{row.home}</span>
-                    <span className="uppercase tracking-wider text-slate-400 text-[11px]">
-                      {row.label}
-                    </span>
-                    <span className="font-semibold tabular-nums">{row.away}</span>
-                  </div>
-                  <div className="flex h-1.5 rounded-full overflow-hidden bg-white/5">
-                    <div
-                      className="bg-ghanaGreen-400"
-                      style={{ width: `${homePct}%` }}
-                    />
-                    <div
-                      className="bg-ghanaYellow-500"
-                      style={{ width: `${100 - homePct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Line-ups */}
-      {(lineup ?? []).length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-display text-xl mb-3">Line-ups</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {[
-              { team: home, id: homeId },
-              { team: away, id: awayId },
-            ].map(({ team, id }) => {
-              const starters = lineupFor(id, true);
-              const bench = lineupFor(id, false);
-              if (starters.length === 0 && bench.length === 0) return null;
-              return (
-                <div
-                  key={id ?? team?.name}
-                  className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden"
-                >
-                  <div className="px-4 py-2.5 border-b border-white/10 font-medium text-sm">
-                    {team?.name ?? "TBC"}
-                  </div>
-                  <PlayerList
-                    rows={starters}
-                    statsByPlayer={statsByPlayer}
-                    ratingByPlayer={ratingByPlayer}
-                  />
-                  {bench.length > 0 && (
-                    <>
-                      <div className="px-4 py-1.5 bg-white/5 text-[11px] uppercase tracking-wider text-slate-400">
-                        Bench
-                      </div>
-                      <PlayerList
-                        rows={bench}
-                        statsByPlayer={statsByPlayer}
-                        ratingByPlayer={ratingByPlayer}
-                      />
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                {/* Team stats from events */}
+                {statRows.length > 0 && (
+                  <section className="mb-6">
+                    <h2 className="font-display text-xl mb-3">Team Stats</h2>
+                    <div className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 space-y-3">
+                      {statRows.map((row) => {
+                        const total = row.home + row.away;
+                        const homePct = total ? (row.home / total) * 100 : 50;
+                        return (
+                          <div key={row.label}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="font-semibold tabular-nums">
+                                {row.home}
+                              </span>
+                              <span className="uppercase tracking-wider text-slate-400 text-[11px]">
+                                {row.label}
+                              </span>
+                              <span className="font-semibold tabular-nums">
+                                {row.away}
+                              </span>
+                            </div>
+                            <div className="flex h-1.5 rounded-full overflow-hidden bg-white/5">
+                              <div
+                                className="bg-ghanaGreen-400"
+                                style={{ width: `${homePct}%` }}
+                              />
+                              <div
+                                className="bg-ghanaYellow-500"
+                                style={{ width: `${100 - homePct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+              </>
+            ),
+          },
+        ]}
+      />
 
       {/* Officials */}
       {(officials ?? []).length > 0 && (
