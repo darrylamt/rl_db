@@ -86,34 +86,50 @@ export function TransferMarket({
         aria-label="Search players at every club"
       />
 
+      {/* Two to a row on a phone rather than a sideways scroll: a club is
+          picked by its name and crest, and a row that scrolls cuts both in
+          half at the edge. Names wrap rather than truncate — half a club name
+          is not a club name. */}
       {!q && (
-        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-4">
           {/* A player nobody holds can be signed without asking anyone. */}
           {freeAgents > 0 && (
             <button
               onClick={() => setClub(FREE)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap border ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm border text-left transition ${
                 club === FREE
                   ? "bg-emerald-700 text-white border-emerald-700"
                   : "bg-white border-emerald-200 text-emerald-800 hover:border-emerald-400"
               }`}
             >
-              Free agents
-              <span className="text-[10px] opacity-80">{freeAgents}</span>
+              <span
+                className={`w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
+                  club === FREE ? "bg-white/20" : "bg-emerald-100 text-emerald-800"
+                }`}
+                aria-hidden="true"
+              >
+                FA
+              </span>
+              <span className="min-w-0 flex-1 leading-tight">
+                Free agents
+                <span className="block text-[11px] opacity-70">
+                  {freeAgents} without a club
+                </span>
+              </span>
             </button>
           )}
           {teams.map((t) => (
             <button
               key={t.team_id}
               onClick={() => setClub(t.team_id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap border ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm border text-left transition ${
                 club === t.team_id
                   ? "bg-navy-900 text-white border-navy-900"
                   : "bg-white border-slate-200 text-slate-700 hover:border-navy-300"
               }`}
             >
-              <Avatar src={t.logo_url} name={t.name} size={20} />
-              {t.name}
+              <Avatar src={t.logo_url} name={t.name} size={24} />
+              <span className="min-w-0 flex-1 leading-tight">{t.name}</span>
             </button>
           ))}
         </div>
