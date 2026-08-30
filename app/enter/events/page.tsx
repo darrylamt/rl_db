@@ -2,9 +2,16 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { MatchClockPanel } from "@/components/enter/MatchClockPanel";
+import { clockState, displayMinute, currentHalf } from "@/lib/matchClock";
 
 type Fixture = {
   fixture_id: string;
+  kickoff_at?: string | null;
+  clock_state?: string | null;
+  paused_at?: string | null;
+  stoppage_seconds?: number | null;
+  forfeited_by_team_id?: string | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
   home_team_id: string;
@@ -104,7 +111,7 @@ export default function EnterEventsPage() {
       const { data } = await supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season)"
+          "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
         )
         .or(`scheduled_date.eq.${today},status.eq.postponed,status.eq.live`)
         .order("scheduled_time", { ascending: true });
@@ -115,7 +122,7 @@ export default function EnterEventsPage() {
         const { data: one } = await supabase
           .from("fixtures")
           .select(
-            "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season)"
+            "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
           )
           .eq("fixture_id", wanted)
           .maybeSingle();
@@ -131,6 +138,39 @@ export default function EnterEventsPage() {
     () => fixtures.find((f) => f.fixture_id === fixtureId) ?? null,
     [fixtures, fixtureId]
   );
+
+  /** Pull this fixture back after the clock moves, so the panel is current. */
+  const reloadFixture = useCallback(async () => {
+    if (!fixtureId) return;
+    const { data } = await supabase
+      .from("fixtures")
+      .select(
+        "fixture_id, scheduled_date, scheduled_time, status, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
+      )
+      .eq("fixture_id", fixtureId)
+      .maybeSingle();
+    if (data) {
+      setFixtures((cur) =>
+        cur.map((f) => (f.fixture_id === fixtureId ? ({ ...f, ...(data as any) }) : f))
+      );
+    }
+  }, [supabase, fixtureId]);
+
+  // While the clock runs, the minute box follows it — until the recorder
+  // types their own. An event entered late belongs to the minute it
+  // happened, not the minute it was typed.
+  const [minuteTouched, setMinuteTouched] = useState(false);
+  useEffect(() => {
+    if (!fixture || minuteTouched) return;
+    if (clockState(fixture) !== "running") return;
+    const set = () => {
+      setMinute(String(displayMinute(fixture)));
+      setHalf(String(currentHalf(fixture)) as "1" | "2");
+    };
+    set();
+    const id = setInterval(set, 15000);
+    return () => clearInterval(id);
+  }, [fixture, minuteTouched]);
 
   // ── Load players for the selected fixture ────────────────
   useEffect(() => {
@@ -240,6 +280,7 @@ export default function EnterEventsPage() {
 
     setNotice({ kind: "ok", msg: `✓ ${eventType.replace("_", " ")} recorded` });
     setPendingId(null);
+    setMinuteTouched(false);
     setPlayerId("");
     setPlayerSearch("");
     setEventType("");
@@ -314,6 +355,10 @@ export default function EnterEventsPage() {
             );
           })}
         </div>
+      )}
+
+      {fixture && (
+        <MatchClockPanel fixture={fixture as any} onChange={reloadFixture} />
       )}
 
       {fixture && (
@@ -411,7 +456,7 @@ export default function EnterEventsPage() {
                     type="number"
                     min={1} max={120}
                     value={minute}
-                    onChange={(e) => setMinute(e.target.value)}
+                    onChange={(e) => { setMinuteTouched(true); setMinute(e.target.value); }}
                     placeholder="e.g. 23"
                     className="w-full px-3 py-2 rounded-lg bg-navy-800 border border-navy-600 text-white focus:outline-none focus:border-gold-400 text-sm"
                   />

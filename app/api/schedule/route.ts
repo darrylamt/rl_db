@@ -221,6 +221,18 @@ export async function GET(req: Request) {
       // cannot distinguish a match in progress from a finished one.
       status: f.status ?? "scheduled",
       live: f.status === "live",
+      // The clock as facts rather than as a minute. A minute would be stale
+      // the moment it was sent; from these three a reader works out the
+      // current minute itself, however late it loads the page.
+      clock: {
+        state: f.clock_state ?? "not_started",
+        kickoff_at: f.kickoff_at ?? null,
+        paused_at: f.paused_at ?? null,
+        stoppage_seconds: f.stoppage_seconds ?? 0,
+      },
+      // The side that did not turn up, when a match was awarded rather than
+      // played.
+      forfeited_by: f.forfeited_by_team_id ?? null,
       date: f.scheduled_date
         ? `${f.scheduled_date}T${f.scheduled_time ?? "00:00:00"}`
         : null,

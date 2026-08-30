@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LiveClock } from "@/components/LiveClock";
 import { fmtShortDate, fmtTime } from "@/lib/matchStats";
 
 function one<T>(v: T | T[] | null | undefined): T | null {
@@ -98,6 +99,7 @@ export function MatchCard({ fixture }: { fixture: any }) {
           {fixture.round ? ` · ${fixture.round}` : ""}
         </span>
         <StatusPill status={fixture.status} />
+        <LiveClock fixture={fixture as any} className="text-ghanaYellow-500 text-xs ml-1.5" />
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">

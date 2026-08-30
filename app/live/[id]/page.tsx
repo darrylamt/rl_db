@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { LiveClock } from "@/components/LiveClock";
 import { TeamBadge, StatusPill } from "../MatchCard";
 import {
   TEAM_STAT_ROWS,
@@ -60,7 +61,7 @@ export default async function MatchCentrePage({
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season)"
+        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id"
       )
       .eq("fixture_id", fixtureId)
       .maybeSingle(),
@@ -209,6 +210,13 @@ export default async function MatchCentrePage({
             {f.round ? ` · ${f.round}` : ""}
           </span>
           <StatusPill status={f.status} />
+          {/* The minute, for anyone watching along. */}
+          <LiveClock fixture={f} className="text-ghanaYellow-500 text-sm ml-2" />
+          {f.forfeited_by_team_id && (
+            <span className="ml-2 text-[10px] uppercase tracking-wider bg-white/10 text-slate-300 px-1.5 py-0.5 rounded">
+              walkover
+            </span>
+          )}
         </div>
 
         <div className="px-4 py-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
