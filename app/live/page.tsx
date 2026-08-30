@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { MatchCard } from "./MatchCard";
+import { pointsFrom } from "@/lib/matchStats";
 
 // Scores must never be served stale.
 export const dynamic = "force-dynamic";
@@ -121,6 +122,38 @@ export default async function LiveHubPage() {
   const live = liveRows ?? [];
   const liveIds = new Set(live.map((f: any) => f.fixture_id));
 
+  /**
+   * The running score of a match in progress.
+   *
+   * match_results is written at full time, so a live match has no row there
+   * and the card fell back to showing its kick-off time — the one moment
+   * someone opening this page actually wants a number. The score is added up
+   * from the events instead, the same way the match centre does it.
+   */
+  const inPlay = [...live, ...(todayRows ?? [])].filter((f: any) => !one<any>(f.result));
+  const inPlayIds = Array.from(new Set(inPlay.map((f: any) => f.fixture_id)));
+
+  const { data: liveEvents } = inPlayIds.length
+    ? await supabase
+        .from("match_events")
+        .select("fixture_id, event_type, team_id, player:player_id(team_id)")
+        .in("fixture_id", inPlayIds)
+    : { data: [] as any[] };
+
+  const scoreFor = new Map<string, { home: number; away: number }>();
+  for (const f of inPlay as any[]) {
+    const homeId = one<any>(f.home)?.team_id;
+    const awayId = one<any>(f.away)?.team_id;
+    // An event can land without a team_id; the player it is credited to says
+    // which side it belongs to.
+    const side = (e: any) => e.team_id ?? one<any>(e.player)?.team_id ?? null;
+    const mine = (liveEvents ?? []).filter((e: any) => e.fixture_id === f.fixture_id);
+    scoreFor.set(f.fixture_id, {
+      home: pointsFrom(mine.filter((e: any) => side(e) === homeId)),
+      away: pointsFrom(mine.filter((e: any) => side(e) === awayId)),
+    });
+  }
+
   /** Something was actually scored — a 0-0 row is an unplayed fixture. */
   const hasScore = (f: any) => {
     const r = one<any>(f.result);
@@ -170,7 +203,11 @@ export default async function LiveHubPage() {
       {live.length > 0 && (
         <Section title="Live now" subtitle={`${live.length} in progress`}>
           {live.map((f: any) => (
-            <MatchCard key={f.fixture_id} fixture={f} />
+            <MatchCard
+              key={f.fixture_id}
+              fixture={f}
+              liveScore={scoreFor.get(f.fixture_id)}
+            />
           ))}
         </Section>
       )}
@@ -178,7 +215,11 @@ export default async function LiveHubPage() {
       {todaysMatches.length > 0 && (
         <Section title="Today" subtitle="Kick-off times">
           {todaysMatches.map((f: any) => (
-            <MatchCard key={f.fixture_id} fixture={f} />
+            <MatchCard
+              key={f.fixture_id}
+              fixture={f}
+              liveScore={scoreFor.get(f.fixture_id)}
+            />
           ))}
         </Section>
       )}

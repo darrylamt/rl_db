@@ -76,16 +76,38 @@ export function StatusPill({ status }: { status: string | null | undefined }) {
 }
 
 /**
- * One fixture row on the hub. Shows a score when there is one, kick-off time
- * when there isn't.
+ * One fixture row on the hub.
+ *
+ * Shows a final score where there is one, the running score while a match is
+ * being played, and the kick-off time only when neither exists. liveScore is
+ * added up from the events by the caller, because match_results is not
+ * written until full time.
  */
-export function MatchCard({ fixture }: { fixture: any }) {
+export function MatchCard({
+  fixture,
+  liveScore,
+}: {
+  fixture: any;
+  liveScore?: { home: number; away: number };
+}) {
   const home = one<any>(fixture.home);
   const away = one<any>(fixture.away);
   const comp = one<any>(fixture.competition);
   const venue = one<any>(fixture.venue);
   const result = one<any>(fixture.result);
-  const hasScore = !!result;
+
+  // A recorded result wins; otherwise a match that has produced points is
+  // showing its running score. A 0-0 that nobody has scored in yet stays as
+  // a kick-off time rather than pretending to be a scoreline.
+  const running =
+    !result && liveScore && (liveScore.home > 0 || liveScore.away > 0)
+      ? liveScore
+      : null;
+  const shown = result
+    ? { home: result.home_score ?? 0, away: result.away_score ?? 0 }
+    : running;
+  const hasScore = !!shown;
+  const isLive = fixture.status === "live";
 
   return (
     <Link
@@ -104,11 +126,15 @@ export function MatchCard({ fixture }: { fixture: any }) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <TeamBadge team={home} />
-        {hasScore ? (
-          <div className="font-display text-2xl md:text-3xl tabular-nums whitespace-nowrap px-2">
-            {result.home_score ?? 0}
+        {shown ? (
+          <div
+            className={`font-display text-2xl md:text-3xl tabular-nums whitespace-nowrap px-2 ${
+              isLive ? "text-ghanaYellow-500" : ""
+            }`}
+          >
+            {shown.home}
             <span className="text-slate-600 mx-1.5">–</span>
-            {result.away_score ?? 0}
+            {shown.away}
           </div>
         ) : (
           <div className="text-slate-400 text-sm font-medium whitespace-nowrap px-2">
