@@ -1,4 +1,5 @@
 import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { isMissingColumnError } from "@/lib/optionalColumns";
 import { ok, fail, preflight, requireAdmin, readJson } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -30,15 +31,39 @@ export async function GET(req: Request) {
   const supabase = createPublicClient();
   const url = new URL(req.url);
   const flat = url.searchParams.get("flat");
+  // ?club=<team_id> asks for that club's own partners. Without it the
+  // response is the federation's, which is what every caller wanted before
+  // clubs could have their own.
+  const club = url.searchParams.get("club");
 
-  const { data, error } = await supabase
-    .from("partners")
-    .select(
-      "partner_id, name, link, logo_url, designation, tier, tier_title, sort_order"
-    )
-    .eq("status", "active")
-    .order("tier", { ascending: true })
-    .order("sort_order", { ascending: true });
+  const base = (columns: string) =>
+    supabase
+      .from("partners")
+      .select(columns)
+      .eq("status", "active")
+      .order("tier", { ascending: true })
+      .order("sort_order", { ascending: true });
+
+  const WITH_TEAM =
+    "partner_id, name, link, logo_url, designation, tier, tier_title, sort_order, team_id";
+  const WITHOUT_TEAM =
+    "partner_id, name, link, logo_url, designation, tier, tier_title, sort_order";
+
+  let { data, error }: { data: any; error: any } = await (club
+    ? base(WITH_TEAM).eq("team_id", club)
+    : base(WITH_TEAM).is("team_id", null));
+
+  // club_partners.sql may not have been run. Rather than fail the website's
+  // partner strip, fall back to what the column-less table can answer: the
+  // federation's partners are all of them, and a club has none yet.
+  if (error && isMissingColumnError(error)) {
+    if (club) {
+      data = [];
+      error = null;
+    } else {
+      ({ data, error } = await base(WITHOUT_TEAM));
+    }
+  }
 
   if (error) return fail(error.message, 500);
   const items = (data ?? []) as PartnerRow[];

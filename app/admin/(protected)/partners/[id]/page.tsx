@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { UploadOrLink } from "@/components/admin/UploadOrLink";
 import { updatePartner } from "../actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditPartnerPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
-  const { data: p } = await supabase
-    .from("partners")
-    .select("*")
-    .eq("partner_id", params.id)
-    .maybeSingle();
+  const [{ data: p }, { data: clubs }] = await Promise.all([
+    supabase.from("partners").select("*").eq("partner_id", params.id).maybeSingle(),
+    supabase.from("teams").select("team_id, name").eq("team_type", "club").order("name"),
+  ]);
   if (!p) notFound();
 
   const bound = updatePartner.bind(null, params.id);
@@ -32,6 +34,17 @@ export default async function EditPartnerPage({ params }: { params: { id: string
           <Input name="tier_title" defaultValue={p.tier_title ?? ""} />
         </Field>
       </div>
+      <Field
+        label="Whose partner"
+        hint="Federation partners show across the site; a club's show on that club's profile."
+      >
+        <SearchableSelect
+          name="team_id"
+          emptyLabel="— the federation —"
+          defaultValue={p.team_id ?? ""}
+          options={(clubs ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
+        />
+      </Field>
       <Field label="Designation" hint="Optional line under the logo">
         <Input name="designation" defaultValue={p.designation ?? ""} />
       </Field>

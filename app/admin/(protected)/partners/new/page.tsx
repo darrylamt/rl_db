@@ -1,8 +1,19 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { UploadOrLink } from "@/components/admin/UploadOrLink";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
+import { createAdminClient } from "@/lib/supabase/server";
 import { createPartner } from "../actions";
 
-export default function NewPartnerPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewPartnerPage() {
+  const supabase = createAdminClient();
+  const { data: clubs } = await supabase
+    .from("teams")
+    .select("team_id, name")
+    .eq("team_type", "club")
+    .order("name");
+
   return (
     <FormShell title="Add Partner" backHref="/admin/partners" onSubmit={createPartner} submitLabel="Add partner">
       <Field label="Name">
@@ -20,6 +31,17 @@ export default function NewPartnerPage() {
           <Input name="tier_title" placeholder="Official Partners" />
         </Field>
       </div>
+      <Field
+        label="Whose partner"
+        hint="Federation partners show across the site; a club's show on that club's profile."
+      >
+        <SearchableSelect
+          name="team_id"
+          emptyLabel="— the federation —"
+          defaultValue={""}
+          options={(clubs ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
+        />
+      </Field>
       <Field label="Designation" hint="Optional line under the logo">
         <Input name="designation" />
       </Field>

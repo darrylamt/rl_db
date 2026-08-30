@@ -10,7 +10,7 @@ export default async function ClubOverviewPage() {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
 
-  const [{ data: team }, { data: players }, { data: registrations }, { data: fixtures }] =
+  const [{ data: team }, { data: players }, { data: registrations }, { data: fixtures }, { data: partners }] =
     await Promise.all([
       supabase
         .from("teams")
@@ -32,6 +32,13 @@ export default async function ClubOverviewPage() {
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .order("scheduled_date", { ascending: true })
         .limit(200),
+      // Fails harmlessly until club_partners.sql has been run.
+      supabase
+        .from("partners")
+        .select("partner_id, name, logo_url, link, designation")
+        .eq("team_id", teamId)
+        .eq("status", "active")
+        .order("sort_order"),
     ]);
 
   const squad = players ?? [];
@@ -115,6 +122,33 @@ export default async function ClubOverviewPage() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {(partners ?? []).length > 0 && (
+        <section>
+          <h2 className="font-display text-lg text-navy-900 mb-2">Your partners</h2>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {(partners ?? []).map((s: any) => (
+              <li key={s.partner_id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3">
+                {s.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.logo_url} alt="" className="w-10 h-10 object-contain shrink-0" />
+                ) : (
+                  <span className="w-10 h-10 rounded bg-slate-100 shrink-0" />
+                )}
+                <span className="min-w-0">
+                  <span className="block font-medium text-navy-900 truncate">{s.name}</span>
+                  {s.designation && (
+                    <span className="block text-xs text-slate-500 truncate">{s.designation}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-slate-400 mt-2">
+            Held by the federation — ask them to add or change a partner.
+          </p>
         </section>
       )}
 
