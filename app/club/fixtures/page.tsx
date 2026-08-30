@@ -3,6 +3,20 @@ import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Whether a match has actually been played.
+ *
+ * The date alone is not the answer: a match kicking off at two o'clock is
+ * still today's date at six, so splitting on the date left a finished match
+ * sitting under "coming up" with no score against it. A result, or a fixture
+ * marked completed, is what settles it.
+ */
+function isPlayed(f: any): boolean {
+  const r = Array.isArray(f?.result) ? f.result[0] : f?.result;
+  if (r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0)) return true;
+  return f?.status === "completed";
+}
+
 export default async function ClubFixturesPage() {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
@@ -18,8 +32,12 @@ export default async function ClubFixturesPage() {
 
   const rows = fixtures ?? [];
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = rows.filter((f: any) => (f.scheduled_date ?? "") >= today).reverse();
-  const past = rows.filter((f: any) => (f.scheduled_date ?? "") < today);
+  const upcoming = rows
+    .filter((f: any) => !isPlayed(f) && (f.scheduled_date ?? "") >= today)
+    .reverse();
+  const past = rows.filter(
+    (f: any) => isPlayed(f) || (f.scheduled_date ?? "") < today
+  );
 
   const Table = ({ list, title }: { list: any[]; title: string }) =>
     list.length === 0 ? null : (

@@ -6,6 +6,20 @@ export const dynamic = "force-dynamic";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+/**
+ * Whether a match has actually been played.
+ *
+ * The date alone is not the answer: a match kicking off at two o'clock is
+ * still today's date at six, so splitting on the date left a finished match
+ * sitting under "coming up" with no score against it. A result, or a fixture
+ * marked completed, is what settles it.
+ */
+function isPlayed(f: any): boolean {
+  const r = Array.isArray(f?.result) ? f.result[0] : f?.result;
+  if (r && ((r.home_score ?? 0) > 0 || (r.away_score ?? 0) > 0)) return true;
+  return f?.status === "completed";
+}
+
 export default async function ClubOverviewPage() {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
@@ -28,7 +42,7 @@ export default async function ClubOverviewPage() {
         .eq("season_year", CURRENT_YEAR),
       supabase
         .from("fixtures")
-        .select("fixture_id, scheduled_date, status, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season)")
+        .select("fixture_id, scheduled_date, status, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season), result:match_results(home_score, away_score)")
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .order("scheduled_date", { ascending: true })
         .limit(200),
@@ -43,7 +57,15 @@ export default async function ClubOverviewPage() {
 
   const squad = players ?? [];
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = (fixtures ?? []).filter((f: any) => (f.scheduled_date ?? "") >= today).slice(0, 3);
+  const all = (fixtures ?? []) as any[];
+  const upcoming = all
+    .filter((f: any) => !isPlayed(f) && (f.scheduled_date ?? "") >= today)
+    .slice(0, 3);
+  // A match played today belongs under a result, not under a kick-off time.
+  const justPlayed = all
+    .filter((f: any) => isPlayed(f) && (f.scheduled_date ?? "") <= today)
+    .slice(-3)
+    .reverse();
 
   const missingPosition = squad.filter((p: any) => !p.position).length;
   const missingPhoto = squad.filter((p: any) => !p.photo_url).length;
@@ -105,6 +127,30 @@ export default async function ClubOverviewPage() {
           </div>
         ))}
       </section>
+
+      {justPlayed.length > 0 && (
+        <section>
+          <h2 className="font-display text-lg text-navy-900 mb-2">Latest results</h2>
+          <ul className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+            {justPlayed.map((f: any) => {
+              const r = Array.isArray(f.result) ? f.result[0] : f.result;
+              return (
+                <li key={f.fixture_id} className="px-4 py-2.5 text-sm flex flex-wrap items-center gap-x-3">
+                  <span className="text-slate-500 w-24 shrink-0">{f.scheduled_date}</span>
+                  <span className="font-medium text-navy-900 flex-1 min-w-0">
+                    {f.home?.name} <span className="text-slate-400">v</span> {f.away?.name}
+                  </span>
+                  {r && (
+                    <span className="font-display tabular-nums text-navy-900 shrink-0">
+                      {r.home_score}–{r.away_score}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {upcoming.length > 0 && (
         <section>
