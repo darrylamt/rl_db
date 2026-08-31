@@ -46,6 +46,7 @@ const navSections = [
     items: [
       { href: "/admin/teams", label: "Teams" },
       { href: "/admin/club-accounts", label: "Club Accounts" },
+      { href: "/admin/player-accounts", label: "Player Accounts" },
       { href: "/admin/recorders", label: "Match Recorders" },
       { href: "/admin/officials", label: "Officials" },
     ],
