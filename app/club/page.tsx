@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { expiringSoon, daysUntil, describeDays } from "@/lib/contracts";
 import { Avatar } from "@/components/Avatar";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -25,7 +26,7 @@ export default async function ClubOverviewPage() {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
 
-  const [{ data: team }, { data: players }, { data: registrations }, { data: fixtures }, { data: partners }] =
+  const [{ data: team }, { data: players }, { data: registrations }, { data: fixtures }, { data: contracts }, { data: partners }] =
     await Promise.all([
       supabase
         .from("teams")
@@ -47,6 +48,12 @@ export default async function ClubOverviewPage() {
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .order("scheduled_date", { ascending: true })
         .limit(200),
+      // Fails harmlessly until contracts_and_players.sql has been run.
+      supabase
+        .from("contracts")
+        .select("contract_id, player_id, ends_on, status, player:player_id(first_name, last_name)")
+        .eq("team_id", teamId)
+        .eq("status", "accepted"),
       // Fails harmlessly until club_partners.sql has been run.
       supabase
         .from("partners")
@@ -72,6 +79,10 @@ export default async function ClubOverviewPage() {
   const missingPhoto = squad.filter((p: any) => !p.photo_url).length;
   const missingDob = squad.filter((p: any) => !p.date_of_birth).length;
 
+  // A contract running out is not something a club should discover on the
+  // day, so it leads the page alongside the squad gaps.
+  const endingSoon = expiringSoon((contracts ?? []) as any[]);
+
   const jobs = [
     { n: missingPosition, label: "without a position", href: "/club/players?only=no-position" },
     { n: missingPhoto, label: "without a photo", href: "/club/players?only=no-photo" },
@@ -86,6 +97,44 @@ export default async function ClubOverviewPage() {
           {[team?.division, team?.city, team?.region].filter(Boolean).join(" · ") || "Club"}
         </p>
       </div>
+
+      {endingSoon.length > 0 && (
+        <section className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+          <h2 className="font-display text-lg text-amber-900 mb-1">
+            {endingSoon.length === 1
+              ? "A contract is about to run out"
+              : `${endingSoon.length} contracts are about to run out`}
+          </h2>
+          <p className="text-xs text-amber-800 mb-3">
+            Once a contract ends the player is out of contract and can be
+            approached by anybody. Offer new terms before then.
+          </p>
+          <ul className="grid gap-1.5">
+            {endingSoon.map((c: any) => {
+              const p = Array.isArray(c.player) ? c.player[0] : c.player;
+              const who = `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "A player";
+              const days = daysUntil(c.ends_on);
+              return (
+                <li
+                  key={c.contract_id}
+                  className="flex items-center justify-between gap-3 text-sm bg-white border border-amber-200 rounded px-3 py-2"
+                >
+                  <span className="font-medium text-navy-900 truncate">{who}</span>
+                  <span className="text-amber-800 shrink-0 text-xs">
+                    ends {describeDays(days)} · {c.ends_on}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <Link
+            href="/club/contracts"
+            className="inline-block mt-3 text-sm text-navy-800 hover:underline"
+          >
+            Offer new terms →
+          </Link>
+        </section>
+      )}
 
       {/* The work, first — this portal exists so squads get filled in. */}
       {jobs.length > 0 ? (

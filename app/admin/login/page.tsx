@@ -13,6 +13,9 @@ async function clubLogos(): Promise<string[]> {
       .from("teams")
       .select("logo_url")
       .not("logo_url", "is", null)
+      // Retired clubs come off the sign-in screen with everywhere else.
+      .neq("is_public", false)
+      .eq("team_type", "club")
       .order("name")
       .limit(40);
     return (data ?? []).map((t: any) => t.logo_url).filter(Boolean);

@@ -79,3 +79,34 @@ export function liveContract(list: Contract[] | null | undefined): Contract | nu
     (list ?? []).find((c) => c.status === "accepted" && c.ends_on >= today) ?? null
   );
 }
+
+/** Contracts inside the warning window, soonest first. */
+export const EXPIRY_WARNING_DAYS = 31;
+
+export function expiringSoon<T extends { ends_on: string; status: string }>(
+  list: T[] | null | undefined
+): T[] {
+  const today = new Date();
+  const limit = new Date(today);
+  limit.setDate(limit.getDate() + EXPIRY_WARNING_DAYS);
+
+  const from = today.toISOString().slice(0, 10);
+  const to = limit.toISOString().slice(0, 10);
+
+  return (list ?? [])
+    .filter((c) => c.status === "accepted" && c.ends_on >= from && c.ends_on <= to)
+    .sort((a, b) => a.ends_on.localeCompare(b.ends_on));
+}
+
+/** "in 12 days", "tomorrow", "today" — a month out, days read better than months. */
+export function daysUntil(date: string): number {
+  const a = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+  const b = new Date(`${date}T00:00:00`);
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+export function describeDays(days: number): string {
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  return `in ${days} days`;
+}

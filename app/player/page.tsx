@@ -3,6 +3,7 @@ import { requirePlayer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { remaining, monthsBetween, describeLength, type Contract } from "@/lib/contracts";
 import { normaliseType } from "@/lib/matchStats";
+import { standingsFor } from "@/lib/leaders";
 import { answerContract } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export default async function PlayerHomePage({
       supabase
         .from("players")
         .select(
-          "player_id, first_name, last_name, position, jersey_number, date_of_birth, height_cm, weight_kg, nationality, rating, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking, team:team_id(name)"
+          "player_id, first_name, last_name, position, jersey_number, date_of_birth, height_cm, weight_kg, nationality, rating, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking, team:team_id(name)"
         )
         .eq("player_id", playerId)
         .maybeSingle(),
@@ -61,6 +62,10 @@ export default async function PlayerHomePage({
     ]);
 
   const p = player as any;
+
+  // What they top, if anything. Worked out after the player is known,
+  // because it needs their club to know what "at your club" means.
+  const standings = await standingsFor(playerId, p?.team_id ?? null);
   const all = (contracts ?? []) as any[];
   const offers = all.filter((c) => c.status === "offered");
   const live = all.find((c) => c.status === "accepted") ?? null;
@@ -98,6 +103,36 @@ export default async function PlayerHomePage({
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm px-3 py-2.5 rounded">
           {searchParams.note}
         </div>
+      )}
+
+      {standings.length > 0 && (
+        <section className="grid gap-2">
+          {standings.slice(0, 3).map((s, i) => (
+            <div
+              key={i}
+              className={`rounded-lg px-4 py-3 border ${
+                s.scope === "federation"
+                  ? "bg-gold-50 border-gold-300"
+                  : "bg-white border-slate-200"
+              }`}
+            >
+              <p className="text-sm">
+                <span className="font-display text-lg text-navy-900">
+                  {s.outright ? "You are the" : "You are joint"} {s.title}
+                </span>
+                <span className="text-slate-600">
+                  {" "}
+                  {s.scope === "federation" ? "in the federation" : `at ${s.scopeName}`}
+                </span>
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {s.count} on record
+                {!s.outright &&
+                  ` · shared with ${s.sharedWith} other${s.sharedWith === 1 ? "" : "s"}`}
+              </p>
+            </div>
+          ))}
+        </section>
       )}
 
       {/* Offers first — this is the one thing only you can settle */}
