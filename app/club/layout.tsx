@@ -12,7 +12,6 @@ const NAV = [
   { href: "/club/team-sheets", label: "Team Sheets" },
   { href: "/club/fixtures", label: "Fixtures" },
   { href: "/club/transfers", label: "Transfers" },
-  { href: "/club/credits", label: "Credits" },
 ];
 
 export default async function ClubLayout({
