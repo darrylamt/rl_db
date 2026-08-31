@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { remaining, type Contract } from "@/lib/contracts";
 import { Avatar } from "@/components/Avatar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -69,6 +70,7 @@ export default async function PublicPlayerPage({
     { data: ratings },
     { data: teams },
     { data: allPlayers },
+    { data: contracts },
   ] = await Promise.all([
     supabase
       .from("public_players")
@@ -92,6 +94,13 @@ export default async function PublicPlayerPage({
       .select("player_id, first_name, last_name, team_id")
       .order("last_name")
       .limit(1000),
+    // Only accepted contracts are readable without an account, so an offer
+    // nobody has answered never shows up here.
+    supabase
+      .from("contracts")
+      .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at")
+      .eq("player_id", playerId)
+      .eq("status", "accepted"),
   ]);
 
   if (!player) notFound();
@@ -99,6 +108,10 @@ export default async function PublicPlayerPage({
   const teamName = new Map<string, string>(
     ((teams ?? []) as any[]).map((t) => [t.team_id, t.name])
   );
+  // What is left to run, where there is a contract at all. A profile that
+  // says nothing is a player out of contract, which is worth knowing.
+  const contract = remaining((((contracts ?? []) as any[])[0] ?? null) as Contract);
+
   const team = (teams ?? []).find(
     (t: any) => t.team_id === (player as any).team_id
   ) as any;
@@ -221,6 +234,11 @@ export default async function PublicPlayerPage({
                 <span className="text-slate-500"> · #{p.jersey_number}</span>
               )}
             </p>
+            {contract && (
+              <p className="text-ghanaYellow-500 text-xs mt-1.5">
+                Under contract · {contract.label} to run, to {contract.endsOn}
+              </p>
+            )}
             <p className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
               {p.age != null && <span>Age {p.age}</span>}
               {p.height_cm && <span>{p.height_cm} cm</span>}

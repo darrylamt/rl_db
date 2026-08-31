@@ -44,6 +44,7 @@ export async function updateSession(request: NextRequest) {
   // accepts them from a signed-in session. Without this gate a phone that has
   // never signed in reaches the form and every save fails silently.
   const isEnterRoute = pathname.startsWith("/enter");
+  const isPlayerRoute = pathname.startsWith("/player");
   const isLoginRoute = pathname === "/admin/login";
   // Signing out lives under /admin but belongs to everyone. Without this it
   // is treated as the federation's admin and a club or recorder is bounced
@@ -51,7 +52,7 @@ export async function updateSession(request: NextRequest) {
   // them no way to sign out at all.
   const isLogoutRoute = pathname === "/admin/logout";
 
-  if ((isAdminRoute || isClubRoute || isEnterRoute) && !isLoginRoute && !user) {
+  if ((isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute) && !isLoginRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
@@ -61,13 +62,14 @@ export async function updateSession(request: NextRequest) {
   // What kind of account this is decides which half of the app it sees. The
   // middleware only sorts the traffic; every read and write checks again on
   // the server, because a redirect is a convenience and not a permission.
-  let role: "federation" | "club" | "recorder" | "unprovisioned" = "federation";
+  let role: "federation" | "club" | "recorder" | "player" | "unprovisioned" = "federation";
   let hasRoles = true;
   let onHold = false;
-  if (user && (isAdminRoute || isClubRoute || isEnterRoute || isLoginRoute)) {
+  let mustChange = false;
+  if (user && (isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute || isLoginRoute)) {
     const { data, error } = await supabase
       .from("app_users")
-      .select("role, status")
+      .select("role, status, must_change_password")
       .eq("user_id", user.id)
       .maybeSingle();
     if (error && (error as any).code === "42P01") {
@@ -77,9 +79,10 @@ export async function updateSession(request: NextRequest) {
       role = "unprovisioned";
     } else {
       role =
-        data.role === "club" || data.role === "recorder"
+        data.role === "club" || data.role === "recorder" || data.role === "player"
           ? data.role
           : "federation";
+      mustChange = (data as any).must_change_password === true;
       // The column only exists once account_holds_and_audit.sql has run;
       // before that nothing is held, exactly as before.
       onHold = (data as any).status === "on_hold";
@@ -87,7 +90,13 @@ export async function updateSession(request: NextRequest) {
   }
 
   const home =
-    role === "club" ? "/club" : role === "recorder" ? "/enter" : "/admin/dashboard";
+    role === "club"
+      ? "/club"
+      : role === "recorder"
+      ? "/enter"
+      : role === "player"
+      ? "/player"
+      : "/admin/dashboard";
 
   if (isLoginRoute && user) {
     const url = request.nextUrl.clone();
@@ -105,6 +114,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Every seeded player starts on the same password. Nothing else is
+  // reachable until that has been dealt with.
+  if (
+    user &&
+    mustChange &&
+    !isLogoutRoute &&
+    pathname !== "/player/password"
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/player/password";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   if (user && hasRoles && !isLogoutRoute) {
     // A club account has no business in the federation admin.
     if (isAdminRoute && !isLoginRoute && role === "club") {
@@ -117,6 +140,20 @@ export async function updateSession(request: NextRequest) {
     if (isClubRoute && role === "federation") {
       const url = request.nextUrl.clone();
       url.pathname = "/admin/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // A player account gets its own side and nothing else.
+    if ((isAdminRoute || isClubRoute || isEnterRoute) && !isLoginRoute && role === "player") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/player";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // And nobody else has any business there.
+    if (isPlayerRoute && role !== "player") {
+      const url = request.nextUrl.clone();
+      url.pathname = home;
       url.search = "";
       return NextResponse.redirect(url);
     }

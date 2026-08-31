@@ -3,6 +3,7 @@ import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TransferMarket } from "@/components/club/TransferMarket";
 import { getTransferWindow } from "@/lib/transferWindow";
+import { remaining, type Contract } from "@/lib/contracts";
 import { requestPlayer, withdrawRequest, answerRequest } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ export default async function ClubTransfersPage({
   const tab = searchParams?.tab ?? "market";
   const market = await getTransferWindow();
 
-  const [{ data: teams }, { data: players }, { data: sent, error }, { data: received }] =
+  const [{ data: teams }, { data: players }, { data: sent, error }, { data: received }, { data: liveContracts }] =
     await Promise.all([
       supabase
         .from("teams")
@@ -66,12 +67,26 @@ export default async function ClubTransfersPage({
         .limit(1000),
       supabase.from("transfer_requests").select(SELECT).eq("to_team_id", teamId).order("requested_at", { ascending: false }),
       supabase.from("transfer_requests").select(SELECT).eq("from_team_id", teamId).order("requested_at", { ascending: false }),
+      // What each player is tied up for. A player with two years to run is a
+      // different proposition from one out of contract in a month, and the
+      // list is unreadable without it.
+      supabase
+        .from("contracts")
+        .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at")
+        .eq("status", "accepted"),
     ]);
 
   const outgoing = (sent ?? []) as any[];
   const incoming = (received ?? []) as any[];
   const waiting = incoming.filter((r) => r.status === "with_club").length;
   const notMigrated = !!error && /transfer_requests/.test(error.message);
+
+  // player_id -> "1 year 4 months"
+  const contractLeft: Record<string, string> = {};
+  for (const c of ((liveContracts ?? []) as any[])) {
+    const left = remaining(c as Contract);
+    if (left) contractLeft[c.player_id] = left.label;
+  }
 
   const openFor = outgoing
     .filter((r) => r.status === "with_club" || r.status === "with_federation")
@@ -225,6 +240,7 @@ export default async function ClubTransfersPage({
               teams={(teams ?? []) as any}
               players={(players ?? []) as any}
               openFor={openFor}
+              contractLeft={contractLeft}
               request={requestPlayer}
             />
           )}

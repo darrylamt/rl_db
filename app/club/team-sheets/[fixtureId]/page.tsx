@@ -19,7 +19,7 @@ export default async function BuildTeamSheetPage({
   const supabase = createAdminClient();
   const fixtureId = params.fixtureId;
 
-  const [{ data: fixture }, { data: squad }, { data: sheet }, { data: named }] =
+  const [{ data: fixture }, { data: squad }, { data: sheet }, { data: named }, { data: availability }] =
     await Promise.all([
       supabase
         .from("fixtures")
@@ -44,6 +44,11 @@ export default async function BuildTeamSheetPage({
         .select("player_id, jersey_number, position, is_starter")
         .eq("fixture_id", fixtureId)
         .eq("team_id", teamId),
+      // Who has ruled themselves out of this one. Absent the table, nobody has.
+      supabase
+        .from("player_availability")
+        .select("player_id, status")
+        .eq("fixture_id", fixtureId),
     ]);
 
   if (!fixture) notFound();
@@ -64,6 +69,12 @@ export default async function BuildTeamSheetPage({
   const division = (f.competition as any)?.division;
   const eligible = ((squad ?? []) as any[]).filter(
     (p) => namedBy.has(p.player_id) || inDivision(p.category, division)
+  );
+
+  // A player who has signed out cannot be named. One who has signed in is
+  // marked so; saying nothing leaves them selectable as normal.
+  const availabilityFor = new Map(
+    ((availability ?? []) as any[]).map((a) => [a.player_id, a.status])
   );
 
   return (
@@ -132,6 +143,7 @@ export default async function BuildTeamSheetPage({
               squad={eligible as any}
               named={(named ?? []) as any}
               locked={locked}
+              availability={Object.fromEntries(availabilityFor)}
             />
           )}
 

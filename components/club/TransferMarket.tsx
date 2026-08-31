@@ -39,12 +39,15 @@ export function TransferMarket({
   teams,
   players,
   openFor,
+  contractLeft = {},
   request,
 }: {
   teams: Team[];
   players: Player[];
   /** Players this club already has an open request for. */
   openFor: string[];
+  /** player_id -> what is left to run, for those under contract. */
+  contractLeft?: Record<string, string>;
   request: (fd: FormData) => Promise<void>;
 }) {
   const freeAgents = useMemo(
@@ -158,6 +161,15 @@ export function TransferMarket({
                       ]
                         .filter(Boolean)
                         .join(" · ")}
+                    </p>
+                    <p className="text-xs truncate">
+                      {contractLeft[p.player_id] ? (
+                        <span className="text-amber-800">
+                          {contractLeft[p.player_id]} left on contract
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700">Out of contract</span>
+                      )}
                     </p>
                   </div>
                   {already ? (

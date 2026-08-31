@@ -10,9 +10,16 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 export type AppUser = {
   userId: string;
   email: string | null;
-  role: "federation" | "club" | "recorder";
+  role: "federation" | "club" | "recorder" | "player";
   /** The one club a club account speaks for. Null for the others. */
   teamId: string | null;
+  /** The one player a player account speaks for. Null for the others. */
+  playerId: string | null;
+  /**
+   * Seeded accounts all start on the same password, so the first thing they
+   * are asked to do is stop sharing it.
+   */
+  mustChangePassword: boolean;
   /**
    * False when the account has no row in app_users. Such an account gets
    * nothing — not the admin, not a club — rather than defaulting to either.
@@ -46,7 +53,7 @@ export async function getAppUser(): Promise<AppUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("app_users")
-    .select("role, team_id, status")
+    .select("role, team_id, status, player_id, must_change_password")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -57,6 +64,8 @@ export async function getAppUser(): Promise<AppUser | null> {
       email: user.email ?? null,
       role: "federation",
       teamId: null,
+      playerId: null,
+      mustChangePassword: false,
       provisioned: true,
       onHold: false,
     };
@@ -68,6 +77,8 @@ export async function getAppUser(): Promise<AppUser | null> {
       email: user.email ?? null,
       role: "federation",
       teamId: null,
+      playerId: null,
+      mustChangePassword: false,
       provisioned: false,
       onHold: false,
     };
@@ -77,10 +88,14 @@ export async function getAppUser(): Promise<AppUser | null> {
     userId: user.id,
     email: user.email ?? null,
     role:
-      data.role === "club" || data.role === "recorder"
+      data.role === "club" || data.role === "recorder" || data.role === "player"
         ? data.role
         : "federation",
     teamId: data.team_id ?? null,
+    playerId: (data as any).player_id ?? null,
+    // The column arrives with contracts_and_players.sql; before it does,
+    // nobody is being asked to change anything.
+    mustChangePassword: (data as any).must_change_password === true,
     provisioned: true,
     // The column arrives only once account_holds_and_audit.sql has been run;
     // until then nothing is held, which is how things behaved before.
@@ -129,4 +144,21 @@ export async function requireMatchRecorder(): Promise<AppUser> {
     throw new Error("Match entry is for recorders and the federation");
   }
   return user;
+}
+
+/**
+ * The player this request may act for, or nothing.
+ *
+ * A player account speaks for exactly one player, and the two things it can
+ * decide — a contract, an availability — are the two nobody else can decide
+ * for them.
+ */
+export async function requirePlayer(): Promise<{ user: AppUser; playerId: string }> {
+  const user = await getAppUser();
+  if (!user) throw new Error("Not signed in");
+  if (user.onHold) throw new Error("This account is on hold");
+  if (user.role !== "player" || !user.playerId) {
+    throw new Error("This account is not attached to a player");
+  }
+  return { user, playerId: user.playerId };
 }
