@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MatchClockPanel } from "@/components/enter/MatchClockPanel";
 import { TallyPad } from "@/components/enter/TallyPad";
+import { SubstitutionPad } from "@/components/enter/SubstitutionPad";
 import { clockState, displayMinute, currentHalf } from "@/lib/matchClock";
 import { byMatchTime, halfForMinute } from "@/lib/matchStats";
 import { inDivision } from "@/lib/positions";
@@ -640,6 +641,18 @@ export default function EnterEventsPage() {
           )}
 
           {/* Live event feed */}
+          {/* A substitution is two players and one moment, which neither the
+              scoring form nor the counting pad is shaped for. */}
+          <section className="mt-6">
+            <SubstitutionPad
+              fixtureId={fixtureId}
+              fixture={fixture}
+              players={players}
+              namedIds={namedIds}
+              onRecorded={loadEvents}
+            />
+          </section>
+
           {/* The counting stats. Kept apart from the form above because they
               are a different job: one tap each, hundreds of times. */}
           <section className="mt-6">

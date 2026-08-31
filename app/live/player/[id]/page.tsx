@@ -228,6 +228,14 @@ export default async function PublicPlayerPage({
           <div className="min-w-0">
             <h1 className="font-display text-2xl md:text-4xl leading-tight">
               {p.first_name} {p.last_name}
+              {p.playing_status && (
+                <span
+                  className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
+                    p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
+                  }`}
+                  title={p.playing_status === "active" ? "Active" : "Not active"}
+                />
+              )}
               {p.is_captain && (
                 <span className="ml-2 align-middle text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-ghanaYellow-500/15 text-ghanaYellow-500">
                   Captain
@@ -254,20 +262,7 @@ export default async function PublicPlayerPage({
               {p.height_cm && <span>{p.height_cm} cm</span>}
               {p.weight_kg && <span>{p.weight_kg} kg</span>}
               {p.nationality && <span>{p.nationality}</span>}
-              {p.playing_status && (
-                <span
-                  className="inline-flex items-center gap-1.5"
-                  title={p.playing_status === "active" ? "Active" : "Not active"}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="sr-only">{p.playing_status}</span>
-                </span>
-              )}
+
             </p>
           </div>
         </div>

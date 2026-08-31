@@ -106,7 +106,13 @@ export default async function PlayerHomePage({
     points += EVENT_POINTS[t] ?? 0;
   }
 
-  const appearances = new Set(((lineups ?? []) as any[]).map((l) => l.fixture_id)).size;
+  // Named on a team sheet, or something recorded against them in the match.
+  // Sheets only exist from 2024, so counting them alone loses every earlier
+  // season — 22 of Darryl's 35 matches, for one.
+  const played = new Set<string>();
+  for (const l of (lineups ?? []) as any[]) if (l.fixture_id) played.add(l.fixture_id);
+  for (const e of (events ?? []) as any[]) if (e.fixture_id) played.add(e.fixture_id);
+  const appearances = played.size;
   const marks = ((ratings ?? []) as any[])
     .map((r) => Number(r.rating))
     .filter((n) => !Number.isNaN(n));
@@ -138,6 +144,15 @@ export default async function PlayerHomePage({
           <div className="min-w-0">
             <h1 className="font-display text-2xl md:text-3xl font-bold leading-tight break-words">
               {name}
+              {p?.playing_status && (
+                <span
+                  className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
+                    p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
+                  }`}
+                  title={p.playing_status === "active" ? "Active" : "Not active"}
+                />
+              )}
+              <span className="sr-only">{p?.playing_status}</span>
             </h1>
             <p className="text-slate-300 text-sm mt-1">
               {teamName ?? "No club"}
@@ -163,20 +178,7 @@ export default async function PlayerHomePage({
               {p?.height_cm && <span>{p.height_cm} cm</span>}
               {p?.weight_kg && <span>{p.weight_kg} kg</span>}
               {p?.nationality && <span>{p.nationality}</span>}
-              {p?.playing_status && (
-                <span
-                  className="inline-flex items-center gap-1.5"
-                  title={p.playing_status === "active" ? "Active" : "Not active"}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="sr-only">{p.playing_status}</span>
-                </span>
-              )}
+
             </p>
           </div>
         </div>

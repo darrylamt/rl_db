@@ -53,6 +53,23 @@ export function EventIcon({
   if (t === "missed_conversion") {
     return <Svg viewBox="0 0 24 24" d={MISSED_D} className={`text-slate-500 ${className}`} />;
   }
+  // Not in the website's set, so arrows rather than an invented crest.
+  if (t === "sub_on") {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em"
+        className={`text-emerald-400 ${className}`} aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12 4l6 7h-4v9h-4v-9H6z" />
+      </svg>
+    );
+  }
+  if (t === "sub_off") {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em"
+        className={`text-red-400 ${className}`} aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12 20l-6-7h4V4h4v9h4z" />
+      </svg>
+    );
+  }
   if (t === "yellow_card" || t === "sin_bin") {
     return <span className={`inline-block w-3 h-4 rounded-sm bg-yellow-400 ${className}`} aria-hidden="true" />;
   }

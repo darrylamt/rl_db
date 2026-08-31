@@ -27,6 +27,8 @@ export const EVENT_LABELS: Record<string, string> = {
   missed_tackle: "Missed Tackle",
   turnover_won: "Turnover Won",
   completed_set: "Completed Set",
+  sub_on: "Substituted on",
+  sub_off: "Substituted off",
 };
 
 /** Points each scoring event is worth in Rugby League. */
@@ -48,6 +50,10 @@ export const TIMELINE_EVENTS = new Set([
   "yellow_card",
   "red_card",
   "sin_bin",
+  // A substitution is a moment in the match, so it belongs on the timeline
+  // even though it changes no score.
+  "sub_on",
+  "sub_off",
 ]);
 
 /** Rows of the home-vs-away stat comparison, in display order. */
@@ -66,6 +72,7 @@ export const TEAM_STAT_ROWS: { keys: string[]; label: string }[] = [
   { keys: ["completed_set"], label: "Completed Sets" },
   { keys: ["yellow_card", "sin_bin"], label: "Yellow / Sin Bin" },
   { keys: ["red_card"], label: "Red Cards" },
+  { keys: ["sub_on"], label: "Substitutions" },
 ];
 
 /** Normalise a stored event_type — older rows were saved title-cased. */
