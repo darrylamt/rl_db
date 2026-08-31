@@ -42,6 +42,10 @@ const navSections = [
     ],
   },
   {
+    title: "Credits",
+    items: [{ href: "/admin/credits", label: "Club Credits" }],
+  },
+  {
     title: "Clubs & people",
     items: [
       { href: "/admin/teams", label: "Teams" },
