@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
-import { lengthProblem } from "@/lib/contracts";
+import { lengthProblem, renewalProblem } from "@/lib/contracts";
 
 type Outcome = { error: string } | { note: string };
 
@@ -14,8 +14,11 @@ function describe(message: string) {
   if (/contracts/.test(message) && /does not exist|relation/i.test(message)) {
     return "Contracts need supabase/contracts_and_players.sql to be run first.";
   }
-  if (/one_live_contract_per_club_per_player/.test(message)) {
-    return "You already have a live contract or an open offer with that player.";
+  if (/one_open_offer_per_club_per_player/.test(message)) {
+    return "You already have an offer on the table with that player.";
+  }
+  if (/one_accepted_contract_per_club_per_player|one_live_contract_per_club_per_player/.test(message)) {
+    return "You already have a contract running with that player.";
   }
   if (/contract_runs_at_least_six_months/.test(message)) {
     return "The shortest contract is six months.";
@@ -63,6 +66,26 @@ export async function offerContract(fd: FormData) {
     .maybeSingle();
 
   if (!player) done({ error: "That player no longer exists." });
+
+  // The form only lists this club's squad, but a posted id is the caller's
+  // claim rather than a fact — without this a club could offer terms to
+  // somebody else's player and go round the transfer market entirely.
+  if ((player as any).team_id !== teamId) {
+    done({ error: "That player is not at your club. Sign them through transfers." });
+  }
+
+  // Re-signing your own player is allowed in the last month of their
+  // contract, and the new terms have to start after the old ones end.
+  const { data: current } = await supabase
+    .from("contracts")
+    .select("ends_on, status")
+    .eq("player_id", playerId)
+    .eq("team_id", teamId)
+    .eq("status", "accepted")
+    .maybeSingle();
+
+  const renewal = renewalProblem(current as any, starts);
+  if (renewal) done({ error: renewal });
 
   const { error } = await supabase.from("contracts").insert({
     player_id: playerId,

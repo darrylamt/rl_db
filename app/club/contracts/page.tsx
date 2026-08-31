@@ -2,7 +2,15 @@ import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { OfferContractForm } from "@/components/club/OfferContractForm";
-import { remaining, monthsBetween, describeLength, type Contract } from "@/lib/contracts";
+import {
+  remaining,
+  monthsBetween,
+  describeLength,
+  daysUntil,
+  describeDays,
+  RENEWAL_WINDOW_DAYS,
+  type Contract,
+} from "@/lib/contracts";
 import { offerContract, withdrawOffer, terminateContract } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -56,11 +64,32 @@ export default async function ClubContractsPage({
     ["declined", "withdrawn", "terminated"].includes(c.status)
   );
 
-  // Who has nothing running, so a club can see who to approach.
-  const underContract = new Set(signed.map((c) => c.player_id));
-  const free = ((squad ?? []) as any[]).filter(
-    (p) => !underContract.has(p.player_id) && !open.some((o) => o.player_id === p.player_id)
-  );
+  // Who a club may put terms to: anybody with nothing running, and anybody
+  // whose contract is inside its last month. Waiting for a contract to lapse
+  // before re-signing means negotiating with somebody every other club is
+  // free to talk to — which is the wrong moment to start.
+  const runningFor = new Map<string, any>();
+  for (const c of signed) runningFor.set(c.player_id, c);
+
+  const offerable = ((squad ?? []) as any[])
+    .filter((p) => !open.some((o) => o.player_id === p.player_id))
+    .map((p) => {
+      const current = runningFor.get(p.player_id);
+      if (!current) return { ...p, renewal: null as any };
+      const days = daysUntil(current.ends_on);
+      if (days > RENEWAL_WINDOW_DAYS) return null;
+      return { ...p, renewal: current };
+    })
+    .filter(Boolean) as any[];
+
+  // Whose terms run out soonest, so the urgent ones lead the list.
+  offerable.sort((a, b) => {
+    const ad = a.renewal ? daysUntil(a.renewal.ends_on) : 9999;
+    const bd = b.renewal ? daysUntil(b.renewal.ends_on) : 9999;
+    return ad - bd;
+  });
+
+  const renewalsDue = offerable.filter((p) => p.renewal).length;
 
   const Card = ({ c }: { c: any }) => {
     const p = Array.isArray(c.player) ? c.player[0] : c.player;
@@ -158,7 +187,18 @@ export default async function ClubContractsPage({
         </div>
       ) : (
         <>
-          <OfferContractForm players={free} offer={offerContract} />
+          {renewalsDue > 0 && (
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2.5 rounded mb-4">
+              <strong>
+                {renewalsDue} {renewalsDue === 1 ? "contract is" : "contracts are"} in
+                the last month.
+              </strong>{" "}
+              You can re-sign those players now. Once a contract ends they are
+              out of contract and any club can talk to them.
+            </div>
+          )}
+
+          <OfferContractForm players={offerable} offer={offerContract} />
 
           {open.length > 0 && (
             <section className="mt-6">

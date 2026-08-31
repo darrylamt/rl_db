@@ -110,3 +110,41 @@ export function describeDays(days: number): string {
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
 }
+
+/**
+ * How close to the end a contract has to be before it can be re-signed.
+ *
+ * The same month the club is warned about, so the warning and the thing it
+ * asks you to do arrive together rather than the second lagging the first.
+ */
+export const RENEWAL_WINDOW_DAYS = EXPIRY_WARNING_DAYS;
+
+/**
+ * Whether a club may offer this player new terms, and why not when it may not.
+ *
+ * A club can always sign somebody it has nothing running with. Re-signing
+ * its own player is allowed only in the last month — early enough to keep
+ * them, late enough that a club cannot lock somebody in for years by
+ * re-signing them every week.
+ */
+export function renewalProblem(
+  current: { ends_on: string; status: string } | null | undefined,
+  proposedStart: string
+): string | null {
+  if (!current || current.status !== "accepted") return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (current.ends_on < today) return null;
+
+  const days = daysUntil(current.ends_on);
+  if (days > RENEWAL_WINDOW_DAYS) {
+    return `Their contract runs to ${current.ends_on}. You can offer new terms once it is inside its last month — that is ${describeDays(days - RENEWAL_WINDOW_DAYS)}.`;
+  }
+
+  // A renewal follows the contract it renews; it does not sit on top of it.
+  if (proposedStart <= current.ends_on) {
+    return `Their current contract runs to ${current.ends_on}, so new terms have to start after that.`;
+  }
+
+  return null;
+}
