@@ -34,18 +34,24 @@ export default async function PlayerLayout({
   const name = `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "Player";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-navy-900 text-white">
+    <div className="min-h-screen bg-black text-white">
+      {/* Ghana flag strip, as on the live pages */}
+      <div className="flex h-1 w-full">
+        <div className="flex-1 bg-ghanaRed-500" />
+        <div className="flex-1 bg-ghanaYellow-500" />
+        <div className="flex-1 bg-ghanaGreen-500" />
+      </div>
+      <header className="bg-neutral-950 border-b border-white/10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <Avatar src={p?.photo_url} name={name} size={38} />
           <div className="min-w-0 flex-1">
             <p className="font-display font-bold leading-tight truncate">{name}</p>
-            <p className="text-[11px] text-navy-200 truncate">
+            <p className="text-[11px] text-slate-400 truncate">
               {[p?.team?.name, p?.position].filter(Boolean).join(" · ") || "Player"}
             </p>
           </div>
           <form action="/admin/logout" method="post">
-            <button className="text-navy-200 hover:text-white text-xs border border-white/15 rounded px-2.5 py-1">
+            <button className="text-slate-400 hover:text-white text-xs border border-white/15 rounded px-2.5 py-1">
               Sign out
             </button>
           </form>
@@ -55,7 +61,7 @@ export default async function PlayerLayout({
             <Link
               key={n.href}
               href={n.href}
-              className="px-3 py-2 text-sm text-navy-100 hover:text-white hover:bg-white/5 rounded-t whitespace-nowrap"
+              className="px-3 py-2 text-sm text-slate-300 hover:text-ghanaYellow-500 hover:bg-white/5 rounded-t whitespace-nowrap"
             >
               {n.label}
             </Link>
@@ -67,7 +73,7 @@ export default async function PlayerLayout({
         {children}
       </main>
 
-      <footer className="max-w-3xl mx-auto px-4 pb-8 text-xs text-slate-400">
+      <footer className="max-w-3xl mx-auto px-4 pb-8 text-xs text-slate-500">
         Everything here is yours to read. Your club and the federation keep it
         up to date — the two things you decide are your contracts and whether
         you are available.

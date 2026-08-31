@@ -49,8 +49,8 @@ export default async function AvailabilityPage({
   return (
     <div>
       <div className="mb-4">
-        <h1 className="font-display text-2xl font-bold text-navy-900">Availability</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
+        <h1 className="font-display text-2xl font-bold">Availability</h1>
+        <p className="text-sm text-slate-400 mt-0.5">
           Tell your club which matches you can play. Signing out means you
           cannot be named. Saying nothing means you can be — so you only need
           to speak up when something is wrong.
@@ -58,28 +58,28 @@ export default async function AvailabilityPage({
       </div>
 
       {searchParams?.error && (
-        <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2.5 rounded mb-4">
+        <div className="bg-red-900/30 border border-red-700 text-red-200 text-sm px-3 py-2.5 rounded mb-4">
           {searchParams.error}
         </div>
       )}
       {searchParams?.note && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm px-3 py-2.5 rounded mb-4">
+        <div className="bg-emerald-900/30 border border-emerald-700 text-emerald-200 text-sm px-3 py-2.5 rounded mb-4">
           {searchParams.note}
         </div>
       )}
 
       {notMigrated ? (
-        <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2.5 rounded">
+        <div className="bg-amber-900/25 border border-amber-700 text-amber-200 text-sm px-3 py-2.5 rounded">
           Run <code className="font-mono">supabase/contracts_and_players.sql</code> to
           turn this on.
         </div>
       ) : !teamId ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
+        <div className="bg-neutral-900 border border-white/10 rounded-lg p-8 text-center text-slate-500 text-sm">
           You are not at a club at the moment, so there is nothing to be
           available for.
         </div>
       ) : rows.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
+        <div className="bg-neutral-900 border border-white/10 rounded-lg p-8 text-center text-slate-500 text-sm">
           No matches coming up for your club.
         </div>
       ) : (
@@ -89,16 +89,16 @@ export default async function AvailabilityPage({
             return (
               <li
                 key={f.fixture_id}
-                className={`bg-white border rounded-lg px-4 py-3 ${
-                  answer === "out" ? "border-red-200" : "border-slate-200"
+                className={`bg-neutral-900 border rounded-lg px-4 py-3 ${
+                  answer === "out" ? "border-red-700/50" : "border-white/10"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
-                    <p className="font-medium text-navy-900 break-words">
+                    <p className="font-medium text-white break-words">
                       {f.home?.name} <span className="text-slate-400">v</span> {f.away?.name}
                     </p>
-                    <p className="text-xs text-slate-500 break-words">
+                    <p className="text-xs text-slate-400 break-words">
                       {[f.scheduled_date, f.scheduled_time?.slice(0, 5), f.venue?.name, f.competition?.name]
                         .filter(Boolean)
                         .join(" · ")}
@@ -111,7 +111,7 @@ export default async function AvailabilityPage({
                         className={`text-xs font-medium px-3 py-1.5 rounded border ${
                           answer === "in"
                             ? "bg-emerald-600 text-white border-emerald-600"
-                            : "border-slate-300 text-slate-700 hover:border-emerald-400"
+                            : "border-white/20 text-slate-300 hover:border-emerald-400"
                         }`}
                       >
                         Available
@@ -122,7 +122,7 @@ export default async function AvailabilityPage({
                         className={`text-xs font-medium px-3 py-1.5 rounded border ${
                           answer === "out"
                             ? "bg-red-600 text-white border-red-600"
-                            : "border-slate-300 text-slate-700 hover:border-red-400"
+                            : "border-white/20 text-slate-300 hover:border-red-400"
                         }`}
                       >
                         Not available
@@ -130,7 +130,7 @@ export default async function AvailabilityPage({
                     </form>
                     {answer && (
                       <form action={setAvailability.bind(null, f.fixture_id, "clear")}>
-                        <button className="text-xs px-2.5 py-1.5 rounded text-slate-500 hover:text-navy-800">
+                        <button className="text-xs px-2.5 py-1.5 rounded text-slate-500 hover:text-white">
                           Clear
                         </button>
                       </form>
@@ -139,7 +139,7 @@ export default async function AvailabilityPage({
                 </div>
 
                 {answer === "out" && (
-                  <p className="text-xs text-red-700 mt-2">
+                  <p className="text-xs text-red-300 mt-2">
                     Your club cannot name you for this one.
                   </p>
                 )}

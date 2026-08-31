@@ -14,101 +14,124 @@ const TRACKED: { type: string; noun: string; verb: string }[] = [
 ];
 
 export type Standing = {
-  /** "leading try scorer", from TRACKED. */
+  /** "top try scorer", from TRACKED. */
   title: string;
-  /** How many they have. */
   count: number;
-  /** "at Bulls" or "in the whole federation". */
-  scope: "club" | "federation";
+  /** All time across the federation, or at one club. */
+  scope: "all_time" | "club";
+  /** The club's name, when the scope is a club. */
   scopeName: string;
-  /** True when nobody else has as many. */
   outright: boolean;
-  /** How many share the top, when it is shared. */
   sharedWith: number;
 };
 
 /**
- * What this player leads, if anything.
+ * What a player leads, if anything.
  *
- * Counted across everything on record rather than one season, because a
- * player wants to know where they stand, not where they stood. Ties are
- * reported as ties: telling somebody they lead outright when three others
- * have the same number is the kind of small lie that gets noticed.
+ * A club standing follows the club the events were recorded against, not
+ * where the player is registered today: somebody can be the leading try
+ * scorer for Panthers years after leaving them, and that is exactly the
+ * thing worth saying.
  *
- * Reads every event once and counts in memory. At a few thousand rows that
- * is far cheaper than asking the database eight questions twice.
+ * Ties are reported as ties. Telling somebody they lead outright when three
+ * others match them is the kind of small lie that gets noticed.
+ *
+ * Every event is read once and counted in memory — far cheaper at a few
+ * thousand rows than asking the database a question per statistic per club.
  */
-export async function standingsFor(
-  playerId: string,
-  teamId: string | null
-): Promise<Standing[]> {
+export async function standingsFor(playerId: string): Promise<Standing[]> {
   const supabase = createAdminClient();
 
-  const [{ data: events }, { data: players }] = await Promise.all([
-    supabase.from("match_events").select("player_id, event_type").limit(20000),
-    supabase.from("players").select("player_id, team_id").limit(2000),
+  const [{ data: events }, { data: teams }] = await Promise.all([
+    supabase.from("match_events").select("player_id, team_id, event_type").limit(20000),
+    supabase.from("teams").select("team_id, name"),
   ]);
 
-  const teamOf = new Map(
-    ((players ?? []) as any[]).map((p) => [p.player_id, p.team_id])
+  const teamName = new Map(
+    ((teams ?? []) as any[]).map((t) => [t.team_id, t.name])
   );
 
-  // event type -> player -> count
-  const counts = new Map<string, Map<string, number>>();
+  // type -> player -> count, all time
+  const overall = new Map<string, Map<string, number>>();
+  // type -> team -> player -> count
+  const perClub = new Map<string, Map<string, Map<string, number>>>();
+
   for (const e of ((events ?? []) as any[])) {
     if (!e.player_id) continue;
     const t = normaliseType(e.event_type);
-    if (!counts.has(t)) counts.set(t, new Map());
-    const m = counts.get(t)!;
-    m.set(e.player_id, (m.get(e.player_id) ?? 0) + 1);
+
+    if (!overall.has(t)) overall.set(t, new Map());
+    const o = overall.get(t)!;
+    o.set(e.player_id, (o.get(e.player_id) ?? 0) + 1);
+
+    if (!e.team_id) continue;
+    if (!perClub.has(t)) perClub.set(t, new Map());
+    const byTeam = perClub.get(t)!;
+    if (!byTeam.has(e.team_id)) byTeam.set(e.team_id, new Map());
+    const c = byTeam.get(e.team_id)!;
+    c.set(e.player_id, (c.get(e.player_id) ?? 0) + 1);
   }
 
-  const { data: team } = teamId
-    ? await supabase.from("teams").select("name").eq("team_id", teamId).maybeSingle()
-    : { data: null };
-  const clubName = (team as any)?.name ?? "your club";
+  /** Whether this player tops a tally, and by how much company. */
+  const topOf = (tally: Map<string, number>) => {
+    const mine = tally.get(playerId) ?? 0;
+    if (mine === 0) return null;
+    let best = 0;
+    let holders = 0;
+    for (const n of Array.from(tally.values())) {
+      if (n > best) {
+        best = n;
+        holders = 1;
+      } else if (n === best) {
+        holders += 1;
+      }
+    }
+    if (mine < best) return null;
+    return { count: mine, outright: holders === 1, sharedWith: holders - 1 };
+  };
 
   const found: Standing[] = [];
 
   for (const t of TRACKED) {
-    const m = counts.get(t.type);
-    const mine = m?.get(playerId) ?? 0;
-    if (!m || mine === 0) continue;
+    const all = overall.get(t.type);
+    if (!all) continue;
 
-    const consider = (scope: "club" | "federation", scopeName: string) => {
-      let best = 0;
-      let holders = 0;
-      for (const [pid, n] of Array.from(m)) {
-        if (scope === "club" && teamOf.get(pid) !== teamId) continue;
-        if (n > best) {
-          best = n;
-          holders = 1;
-        } else if (n === best) {
-          holders += 1;
-        }
-      }
-      if (mine < best) return;
+    const top = topOf(all);
+    if (top) {
       found.push({
-        title: `leading ${t.noun}`,
-        count: mine,
-        scope,
-        scopeName,
-        outright: holders === 1,
-        sharedWith: holders - 1,
+        title: `top ${t.noun}`,
+        scope: "all_time",
+        scopeName: "",
+        ...top,
       });
-    };
+      // Leading everybody already covers leading any one club.
+      continue;
+    }
 
-    // Federation first: leading everybody says more than leading a club, and
-    // saying both about the same stat is repeating yourself.
-    const before = found.length;
-    consider("federation", "the federation");
-    if (found.length === before && teamId) consider("club", clubName);
+    // Otherwise, every club they top — including ones they have left.
+    for (const [teamId, tally] of Array.from(perClub.get(t.type) ?? [])) {
+      const clubTop = topOf(tally);
+      if (!clubTop) continue;
+      found.push({
+        title: `top ${t.noun}`,
+        scope: "club",
+        scopeName: teamName.get(teamId) ?? "their club",
+        ...clubTop,
+      });
+    }
   }
 
-  // The rarest thing first — topping the federation beats topping a club,
-  // and a bigger number beats a smaller one.
+  // All-time first, then the biggest numbers.
   return found.sort((a, b) => {
-    if (a.scope !== b.scope) return a.scope === "federation" ? -1 : 1;
+    if (a.scope !== b.scope) return a.scope === "all_time" ? -1 : 1;
     return b.count - a.count;
   });
+}
+
+/** "top try scorer of all time" / "top try scorer for Panthers". */
+export function describeStanding(s: Standing): string {
+  const lead = s.outright ? "" : "joint ";
+  return s.scope === "all_time"
+    ? `${lead}${s.title} of all time`
+    : `${lead}${s.title} for ${s.scopeName}`;
 }

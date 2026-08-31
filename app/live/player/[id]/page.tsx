@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { remaining, type Contract } from "@/lib/contracts";
+import { standingsFor, describeStanding } from "@/lib/leaders";
 import { Avatar } from "@/components/Avatar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -98,7 +99,7 @@ export default async function PublicPlayerPage({
     // nobody has answered never shows up here.
     supabase
       .from("contracts")
-      .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at")
+      .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at, team:team_id(name)")
       .eq("player_id", playerId)
       .eq("status", "accepted"),
   ]);
@@ -110,7 +111,15 @@ export default async function PublicPlayerPage({
   );
   // What is left to run, where there is a contract at all. A profile that
   // says nothing is a player out of contract, which is worth knowing.
-  const contract = remaining((((contracts ?? []) as any[])[0] ?? null) as Contract);
+  const contractRow = ((contracts ?? []) as any[])[0] ?? null;
+  const contract = remaining(contractRow as Contract);
+  const contractClub = contractRow
+    ? (Array.isArray(contractRow.team) ? contractRow.team[0] : contractRow.team)?.name
+    : null;
+
+  // What this player tops, anywhere. A club standing follows the club the
+  // events belong to, so leaving Panthers does not take their record with it.
+  const standings = await standingsFor(playerId);
 
   const team = (teams ?? []).find(
     (t: any) => t.team_id === (player as any).team_id
@@ -236,7 +245,8 @@ export default async function PublicPlayerPage({
             </p>
             {contract && (
               <p className="text-ghanaYellow-500 text-xs mt-1.5">
-                Under contract · {contract.label} to run, to {contract.endsOn}
+                {contract.label} left on contract
+                {contractClub ? ` with ${contractClub}` : ""}
               </p>
             )}
             <p className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
@@ -245,12 +255,47 @@ export default async function PublicPlayerPage({
               {p.weight_kg && <span>{p.weight_kg} kg</span>}
               {p.nationality && <span>{p.nationality}</span>}
               {p.playing_status && (
-                <span className="capitalize">{p.playing_status}</span>
+                <span
+                  className="inline-flex items-center gap-1.5"
+                  title={p.playing_status === "active" ? "Active" : "Not active"}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">{p.playing_status}</span>
+                </span>
               )}
             </p>
           </div>
         </div>
       </div>
+
+      {standings.length > 0 && (
+        <div className="grid gap-2 mb-6">
+          {standings.slice(0, 3).map((st, i) => (
+            <div
+              key={i}
+              className={`rounded-lg px-4 py-3 border ${
+                st.scope === "all_time"
+                  ? "bg-ghanaYellow-500/10 border-ghanaYellow-500/40"
+                  : "bg-neutral-900 border-white/10"
+              }`}
+            >
+              <p className="font-display text-base md:text-lg capitalize">
+                {describeStanding(st)}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {st.count} on record
+                {!st.outright &&
+                  ` · shared with ${st.sharedWith} other${st.sharedWith === 1 ? "" : "s"}`}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Headline numbers */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
