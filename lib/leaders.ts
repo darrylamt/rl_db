@@ -104,19 +104,29 @@ export async function standingsFor(playerId: string): Promise<Standing[]> {
         scopeName: "",
         ...top,
       });
-      // Leading everybody already covers leading any one club.
-      continue;
     }
 
-    // Otherwise, every club they top — including ones they have left.
+    // The club standing is its own fact and is kept even when they top the
+    // federation too: leading everybody is about a career, leading a club is
+    // about that club, and one does not follow from the other — the record
+    // at a club they have left is often the more interesting of the two.
+    //
+    // Only their strongest club per statistic, though. Somebody who tops
+    // three clubs at conversions does not need three lines saying so.
+    let best: { teamId: string; count: number; outright: boolean; sharedWith: number } | null = null;
     for (const [teamId, tally] of Array.from(perClub.get(t.type) ?? [])) {
       const clubTop = topOf(tally);
       if (!clubTop) continue;
+      if (!best || clubTop.count > best.count) best = { teamId, ...clubTop };
+    }
+    if (best) {
       found.push({
         title: `top ${t.noun}`,
         scope: "club",
-        scopeName: teamName.get(teamId) ?? "their club",
-        ...clubTop,
+        scopeName: teamName.get(best.teamId) ?? "their club",
+        count: best.count,
+        outright: best.outright,
+        sharedWith: best.sharedWith,
       });
     }
   }

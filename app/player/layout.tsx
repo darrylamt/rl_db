@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/Avatar";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +22,6 @@ export default async function PlayerLayout({
   if (user.onHold) redirect("/admin/on-hold");
   if (user.role !== "player" || !user.playerId) redirect("/admin/dashboard");
 
-  const supabase = createAdminClient();
-  const { data: player } = await supabase
-    .from("players")
-    .select("first_name, last_name, photo_url, position, team:team_id(name)")
-    .eq("player_id", user.playerId)
-    .maybeSingle();
-
-  const p = player as any;
-  const name = `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "Player";
-
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Ghana flag strip, as on the live pages */}
@@ -42,14 +31,27 @@ export default async function PlayerLayout({
         <div className="flex-1 bg-ghanaGreen-500" />
       </div>
       <header className="bg-neutral-950 border-b border-white/10">
+        {/* The federation's mark, not the player's. Their name and photo lead
+            the page itself, and saying both twice on one screen wastes the
+            room a phone does not have. */}
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Avatar src={p?.photo_url} name={name} size={38} />
-          <div className="min-w-0 flex-1">
-            <p className="font-display font-bold leading-tight truncate">{name}</p>
-            <p className="text-[11px] text-slate-400 truncate">
-              {[p?.team?.name, p?.position].filter(Boolean).join(" · ") || "Player"}
-            </p>
-          </div>
+          <Link href="/player" className="flex items-center gap-2.5 min-w-0 flex-1">
+            <Image
+              src="/federationlogo.png"
+              alt=""
+              width={32}
+              height={32}
+              className="rounded shrink-0"
+            />
+            <span className="min-w-0">
+              <span className="block font-display text-ghanaYellow-500 text-sm tracking-widest leading-none">
+                RLFG
+              </span>
+              <span className="block text-slate-400 text-[11px] leading-tight mt-0.5 truncate">
+                Player Account
+              </span>
+            </span>
+          </Link>
           <form action="/admin/logout" method="post">
             <button className="text-slate-400 hover:text-white text-xs border border-white/15 rounded px-2.5 py-1">
               Sign out

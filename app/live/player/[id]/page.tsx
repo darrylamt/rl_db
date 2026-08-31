@@ -270,7 +270,7 @@ export default async function PublicPlayerPage({
 
       {standings.length > 0 && (
         <div className="grid gap-2 mb-6">
-          {standings.slice(0, 3).map((st, i) => (
+          {standings.slice(0, 4).map((st, i) => (
             <div
               key={i}
               className={`rounded-lg px-4 py-3 border ${
