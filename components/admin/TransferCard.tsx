@@ -6,6 +6,8 @@ import { Avatar } from "@/components/Avatar";
 const WORDS: Record<string, string> = {
   with_club: "Waiting on the club",
   rejected: "Turned down",
+  with_player: "With the player",
+  player_declined: "Player said no",
   with_federation: "To sign off",
   approved: "Done",
   declined: "Refused",
@@ -15,6 +17,8 @@ const WORDS: Record<string, string> = {
 const TONE: Record<string, string> = {
   with_club: "bg-amber-100 text-amber-800",
   rejected: "bg-red-100 text-red-800",
+  with_player: "bg-violet-100 text-violet-800",
+  player_declined: "bg-red-100 text-red-800",
   with_federation: "bg-sky-100 text-sky-800",
   approved: "bg-emerald-100 text-emerald-800",
   declined: "bg-red-100 text-red-800",

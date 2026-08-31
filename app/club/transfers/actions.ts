@@ -84,7 +84,9 @@ export async function requestPlayer(fd: FormData) {
       loan_until: kind === "loan" ? loanUntil : null,
       message,
       requested_by: user?.userId ?? null,
-      status: free ? "with_federation" : "with_club",
+      // Nobody holds a free agent, so there is no club to agree — but the
+      // player still has to want to come.
+      status: free ? "with_player" : "with_club",
       club_answered_at: free ? new Date().toISOString() : null,
       club_note: free ? "No club to answer — the player is a free agent." : null,
     });
@@ -93,7 +95,7 @@ export async function requestPlayer(fd: FormData) {
     const name = `${(player as any).first_name ?? ""} ${(player as any).last_name ?? ""}`.trim();
     outcome = {
       note: free
-        ? `${name} has no club, so this goes straight to the federation to sign off.`
+        ? `${name} has no club, so it goes straight to them to accept.`
         : `Asked ${(player as any).team?.name ?? "their club"} about ${name}. They answer next.`,
     };
   } catch (e: any) {
@@ -167,7 +169,10 @@ export async function answerRequest(
     const { error } = await supabase
       .from("transfer_requests")
       .update({
-        status: accept ? "with_federation" : "rejected",
+        // Agreeing hands it to the player, not to the federation. Two clubs
+        // settling a move between them is not a transfer until the person
+        // being moved has said yes.
+        status: accept ? "with_player" : "rejected",
         club_answered_by: user?.userId ?? null,
         club_answered_at: new Date().toISOString(),
         club_note: note,
@@ -178,11 +183,67 @@ export async function answerRequest(
       ? { error: describe(error.message) }
       : {
           note: accept
-            ? `Agreed. ${name} does not move until the federation signs it off.`
+            ? `Agreed. It is ${name}'s decision now, and then the federation's.`
             : `Turned down the approach for ${name}.`,
         };
   }
 
   revalidatePath(PAGE);
   back(outcome, "received");
+}
+
+/**
+ * Answers a player who has asked to leave.
+ *
+ * Agreeing does not move them anywhere — it says the club will listen to
+ * offers, which is what a transfer request means. The move itself still
+ * needs a club to ask, this club to agree, the player to agree and the
+ * federation to sign it off.
+ */
+export async function answerMoveRequest(
+  requestId: string,
+  accept: boolean,
+  fd: FormData
+) {
+  const { teamId } = await requireClub();
+  const supabase = createAdminClient();
+  const note = ((fd.get("note") as string) ?? "").trim() || null;
+
+  const { data: r } = await supabase
+    .from("player_transfer_requests")
+    .select("request_id, team_id, status, player:player_id(first_name, last_name)")
+    .eq("request_id", requestId)
+    .maybeSingle();
+
+  let outcome: Outcome;
+  if (!r || (r as any).team_id !== teamId) {
+    outcome = { error: "That request is not about one of your players." };
+  } else if ((r as any).status !== "pending") {
+    outcome = { error: "You have already answered that one." };
+  } else {
+    const p = (r as any).player;
+    const person = Array.isArray(p) ? p[0] : p;
+    const name = `${person?.first_name ?? ""} ${person?.last_name ?? ""}`.trim() || "The player";
+
+    const { error } = await supabase
+      .from("player_transfer_requests")
+      .update({
+        status: accept ? "accepted" : "rejected",
+        club_note: note,
+        answered_at: new Date().toISOString(),
+      })
+      .eq("request_id", requestId);
+
+    outcome = error
+      ? { error: describe(error.message) }
+      : {
+          note: accept
+            ? `You have told ${name} you will listen to offers.`
+            : `You have turned down ${name}'s request.`,
+        };
+  }
+
+  revalidatePath(PAGE);
+  revalidatePath("/player/transfers");
+  back(outcome, "requests");
 }

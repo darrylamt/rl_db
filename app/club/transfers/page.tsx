@@ -4,13 +4,20 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { TransferMarket } from "@/components/club/TransferMarket";
 import { getTransferWindow } from "@/lib/transferWindow";
 import { remaining, type Contract } from "@/lib/contracts";
-import { requestPlayer, withdrawRequest, answerRequest } from "./actions";
+import {
+  requestPlayer,
+  withdrawRequest,
+  answerRequest,
+  answerMoveRequest,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const WORDS: Record<string, string> = {
   with_club: "Waiting on them",
   rejected: "Turned down",
+  with_player: "With the player",
+  player_declined: "Player said no",
   with_federation: "With the federation",
   approved: "Done",
   declined: "Refused",
@@ -20,6 +27,8 @@ const WORDS: Record<string, string> = {
 const TONE: Record<string, string> = {
   with_club: "bg-amber-100 text-amber-800",
   rejected: "bg-red-100 text-red-800",
+  with_player: "bg-violet-100 text-violet-800",
+  player_declined: "bg-red-100 text-red-800",
   with_federation: "bg-sky-100 text-sky-800",
   approved: "bg-emerald-100 text-emerald-800",
   declined: "bg-red-100 text-red-800",
@@ -44,37 +53,63 @@ export default async function ClubTransfersPage({
   const tab = searchParams?.tab ?? "market";
   const market = await getTransferWindow();
 
-  const [{ data: teams }, { data: players }, { data: sent, error }, { data: received }, { data: liveContracts }] =
-    await Promise.all([
-      supabase
-        .from("teams")
-        .select("team_id, name, logo_url")
-        .eq("team_type", "club")
-        // Retired clubs are not somewhere new things can be filed.
-        .neq("is_public", false)
-        .neq("team_id", teamId)
-        .order("name"),
-      // or(...) rather than neq: a player with no club has a null team_id,
-      // and "team_id <> ours" is null for them — so neq alone quietly hides
-      // every free agent.
-      supabase
-        .from("players")
-        .select("player_id, first_name, last_name, position, photo_url, category, team_id")
-        .or(`team_id.is.null,team_id.neq.${teamId}`)
-        .eq("playing_status", "active")
-        .eq("approval_status", "approved")
-        .order("last_name")
-        .limit(1000),
-      supabase.from("transfer_requests").select(SELECT).eq("to_team_id", teamId).order("requested_at", { ascending: false }),
-      supabase.from("transfer_requests").select(SELECT).eq("from_team_id", teamId).order("requested_at", { ascending: false }),
-      // What each player is tied up for. A player with two years to run is a
-      // different proposition from one out of contract in a month, and the
-      // list is unreadable without it.
-      supabase
-        .from("contracts")
-        .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at")
-        .eq("status", "accepted"),
-    ]);
+  const [
+    { data: teams },
+    { data: players },
+    { data: sent, error },
+    { data: received },
+    { data: liveContracts },
+    { data: moveRequests },
+  ] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("team_id, name, logo_url")
+      .eq("team_type", "club")
+      // Retired clubs are not somewhere new things can be filed.
+      .neq("is_public", false)
+      .neq("team_id", teamId)
+      .order("name"),
+    // or(...) rather than neq: a player with no club has a null team_id,
+    // and "team_id <> ours" is null for them — so neq alone quietly hides
+    // every free agent.
+    supabase
+      .from("players")
+      .select(
+        "player_id, first_name, last_name, position, photo_url, category, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking",
+      )
+      .or(`team_id.is.null,team_id.neq.${teamId}`)
+      .eq("playing_status", "active")
+      .eq("approval_status", "approved")
+      .order("last_name")
+      .limit(1000),
+    supabase
+      .from("transfer_requests")
+      .select(SELECT)
+      .eq("to_team_id", teamId)
+      .order("requested_at", { ascending: false }),
+    supabase
+      .from("transfer_requests")
+      .select(SELECT)
+      .eq("from_team_id", teamId)
+      .order("requested_at", { ascending: false }),
+    // What each player is tied up for. A player with two years to run is a
+    // different proposition from one out of contract in a month, and the
+    // list is unreadable without it.
+    supabase
+      .from("contracts")
+      .select(
+        "contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at",
+      )
+      .eq("status", "accepted"),
+    // Players of this club who have asked to leave.
+    supabase
+      .from("player_transfer_requests")
+      .select(
+        "request_id, status, reason, created_at, player:player_id(player_id, first_name, last_name, photo_url, position)",
+      )
+      .eq("team_id", teamId)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const outgoing = (sent ?? []) as any[];
   const incoming = (received ?? []) as any[];
@@ -83,17 +118,28 @@ export default async function ClubTransfersPage({
 
   // player_id -> "1 year 4 months"
   const contractLeft: Record<string, string> = {};
-  for (const c of ((liveContracts ?? []) as any[])) {
+  for (const c of (liveContracts ?? []) as any[]) {
     const left = remaining(c as Contract);
     if (left) contractLeft[c.player_id] = left.label;
   }
+
+  const asks = (moveRequests ?? []) as any[];
+  const openAsks = asks.filter((r) => r.status === "pending");
 
   const openFor = outgoing
     .filter((r) => r.status === "with_club" || r.status === "with_federation")
     .map((r) => (Array.isArray(r.player) ? r.player[0] : r.player)?.player_id)
     .filter(Boolean);
 
-  const Tab = ({ id, label, count }: { id: string; label: string; count?: number }) => (
+  const Tab = ({
+    id,
+    label,
+    count,
+  }: {
+    id: string;
+    label: string;
+    count?: number;
+  }) => (
     <Link
       href={`/club/transfers?tab=${id}`}
       className={`px-3 py-2 text-sm border-b-2 -mb-px whitespace-nowrap ${
@@ -125,13 +171,19 @@ export default async function ClubTransfersPage({
               : `to ${r.to_team?.name ?? "them"}`}
           </p>
           {r.message && (
-            <p className="text-xs text-slate-600 mt-1.5 italic">“{r.message}”</p>
+            <p className="text-xs text-slate-600 mt-1.5 italic">
+              “{r.message}”
+            </p>
           )}
           {r.club_note && (
-            <p className="text-xs text-slate-600 mt-1">Their reply: {r.club_note}</p>
+            <p className="text-xs text-slate-600 mt-1">
+              Their reply: {r.club_note}
+            </p>
           )}
           {r.review_note && (
-            <p className="text-xs text-red-700 mt-1">Federation: {r.review_note}</p>
+            <p className="text-xs text-red-700 mt-1">
+              Federation: {r.review_note}
+            </p>
           )}
         </div>
         <span
@@ -144,7 +196,10 @@ export default async function ClubTransfersPage({
       </div>
 
       {mine && r.status === "with_club" && (
-        <form action={withdrawRequest.bind(null, r.request_id)} className="mt-3 flex justify-end">
+        <form
+          action={withdrawRequest.bind(null, r.request_id)}
+          className="mt-3 flex justify-end"
+        >
           <button className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50">
             Withdraw
           </button>
@@ -160,12 +215,18 @@ export default async function ClubTransfersPage({
             className="px-2 py-1.5 rounded border border-slate-300 text-xs"
           />
           <div className="flex gap-2 justify-end">
-            <form id={`reject-${r.request_id}`} action={answerRequest.bind(null, r.request_id, false)}>
+            <form
+              id={`reject-${r.request_id}`}
+              action={answerRequest.bind(null, r.request_id, false)}
+            >
               <button className="text-xs px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50">
                 Turn down
               </button>
             </form>
-            <form id={`answer-${r.request_id}`} action={answerRequest.bind(null, r.request_id, true)}>
+            <form
+              id={`answer-${r.request_id}`}
+              action={answerRequest.bind(null, r.request_id, true)}
+            >
               <button className="text-xs font-medium px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
                 Agree to it
               </button>
@@ -179,10 +240,12 @@ export default async function ClubTransfersPage({
   return (
     <div>
       <div className="mb-4">
-        <h1 className="font-display text-2xl font-bold text-navy-900">Transfers</h1>
+        <h1 className="font-display text-2xl font-bold text-navy-900">
+          Transfers
+        </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Ask another club about a player. They answer, and the federation
-          signs off anything they agree to — nobody moves before that.
+          Ask another club about a player. They answer, and the federation signs
+          off anything they agree to — nobody moves before that.
         </p>
         <p className="text-xs mt-1.5">
           <span
@@ -193,7 +256,9 @@ export default async function ClubTransfersPage({
           <span className={market.open ? "text-emerald-800" : "text-red-800"}>
             {market.open ? "Market open" : "Market closed"}
           </span>
-          {market.reason && <span className="text-slate-500"> — {market.reason}</span>}
+          {market.reason && (
+            <span className="text-slate-500"> — {market.reason}</span>
+          )}
         </p>
       </div>
 
@@ -210,8 +275,8 @@ export default async function ClubTransfersPage({
 
       {notMigrated ? (
         <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2.5 rounded">
-          Run <code className="font-mono">supabase/transfer_requests.sql</code> to
-          turn this on.
+          Run <code className="font-mono">supabase/transfer_requests.sql</code>{" "}
+          to turn this on.
         </div>
       ) : (
         <>
@@ -219,6 +284,7 @@ export default async function ClubTransfersPage({
             <Tab id="market" label="Find a player" />
             <Tab id="received" label="Asked of you" count={waiting} />
             <Tab id="sent" label="Your enquiries" />
+            <Tab id="requests" label="Asked to leave" count={openAsks.length} />
           </div>
 
           {tab === "market" && !market.open && (
@@ -252,7 +318,107 @@ export default async function ClubTransfersPage({
                   No club has asked about your players.
                 </div>
               ) : (
-                incoming.map((r) => <Card key={r.request_id} r={r} mine={false} />)
+                incoming.map((r) => (
+                  <Card key={r.request_id} r={r} mine={false} />
+                ))
+              )}
+            </div>
+          )}
+
+          {tab === "requests" && (
+            <div className="grid gap-3">
+              {asks.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
+                  None of your players has asked for a move.
+                </div>
+              ) : (
+                asks.map((r) => {
+                  const pl = Array.isArray(r.player) ? r.player[0] : r.player;
+                  const who =
+                    `${pl?.first_name ?? ""} ${pl?.last_name ?? ""}`.trim() ||
+                    "A player";
+                  return (
+                    <div
+                      key={r.request_id}
+                      className="bg-white border border-slate-200 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-navy-900 break-words">
+                            {who}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            asked on {String(r.created_at).slice(0, 10)}
+                            {pl?.position ? ` · ${pl.position}` : ""}
+                          </p>
+                          {r.reason && (
+                            <p className="text-sm text-slate-600 mt-1.5 italic break-words">
+                              “{r.reason}”
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
+                            r.status === "pending"
+                              ? "bg-amber-100 text-amber-800"
+                              : r.status === "accepted"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {r.status === "pending"
+                            ? "Waiting on you"
+                            : r.status === "accepted"
+                              ? "You agreed"
+                              : r.status === "rejected"
+                                ? "You said no"
+                                : "Withdrawn"}
+                        </span>
+                      </div>
+
+                      {r.status === "pending" && (
+                        <div className="mt-3 grid gap-2">
+                          <input
+                            form={`ask-yes-${r.request_id}`}
+                            name="note"
+                            placeholder="A word back — optional"
+                            className="px-2 py-1.5 rounded border border-slate-300 text-xs"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <form
+                              action={answerMoveRequest.bind(
+                                null,
+                                r.request_id,
+                                false,
+                              )}
+                            >
+                              <button className="text-xs px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50">
+                                Turn it down
+                              </button>
+                            </form>
+                            <form
+                              id={`ask-yes-${r.request_id}`}
+                              action={answerMoveRequest.bind(
+                                null,
+                                r.request_id,
+                                true,
+                              )}
+                            >
+                              <button className="text-xs font-medium px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
+                                Willing to listen
+                              </button>
+                            </form>
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            Agreeing does not move them. It says you will listen
+                            to offers — a club still has to ask, and the player
+                            and the federation still have to agree.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -264,7 +430,9 @@ export default async function ClubTransfersPage({
                   You have not asked about anybody yet.
                 </div>
               ) : (
-                outgoing.map((r) => <Card key={r.request_id} r={r} mine={true} />)
+                outgoing.map((r) => (
+                  <Card key={r.request_id} r={r} mine={true} />
+                ))
               )}
             </div>
           )}
