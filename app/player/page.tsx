@@ -9,10 +9,16 @@ import {
   hasAttributes,
   attributeAverage,
 } from "@/lib/attributes";
-import { remaining, monthsBetween, describeLength, type Contract } from "@/lib/contracts";
+import {
+  remaining,
+  monthsBetween,
+  describeLength,
+  type Contract,
+} from "@/lib/contracts";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 import { standingsFor, describeStanding } from "@/lib/leaders";
-import { answerContract } from "./actions";
+import { answerContract, counterContract } from "./actions";
+import { contractDocumentUrl } from "@/lib/contractDocument";
 
 export const dynamic = "force-dynamic";
 
@@ -66,32 +72,56 @@ export default async function PlayerHomePage({
   const { playerId } = await requirePlayer();
   const supabase = createAdminClient();
 
-  const [{ data: player }, { data: contracts }, { data: events }, { data: lineups }, { data: ratings }] =
-    await Promise.all([
-      supabase
-        .from("players")
-        .select(
-          "player_id, first_name, last_name, position, jersey_number, date_of_birth, height_cm, weight_kg, nationality, playing_status, photo_url, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking, team:team_id(name)"
-        )
-        .eq("player_id", playerId)
-        .maybeSingle(),
-      supabase
-        .from("contracts")
-        .select(
-          "contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at, team:team_id(name)"
-        )
-        .eq("player_id", playerId)
-        .order("offered_at", { ascending: false }),
-      supabase.from("match_events").select("event_type, fixture_id").eq("player_id", playerId),
-      supabase.from("match_lineups").select("fixture_id").eq("player_id", playerId),
-      supabase.from("match_player_ratings").select("rating").eq("player_id", playerId),
-    ]);
+  const [
+    { data: player },
+    { data: contracts },
+    { data: events },
+    { data: lineups },
+    { data: ratings },
+  ] = await Promise.all([
+    supabase
+      .from("players")
+      .select(
+        "player_id, first_name, last_name, position, jersey_number, date_of_birth, height_cm, weight_kg, nationality, playing_status, photo_url, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking, team:team_id(name)",
+      )
+      .eq("player_id", playerId)
+      .maybeSingle(),
+    supabase
+      .from("contracts")
+      .select(
+        "contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at, document_path, document_name, document_size, team:team_id(name)",
+      )
+      .eq("player_id", playerId)
+      .order("offered_at", { ascending: false }),
+    supabase
+      .from("match_events")
+      .select("event_type, fixture_id")
+      .eq("player_id", playerId),
+    supabase
+      .from("match_lineups")
+      .select("fixture_id")
+      .eq("player_id", playerId),
+    supabase
+      .from("match_player_ratings")
+      .select("rating")
+      .eq("player_id", playerId),
+  ]);
 
   const p = player as any;
   const standings = await standingsFor(playerId);
 
   const all = (contracts ?? []) as any[];
   const offers = all.filter((c) => c.status === "offered");
+  const awaitingClub = all.filter((c) => c.status === "countered");
+
+  // A link that expires, per offer, rather than a public URL anybody who
+  // ever saw it could keep reading.
+  const docFor = new Map<string, string>();
+  for (const c of offers) {
+    if (!c.document_path) continue;
+    const url = await contractDocumentUrl(c.document_path);
+    if (url) docFor.set(c.contract_id, url);
+  }
   const live = all.find((c) => c.status === "accepted") ?? null;
   const left = remaining(live as Contract);
   const liveClub = live
@@ -110,8 +140,10 @@ export default async function PlayerHomePage({
   // Sheets only exist from 2024, so counting them alone loses every earlier
   // season — 22 of Darryl's 35 matches, for one.
   const played = new Set<string>();
-  for (const l of (lineups ?? []) as any[]) if (l.fixture_id) played.add(l.fixture_id);
-  for (const e of (events ?? []) as any[]) if (e.fixture_id) played.add(e.fixture_id);
+  for (const l of (lineups ?? []) as any[])
+    if (l.fixture_id) played.add(l.fixture_id);
+  for (const e of (events ?? []) as any[])
+    if (e.fixture_id) played.add(e.fixture_id);
   const appearances = played.size;
   const marks = ((ratings ?? []) as any[])
     .map((r) => Number(r.rating))
@@ -120,7 +152,8 @@ export default async function PlayerHomePage({
     ? (marks.reduce((a, b) => a + b, 0) / marks.length).toFixed(1)
     : "—";
 
-  const name = `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "Player";
+  const name =
+    `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "Player";
   const teamName = (Array.isArray(p?.team) ? p.team[0] : p?.team)?.name;
   const overall = attributeAverage(p);
 
@@ -147,23 +180,30 @@ export default async function PlayerHomePage({
               {p?.playing_status && (
                 <span
                   className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
-                    p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
+                    p.playing_status === "active"
+                      ? "bg-emerald-500"
+                      : "bg-red-500"
                   }`}
-                  title={p.playing_status === "active" ? "Active" : "Not active"}
+                  title={
+                    p.playing_status === "active" ? "Active" : "Not active"
+                  }
                 />
               )}
               <span className="sr-only">{p?.playing_status}</span>
             </h1>
             <p className="text-slate-300 text-sm mt-1">
               {teamName ?? "No club"}
-              {p?.position && <span className="text-slate-500"> · {p.position}</span>}
+              {p?.position && (
+                <span className="text-slate-500"> · {p.position}</span>
+              )}
               {p?.jersey_number != null && (
                 <span className="text-slate-500"> · #{p.jersey_number}</span>
               )}
             </p>
             {left && (
               <p className="text-ghanaYellow-500 text-xs mt-1.5">
-                {left.label} left on contract{liveClub ? ` with ${liveClub}` : ""}
+                {left.label} left on contract
+                {liveClub ? ` with ${liveClub}` : ""}
               </p>
             )}
             <p className="text-slate-500 text-xs mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -171,14 +211,14 @@ export default async function PlayerHomePage({
                 <span>
                   Age{" "}
                   {Math.floor(
-                    (Date.now() - new Date(p.date_of_birth).getTime()) / 31557600000
+                    (Date.now() - new Date(p.date_of_birth).getTime()) /
+                      31557600000,
                   )}
                 </span>
               )}
               {p?.height_cm && <span>{p.height_cm} cm</span>}
               {p?.weight_kg && <span>{p.weight_kg} kg</span>}
               {p?.nationality && <span>{p.nationality}</span>}
-
             </p>
           </div>
         </div>
@@ -225,14 +265,72 @@ export default async function PlayerHomePage({
                 >
                   <p className="font-display text-lg">{club}</p>
                   <p className="text-sm text-slate-400 mt-0.5">
-                    {describeLength(monthsBetween(c.starts_on, c.ends_on))} · from{" "}
-                    {c.starts_on}
+                    {describeLength(monthsBetween(c.starts_on, c.ends_on))} ·
+                    from {c.starts_on}
                   </p>
                   {c.terms && (
-                    <p className="text-sm text-slate-300 mt-2 break-words">{c.terms}</p>
+                    <p className="text-sm text-slate-300 mt-2 break-words">
+                      {c.terms}
+                    </p>
                   )}
+                  {c.document_name && (
+                    <p className="text-sm mt-2">
+                      {docFor.get(c.contract_id) ? (
+                        <a
+                          href={docFor.get(c.contract_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-ghanaYellow-500 hover:underline"
+                        >
+                          Read the contract ({c.document_name}) →
+                        </a>
+                      ) : (
+                        <span className="text-slate-500">
+                          {c.document_name} is attached but could not be opened.
+                        </span>
+                      )}
+                    </p>
+                  )}
+
+                  {/* Countering keeps the offer alive; refusing ends it. */}
+                  <form
+                    action={counterContract.bind(null, c.contract_id)}
+                    className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto] items-end bg-neutral-950 border border-white/10 rounded p-3"
+                  >
+                    <label className="text-[11px] text-slate-400">
+                      <span className="block mb-0.5">You would start</span>
+                      <input
+                        type="date"
+                        name="starts_on"
+                        required
+                        defaultValue={c.starts_on}
+                        className="w-full px-2 py-1.5 rounded bg-neutral-900 border border-white/15 text-white text-xs"
+                      />
+                    </label>
+                    <label className="text-[11px] text-slate-400">
+                      <span className="block mb-0.5">and finish</span>
+                      <input
+                        type="date"
+                        name="ends_on"
+                        required
+                        defaultValue={c.ends_on}
+                        className="w-full px-2 py-1.5 rounded bg-neutral-900 border border-white/15 text-white text-xs"
+                      />
+                    </label>
+                    <button className="text-xs px-3 py-2 rounded border border-white/20 text-slate-200 hover:border-white/50">
+                      Counter
+                    </button>
+                    <input
+                      name="note"
+                      placeholder="Why — the club sees this"
+                      className="sm:col-span-3 px-2 py-1.5 rounded bg-neutral-900 border border-white/15 text-white text-xs"
+                    />
+                  </form>
+
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <form action={answerContract.bind(null, c.contract_id, true)}>
+                    <form
+                      action={answerContract.bind(null, c.contract_id, true)}
+                    >
                       <button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded">
                         Accept
                       </button>
@@ -251,6 +349,34 @@ export default async function PlayerHomePage({
                       </button>
                     </form>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {awaitingClub.length > 0 && (
+        <section>
+          <h2 className="font-display text-xl mb-3">With the club</h2>
+          <div className="grid gap-2">
+            {awaitingClub.map((c) => {
+              const club = (Array.isArray(c.team) ? c.team[0] : c.team)?.name;
+              return (
+                <div
+                  key={c.contract_id}
+                  className="bg-neutral-900 border border-violet-700/40 rounded-lg px-4 py-3 text-sm"
+                >
+                  <p>
+                    You countered {club}:{" "}
+                    <span className="text-slate-400">
+                      {describeLength(monthsBetween(c.starts_on, c.ends_on))},{" "}
+                      {c.starts_on} to {c.ends_on}
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Waiting on them to accept or come back again.
+                  </p>
                 </div>
               );
             })}
@@ -317,7 +443,10 @@ export default async function PlayerHomePage({
       </section>
 
       <p className="text-sm">
-        <Link href="/player/availability" className="text-ghanaYellow-500 hover:underline">
+        <Link
+          href="/player/availability"
+          className="text-ghanaYellow-500 hover:underline"
+        >
           Tell your club which matches you are available for →
         </Link>
       </p>

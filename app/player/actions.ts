@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePlayer, getAppUser } from "@/lib/auth";
+import { lengthProblem } from "@/lib/contracts";
 
 type Outcome = { error: string } | { note: string };
 
@@ -38,7 +39,7 @@ export async function answerContract(
     done({ error: "That offer is not yours." });
   }
   if ((c as any).status !== "offered") {
-    done({ error: "You have already answered that one." });
+    done({ error: "That one is not waiting on you." });
   }
 
   const { error } = await supabase
@@ -145,4 +146,68 @@ export async function changePassword(fd: FormData) {
   }
 
   redirect(`/player/password?${new URLSearchParams(outcome as any)}`);
+}
+
+/**
+ * Proposes different terms.
+ *
+ * A counter is not a refusal — the offer stays alive and goes back to the
+ * club, who can take it or come back again. Refusing ends it; this keeps it
+ * going, which is what somebody who wants to stay but not on those terms
+ * actually needs.
+ */
+export async function counterContract(contractId: string, fd: FormData) {
+  const { playerId } = await requirePlayer();
+  const supabase = createAdminClient();
+
+  const starts = ((fd.get("starts_on") as string) ?? "").trim();
+  const ends = ((fd.get("ends_on") as string) ?? "").trim();
+  const note = ((fd.get("note") as string) ?? "").trim() || null;
+
+  const { data: c } = await supabase
+    .from("contracts")
+    .select("contract_id, player_id, status, team:team_id(name)")
+    .eq("contract_id", contractId)
+    .maybeSingle();
+
+  if (!c || (c as any).player_id !== playerId) {
+    done({ error: "That offer is not yours." });
+  }
+  if ((c as any).status !== "offered") {
+    done({ error: "That one is not waiting on you." });
+  }
+
+  const problem = lengthProblem(starts, ends);
+  if (problem) done({ error: problem });
+
+  const { error } = await supabase
+    .from("contracts")
+    .update({
+      status: "countered",
+      starts_on: starts,
+      ends_on: ends,
+      // The player's reasoning belongs with the version they proposed, not
+      // overwriting the terms the club wrote.
+      decline_note: null,
+    })
+    .eq("contract_id", contractId);
+
+  if (error) {
+    done({
+      error: /contracts_status_check/.test(error.message)
+        ? "Countering needs supabase/contract_negotiation.sql to be run first."
+        : error.message,
+    });
+  }
+
+  await supabase.from("contract_proposals").insert({
+    contract_id: contractId,
+    proposed_by: "player",
+    starts_on: starts,
+    ends_on: ends,
+    note,
+  });
+
+  const club = (c as any).team?.name ?? "the club";
+  done({ note: `Sent back to ${club}. They can accept your terms or come back again.` });
 }

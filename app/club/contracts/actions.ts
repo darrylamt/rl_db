@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
 import { lengthProblem, renewalProblem } from "@/lib/contracts";
+import {
+  storeContractDocument,
+  removeContractDocument,
+} from "@/lib/contractDocument";
 
 type Outcome = { error: string } | { note: string };
 
@@ -87,21 +91,58 @@ export async function offerContract(fd: FormData) {
   const renewal = renewalProblem(current as any, starts);
   if (renewal) done({ error: renewal });
 
-  const { error } = await supabase.from("contracts").insert({
-    player_id: playerId,
-    team_id: teamId,
+  const { data: made, error } = await supabase
+    .from("contracts")
+    .insert({
+      player_id: playerId,
+      team_id: teamId,
+      starts_on: starts,
+      ends_on: ends,
+      terms,
+      offered_by: user?.userId ?? null,
+    })
+    .select("contract_id")
+    .single();
+
+  const name = `${(player as any).first_name ?? ""} ${(player as any).last_name ?? ""}`.trim();
+  if (error) done({ error: describe(error.message) });
+
+  const contractId = (made as any).contract_id;
+
+  // The opening position, kept so what was agreed can be read against what
+  // was asked for.
+  await supabase.from("contract_proposals").insert({
+    contract_id: contractId,
+    proposed_by: "club",
     starts_on: starts,
     ends_on: ends,
     terms,
-    offered_by: user?.userId ?? null,
   });
 
-  const name = `${(player as any).first_name ?? ""} ${(player as any).last_name ?? ""}`.trim();
-  done(
-    error
-      ? { error: describe(error.message) }
-      : { note: `Offered to ${name}. It is theirs to accept or turn down.` }
-  );
+  // The document is optional; a failed upload must not lose the offer that
+  // has already been made.
+  const file = fd.get("document") as File | null;
+  let docNote = "";
+  if (file && file.size > 0) {
+    const stored = await storeContractDocument(contractId, file);
+    if ("error" in stored) {
+      docNote = ` The document was not attached: ${stored.error}`;
+    } else {
+      await supabase
+        .from("contracts")
+        .update({
+          document_path: stored.path,
+          document_name: stored.name,
+          document_size: stored.size,
+          document_uploaded_at: new Date().toISOString(),
+        })
+        .eq("contract_id", contractId);
+    }
+  }
+
+  done({
+    note: `Offered to ${name}. It is theirs to accept, turn down or counter.${docNote}`,
+  });
 }
 
 /** Takes back an offer the player has not answered. */
@@ -111,12 +152,12 @@ export async function withdrawOffer(contractId: string) {
 
   const { data: c } = await supabase
     .from("contracts")
-    .select("contract_id, team_id, status")
+    .select("contract_id, team_id, status, document_path")
     .eq("contract_id", contractId)
     .maybeSingle();
 
   if (!c || (c as any).team_id !== teamId) done({ error: "That is not your offer." });
-  if ((c as any).status !== "offered") {
+  if (!["offered", "countered"].includes((c as any).status)) {
     done({ error: "That offer has already been answered." });
   }
 
@@ -124,6 +165,10 @@ export async function withdrawOffer(contractId: string) {
     .from("contracts")
     .update({ status: "withdrawn", ended_at: new Date().toISOString() })
     .eq("contract_id", contractId);
+
+  // Nothing points at the document once the offer is gone, and an upload
+  // nobody can reach is a storage bill nobody decided to pay.
+  if (!error) await removeContractDocument((c as any).document_path);
 
   done(error ? { error: describe(error.message) } : { note: "Offer withdrawn." });
 }
@@ -162,5 +207,116 @@ export async function terminateContract(contractId: string, fd: FormData) {
 
   done(
     error ? { error: describe(error.message) } : { note: "Contract ended and recorded." }
+  );
+}
+
+/**
+ * Answers a player's counter.
+ *
+ * Accepting takes the player's terms as they stand — they proposed them, so
+ * there is nothing left to agree. Countering puts the club's version back on
+ * the table and hands it over again.
+ */
+export async function answerCounter(
+  contractId: string,
+  accept: boolean,
+  fd: FormData
+) {
+  const { teamId } = await requireClub();
+  const supabase = createAdminClient();
+
+  const { data: c } = await supabase
+    .from("contracts")
+    .select("contract_id, team_id, status, starts_on, ends_on, player:player_id(first_name, last_name)")
+    .eq("contract_id", contractId)
+    .maybeSingle();
+
+  if (!c || (c as any).team_id !== teamId) done({ error: "That is not your contract." });
+  if ((c as any).status !== "countered") {
+    done({ error: "That one is not waiting on you." });
+  }
+
+  const p = (c as any).player;
+  const person = Array.isArray(p) ? p[0] : p;
+  const name = `${person?.first_name ?? ""} ${person?.last_name ?? ""}`.trim() || "The player";
+
+  if (accept) {
+    const { error } = await supabase
+      .from("contracts")
+      .update({ status: "accepted", answered_at: new Date().toISOString() })
+      .eq("contract_id", contractId);
+    done(
+      error
+        ? { error: describe(error.message) }
+        : { note: `Agreed on ${name}'s terms. They are signed.` }
+    );
+  }
+
+  const starts = ((fd.get("starts_on") as string) ?? "").trim();
+  const ends = ((fd.get("ends_on") as string) ?? "").trim();
+  const terms = ((fd.get("terms") as string) ?? "").trim() || null;
+
+  const problem = lengthProblem(starts, ends);
+  if (problem) done({ error: problem });
+
+  const { error } = await supabase
+    .from("contracts")
+    .update({ status: "offered", starts_on: starts, ends_on: ends, terms })
+    .eq("contract_id", contractId);
+
+  if (error) done({ error: describe(error.message) });
+
+  await supabase.from("contract_proposals").insert({
+    contract_id: contractId,
+    proposed_by: "club",
+    starts_on: starts,
+    ends_on: ends,
+    terms,
+  });
+
+  done({ note: `Countered. It is back with ${name}.` });
+}
+
+/** Attaches or replaces the document on an offer nobody has signed yet. */
+export async function attachDocument(contractId: string, fd: FormData) {
+  const { teamId } = await requireClub();
+  const supabase = createAdminClient();
+
+  const { data: c } = await supabase
+    .from("contracts")
+    .select("contract_id, team_id, status, document_path")
+    .eq("contract_id", contractId)
+    .maybeSingle();
+
+  if (!c || (c as any).team_id !== teamId) done({ error: "That is not your contract." });
+  if (!["offered", "countered"].includes((c as any).status)) {
+    done({ error: "The document can only change while the terms are still being agreed." });
+  }
+
+  const file = fd.get("document") as File | null;
+  if (!file || file.size === 0) done({ error: "No file was chosen." });
+
+  const stored = await storeContractDocument(
+    contractId,
+    file as File,
+    (c as any).document_path
+  );
+  if ("error" in stored) done({ error: stored.error });
+
+  const ok = stored as { path: string; name: string; size: number };
+  const { error } = await supabase
+    .from("contracts")
+    .update({
+      document_path: ok.path,
+      document_name: ok.name,
+      document_size: ok.size,
+      document_uploaded_at: new Date().toISOString(),
+    })
+    .eq("contract_id", contractId);
+
+  done(
+    error
+      ? { error: describe(error.message) }
+      : { note: `${ok.name} attached. The player can read it before deciding.` }
   );
 }

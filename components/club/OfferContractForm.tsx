@@ -51,7 +51,11 @@ export function OfferContractForm({
   };
 
   return (
-    <form action={offer} className="bg-white border border-slate-200 rounded-lg p-4 grid gap-3">
+    <form
+      action={offer}
+      encType="multipart/form-data"
+      className="bg-white border border-slate-200 rounded-lg p-4 grid gap-3"
+    >
       <div>
         <h2 className="font-display text-lg text-navy-900">Offer a contract</h2>
         <p className="text-xs text-slate-500">
@@ -161,6 +165,23 @@ export function OfferContractForm({
           placeholder="Anything the player should know before accepting"
           className="w-full px-3 py-2 rounded border border-slate-300 text-sm"
         />
+      </label>
+
+      <label className="text-sm">
+        <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+          The contract itself — optional
+        </span>
+        <input
+          type="file"
+          name="document"
+          accept="application/pdf"
+          className="w-full text-sm text-slate-600 file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-navy-900 file:text-white file:text-xs"
+        />
+        <span className="block text-xs text-slate-500 mt-1">
+          A PDF up to 2 MB, so the player can read it before deciding. Export
+          it as text rather than scanning it — a scan of the same document is
+          many times the size.
+        </span>
       </label>
 
       <div>
