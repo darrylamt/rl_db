@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GRADES, isGrade, gradeLabel } from "@/lib/grades";
 import { createAdminClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
@@ -23,6 +24,7 @@ export default async function RegistrationsPage({
   // A season holds well over a hundred registrations. The page already groups
   // them by club, so filtering to one club is the natural way to shorten it.
   const selectedClub = first(searchParams?.club) || "";
+  const selectedGrade = first(searchParams?.grade) || "";
 
   // Year options: current year ± 3 years
   const yearOptions = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 + i);
@@ -32,7 +34,7 @@ export default async function RegistrationsPage({
       supabase
         .from("player_registrations")
         .select(
-          "registration_id, season_year, notes, player:player_id(player_id, first_name, last_name, jersey_number, position), team:team_id(team_id, name)"
+          "registration_id, season_year, notes, player:player_id(player_id, first_name, last_name, jersey_number, position, category), team:team_id(team_id, name)"
         )
         .eq("season_year", selectedYear)
         .order("season_year"),
@@ -48,14 +50,22 @@ export default async function RegistrationsPage({
   // Group registrations by team
   const byTeam = new Map<string, { teamName: string; rows: any[] }>();
   for (const reg of registrations ?? []) {
+    // A club registers men, women and juniors together, so the grade is the
+    // only way to look at one of those squads on its own.
+    const p = (reg.player as any);
+    const person = Array.isArray(p) ? p[0] : p;
+    if (!isGrade(person?.category, selectedGrade)) continue;
+
     const teamId = (reg.team as any)?.team_id ?? "__none__";
     const teamName = (reg.team as any)?.name ?? "Unassigned";
     if (!byTeam.has(teamId)) byTeam.set(teamId, { teamName, rows: [] });
     byTeam.get(teamId)!.rows.push(reg);
   }
-  const visibleGroups = selectedClub
-    ? Array.from(byTeam.entries()).filter(([id]) => id === selectedClub)
-    : Array.from(byTeam.entries());
+  const visibleGroups = (
+    selectedClub
+      ? Array.from(byTeam.entries()).filter(([id]) => id === selectedClub)
+      : Array.from(byTeam.entries())
+  ).filter(([, g]) => g.rows.length > 0);
   const teamGroups = visibleGroups.sort((a, b) =>
     a[1].teamName.localeCompare(b[1].teamName)
   );
@@ -107,6 +117,19 @@ export default async function RegistrationsPage({
             <option value="">All clubs</option>
             {(teams ?? []).map((t) => (
               <option key={t.team_id} value={t.team_id}>{t.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">Grade</span>
+          <select
+            name="grade"
+            defaultValue={selectedGrade}
+            className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[9rem]"
+          >
+            <option value="">All grades</option>
+            {GRADES.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
             ))}
           </select>
         </label>

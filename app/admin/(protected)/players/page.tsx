@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GRADES } from "@/lib/grades";
 import { Avatar } from "@/components/Avatar";
 import { createAdminClient } from "@/lib/supabase/server";
 import { DeleteRowButton } from "@/components/admin/DeleteRowButton";
@@ -153,9 +154,11 @@ export default async function PlayersPage({
             className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900 min-w-[9rem]"
           >
             <option value="">All grades</option>
-            <option value="senior_men">Men</option>
-            <option value="senior_women">Women</option>
-            <option value="youth">Youth</option>
+            {GRADES.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
+            ))}
           </select>
         </label>
         <button type="submit" className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">

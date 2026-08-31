@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { gradeLabel } from "@/lib/grades";
 
 /**
  * One player and their sign-in address.
@@ -51,8 +52,9 @@ export function PlayerAccountRow({
           )}
         </p>
         <p className="text-xs text-slate-500 truncate">
-          {[player.team?.name, player.position].filter(Boolean).join(" · ") ||
-            "No club"}
+          {[player.team?.name, gradeLabel(player.category), player.position]
+            .filter(Boolean)
+            .join(" · ") || "No club"}
         </p>
       </div>
 

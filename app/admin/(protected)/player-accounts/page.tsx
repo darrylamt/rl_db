@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
 import { PlayerAccountRow } from "@/components/admin/PlayerAccountRow";
 import { CopyEmails } from "@/components/admin/CopyEmails";
+import { GRADES, isGrade, gradeLabel } from "@/lib/grades";
 import {
   resetPlayerPassword,
   revokePlayerAccount,
@@ -22,6 +23,7 @@ export default async function PlayerAccountsPage({
     show?: string;
     team?: string;
     status?: string;
+    grade?: string;
   };
 }) {
   const supabase = createAdminClient();
@@ -31,6 +33,7 @@ export default async function PlayerAccountsPage({
   // Active is the useful default: an inactive player rarely needs a login,
   // and 338 of them would bury the ones who do.
   const status = searchParams?.status ?? "active";
+  const grade = (searchParams?.grade ?? "").trim();
 
   const [{ data: accounts, error }, { data: players }, { data: teams }] =
     await Promise.all([
@@ -70,6 +73,7 @@ export default async function PlayerAccountsPage({
   const matched = all.filter((p) => {
     if (showWithout && p.account) return false;
     if (team && p.team_id !== team) return false;
+    if (!isGrade(p.category, grade)) return false;
     if (status === "active" && p.playing_status !== "active") return false;
     if (status === "inactive" && p.playing_status === "active") return false;
     if (!needle) return true;
@@ -90,7 +94,7 @@ export default async function PlayerAccountsPage({
   // used. With a filter on, everything matching is shown, because the copy
   // button takes what is on screen and a capped list would quietly copy a
   // fraction of what was asked for.
-  const filtered = !!(q || showWithout || team || status !== "all");
+  const filtered = !!(q || showWithout || team || grade || status !== "all");
   const shown = filtered ? matched : matched.slice(0, 60);
 
   // What the copy button takes: those on screen who have an address.
@@ -181,6 +185,24 @@ export default async function PlayerAccountsPage({
 
             <label className="text-sm">
               <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Grade
+              </span>
+              <select
+                name="grade"
+                defaultValue={grade}
+                className="px-3 py-2 rounded border border-slate-300 text-sm"
+              >
+                <option value="">All grades</option>
+                {GRADES.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm">
+              <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
                 Status
               </span>
               <select
@@ -205,6 +227,7 @@ export default async function PlayerAccountsPage({
                 ...(showWithout ? {} : { show: "without" }),
                 status,
                 ...(team ? { team } : {}),
+                ...(grade ? { grade } : {}),
                 ...(q ? { q } : {}),
               })}`}
               className={`text-sm px-3 py-2 rounded border ${

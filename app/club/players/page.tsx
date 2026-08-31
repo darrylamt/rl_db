@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GRADES, isGrade, gradeLabel } from "@/lib/grades";
 import { Avatar } from "@/components/Avatar";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -17,12 +18,13 @@ export default async function ClubSquadPage({
   const { teamId } = await requireClub();
   const q = (first(searchParams?.q) ?? "").trim();
   const only = first(searchParams?.only) || "";
+  const grade = first(searchParams?.grade) || "";
 
   const supabase = createAdminClient();
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status, approval_status, review_note"
+      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status, approval_status, review_note, category"
     )
     .eq("team_id", teamId)
     .order("last_name");
@@ -31,6 +33,9 @@ export default async function ClubSquadPage({
 
   const { data, error } = await query;
   let players = data ?? [];
+
+  // A club's men, women and juniors are one list until this is chosen.
+  if (grade) players = players.filter((p: any) => isGrade(p.category, grade));
 
   if (only === "no-position") players = players.filter((p: any) => !p.position);
   if (only === "no-photo") players = players.filter((p: any) => !p.photo_url);
@@ -95,10 +100,22 @@ export default async function ClubSquadPage({
           placeholder="Search your squad…"
           className="flex-1 min-w-[12rem] px-3 py-1.5 rounded border border-slate-300 text-sm"
         />
+        <select
+          name="grade"
+          defaultValue={grade}
+          className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm"
+          aria-label="Grade"
+        >
+          <option value="">All grades</option>
+          {GRADES.map((g) => (
+            <option key={g.value} value={g.value}>{g.label}</option>
+          ))}
+        </select>
+        {only && <input type="hidden" name="only" value={only} />}
         <button className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
           Search
         </button>
-        {(q || only) && (
+        {(q || only || grade) && (
           <Link href="/club/players" className="text-xs text-slate-500 hover:underline">
             clear
           </Link>
@@ -159,7 +176,9 @@ export default async function ClubSquadPage({
                     )}
                   </span>
                   <span className="block text-xs text-slate-500">
-                    {p.position || <span className="text-amber-700">position needed</span>}
+                    {[gradeLabel(p.category), p.position].filter(Boolean).join(" · ") || (
+                      <span className="text-amber-700">position needed</span>
+                    )}
                     {p.jersey_number != null && ` · #${p.jersey_number}`}
                   </span>
                   {p.approval_status === "declined" && p.review_note && (
