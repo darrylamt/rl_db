@@ -16,7 +16,6 @@ import {
   type Contract,
 } from "@/lib/contracts";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
-import { standingsFor, describeStanding } from "@/lib/leaders";
 import { answerContract, counterContract } from "./actions";
 import { contractDocumentUrl } from "@/lib/contractDocument";
 
@@ -108,7 +107,6 @@ export default async function PlayerHomePage({
   ]);
 
   const p = player as any;
-  const standings = await standingsFor(playerId);
 
   const all = (contracts ?? []) as any[];
   const offers = all.filter((c) => c.status === "offered");
@@ -223,31 +221,6 @@ export default async function PlayerHomePage({
           </div>
         </div>
       </div>
-
-      {/* What you top */}
-      {standings.length > 0 && (
-        <div className="grid gap-2">
-          {standings.slice(0, 4).map((st, i) => (
-            <div
-              key={i}
-              className={`rounded-lg px-4 py-3 border ${
-                st.scope === "all_time"
-                  ? "bg-ghanaYellow-500/10 border-ghanaYellow-500/40"
-                  : "bg-neutral-900 border-white/10"
-              }`}
-            >
-              <p className="font-display text-base md:text-lg capitalize">
-                You are the {describeStanding(st)}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {st.count} on record
-                {!st.outright &&
-                  ` · shared with ${st.sharedWith} other${st.sharedWith === 1 ? "" : "s"}`}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Offers — the one thing only you can settle */}
       {offers.length > 0 && (
