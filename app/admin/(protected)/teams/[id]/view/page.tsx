@@ -172,6 +172,79 @@ export default async function TeamDetailPage({
     });
   }
 
+  /**
+   * The same record, split by the competition it was made in.
+   *
+   * A club's overall figures answer nothing on their own here: the 13s, the
+   * 9s and the youth and women's competitions are different games played by
+   * different sides from the same club, and rolling them together hides
+   * exactly the thing somebody opening this page wants to see.
+   *
+   * Scheduled fixtures are counted separately from played ones, because a
+   * competition a club has entered and not yet played is still a competition
+   * they are in.
+   */
+  type CompRow = {
+    key: string;
+    name: string;
+    season: string | null;
+    division: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    pointsFor: number;
+    pointsAgainst: number;
+    scheduled: number;
+  };
+
+  const byComp = new Map<string, CompRow>();
+
+  for (const f of (fixtures ?? []) as any[]) {
+    const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
+    if (!comp?.name) continue;
+    const key = `${comp.name}__${comp.season ?? ""}`;
+
+    if (!byComp.has(key)) {
+      byComp.set(key, {
+        key,
+        name: comp.name,
+        season: comp.season ?? null,
+        division: comp.division ?? "men",
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        scheduled: 0,
+      });
+    }
+    const row = byComp.get(key)!;
+
+    const r = Array.isArray(f.result) ? f.result[0] : f.result;
+    const isHome = f.home_team_id === teamId;
+    const ours = r ? (isHome ? r.home_score : r.away_score) : null;
+    const theirs = r ? (isHome ? r.away_score : r.home_score) : null;
+
+    if (ours == null || theirs == null) {
+      row.scheduled += 1;
+      continue;
+    }
+    row.played += 1;
+    row.pointsFor += ours;
+    row.pointsAgainst += theirs;
+    if (ours > theirs) row.won += 1;
+    else if (ours < theirs) row.lost += 1;
+    else row.drawn += 1;
+  }
+
+  const competitions = Array.from(byComp.values()).sort((a, b) => {
+    const season = (b.season ?? "").localeCompare(a.season ?? "");
+    if (season !== 0) return season;
+    return a.name.localeCompare(b.name);
+  });
+
   // H2H stats — if ?vs= set, compute both sides' aggregate from their shared
   // completed fixtures.
   let vsTeam: { team_id: string; name: string } | null = null;
@@ -268,6 +341,110 @@ export default async function TeamDetailPage({
           </div>
         ))}
       </div>
+
+      {/* What they have played in */}
+      {competitions.length > 0 && (
+        <section className="mb-8">
+          <h2 className="font-display text-xl font-bold text-navy-900 mb-2">
+            Competitions
+          </h2>
+          <p className="text-sm text-slate-500 mb-3">
+            Every competition this club has appeared in, and how they did in
+            each. The 13s, the 9s and the youth and women&apos;s competitions
+            are different sides from the same club, so they are counted apart.
+          </p>
+          <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-slate-700 text-left">
+                <tr>
+                  <th className="px-3 py-2.5 font-medium">Competition</th>
+                  <th className="px-3 py-2.5 font-medium">Season</th>
+                  <th className="px-3 py-2.5 font-medium text-right">P</th>
+                  <th className="px-3 py-2.5 font-medium text-right">W</th>
+                  <th className="px-3 py-2.5 font-medium text-right">D</th>
+                  <th className="px-3 py-2.5 font-medium text-right">L</th>
+                  <th className="hidden sm:table-cell px-3 py-2.5 font-medium text-right">
+                    For
+                  </th>
+                  <th className="hidden sm:table-cell px-3 py-2.5 font-medium text-right">
+                    Against
+                  </th>
+                  <th className="hidden md:table-cell px-3 py-2.5 font-medium text-right">
+                    To play
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {competitions.map((c) => (
+                  <tr key={c.key} className="hover:bg-slate-50">
+                    <td className="px-3 py-2.5">
+                      <span className="font-medium text-navy-900">{c.name}</span>
+                      {c.division && c.division !== "men" && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {c.division}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-600 tabular-nums">
+                      {c.season ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-display text-navy-900">
+                      {c.played}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                      {c.won}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">
+                      {c.drawn}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-red-700">
+                      {c.lost}
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums text-slate-600">
+                      {c.pointsFor}
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums text-slate-600">
+                      {c.pointsAgainst}
+                    </td>
+                    <td className="hidden md:table-cell px-3 py-2.5 text-right tabular-nums text-slate-500">
+                      {c.scheduled || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t border-slate-200">
+                <tr>
+                  <td className="px-3 py-2.5 font-medium text-navy-900" colSpan={2}>
+                    {competitions.length} competition
+                    {competitions.length === 1 ? "" : "s"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums font-display text-navy-900">
+                    {competitions.reduce((n, c) => n + c.played, 0)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                    {competitions.reduce((n, c) => n + c.won, 0)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">
+                    {competitions.reduce((n, c) => n + c.drawn, 0)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-red-700">
+                    {competitions.reduce((n, c) => n + c.lost, 0)}
+                  </td>
+                  <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums text-slate-600">
+                    {competitions.reduce((n, c) => n + c.pointsFor, 0)}
+                  </td>
+                  <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums text-slate-600">
+                    {competitions.reduce((n, c) => n + c.pointsAgainst, 0)}
+                  </td>
+                  <td className="hidden md:table-cell px-3 py-2.5 text-right tabular-nums text-slate-500">
+                    {competitions.reduce((n, c) => n + c.scheduled, 0) || "—"}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* H2H */}
       <section className="mb-8">
