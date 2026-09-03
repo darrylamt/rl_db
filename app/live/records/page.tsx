@@ -56,8 +56,9 @@ function Board({ board }: { board: RecordBoard }) {
           <Avatar
             src={leader.photoUrl ?? leader.clubLogo}
             name={leader.name}
-            size={48}
-            rounded="md"
+            size={56}
+            rounded="none"
+            className="rounded-2xl"
             contain={!leader.photoUrl}
           />
           <div className="min-w-0">
@@ -68,8 +69,8 @@ function Board({ board }: { board: RecordBoard }) {
                   <Avatar
                     src={leader.clubLogo}
                     name={leader.subtitle}
-                    size={16}
-                    rounded="md"
+                    size={18}
+                    rounded="full"
                     contain
                   />
                 )}
