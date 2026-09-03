@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { remaining, type Contract } from "@/lib/contracts";
-import { standingsFor, describeStanding } from "@/lib/leaders";
 import { Avatar } from "@/components/Avatar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -116,10 +115,6 @@ export default async function PublicPlayerPage({
   const contractClub = contractRow
     ? (Array.isArray(contractRow.team) ? contractRow.team[0] : contractRow.team)?.name
     : null;
-
-  // What this player tops, anywhere. A club standing follows the club the
-  // events belong to, so leaving Panthers does not take their record with it.
-  const standings = await standingsFor(playerId);
 
   const team = (teams ?? []).find(
     (t: any) => t.team_id === (player as any).team_id
@@ -267,30 +262,6 @@ export default async function PublicPlayerPage({
           </div>
         </div>
       </div>
-
-      {standings.length > 0 && (
-        <div className="grid gap-2 mb-6">
-          {standings.slice(0, 4).map((st, i) => (
-            <div
-              key={i}
-              className={`rounded-lg px-4 py-3 border ${
-                st.scope === "all_time"
-                  ? "bg-ghanaYellow-500/10 border-ghanaYellow-500/40"
-                  : "bg-neutral-900 border-white/10"
-              }`}
-            >
-              <p className="font-display text-base md:text-lg capitalize">
-                {describeStanding(st)}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {st.count} on record
-                {!st.outright &&
-                  ` · shared with ${st.sharedWith} other${st.sharedWith === 1 ? "" : "s"}`}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Headline numbers */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
