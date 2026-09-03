@@ -106,34 +106,74 @@ function Board({ board }: { board: RecordBoard }) {
   );
 }
 
-const CHIP_ON =
-  "bg-ghanaYellow-500 text-black border-ghanaYellow-500 font-medium";
-const CHIP_OFF = "border-white/15 text-slate-300 hover:border-white/40";
+function Chip({
+  href,
+  on,
+  children,
+}: {
+  href: string;
+  on: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border transition-colors ${
+        on
+          ? "bg-ghanaYellow-500 text-black border-ghanaYellow-500 font-semibold"
+          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function FilterRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
+      <span className="text-[10px] uppercase tracking-widest text-slate-500 w-full sm:w-20 shrink-0">
+        {label}
+      </span>
+      <div className="flex gap-1.5 flex-wrap min-w-0">{children}</div>
+    </div>
+  );
+}
 
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams?: { season?: string; format?: string };
+  searchParams?: { season?: string; format?: string; division?: string };
 }) {
-  const season = searchParams?.season && searchParams.season !== "all"
-    ? searchParams.season
-    : null;
-  const format = searchParams?.format && searchParams.format !== "all"
-    ? searchParams.format
-    : null;
+  const pick = (v?: string) => (v && v !== "all" ? v : null);
+  const season = pick(searchParams?.season);
+  const format = pick(searchParams?.format);
+  const division = pick(searchParams?.division);
 
-  const records = await getRecords(season, format);
+  const records = await getRecords(season, format, division);
   const nothing =
     records.playerBoards.length === 0 && records.clubBoards.length === 0;
 
-  // Changing one filter keeps the other, so narrowing to the 9s does not throw
+  // Changing one filter keeps the others, so narrowing to the 9s does not throw
   // away the season you were already looking at.
-  const href = (next: { season?: string | null; format?: string | null }) => {
+  const href = (next: {
+    season?: string | null;
+    format?: string | null;
+    division?: string | null;
+  }) => {
     const p = new URLSearchParams();
     const s = "season" in next ? next.season : season;
     const f = "format" in next ? next.format : format;
+    const d = "division" in next ? next.division : division;
     if (s) p.set("season", s);
     if (f) p.set("format", f);
+    if (d) p.set("division", d);
     const query = p.toString();
     return query ? `/live/records?${query}` : "/live/records";
   };
@@ -150,57 +190,56 @@ export default async function RecordsPage({
         </p>
       </div>
 
-      {/* Season */}
-      <div className="flex gap-1.5 flex-wrap mb-2">
-        <Link
-          href={href({ season: null })}
-          className={`px-3 py-1.5 rounded-lg text-sm border ${
-            !season ? CHIP_ON : CHIP_OFF
-          }`}
-        >
-          All time
-        </Link>
-        {records.seasons.map((s) => (
-          <Link
-            key={s}
-            href={href({ season: s })}
-            className={`px-3 py-1.5 rounded-lg text-sm border tabular-nums ${
-              season === s ? CHIP_ON : CHIP_OFF
-            }`}
-          >
-            {s}
-          </Link>
-        ))}
-      </div>
+      {/* Everything is combined unless you ask otherwise: a 9s try and a 13s
+          try are not the same feat, and neither are a men's and a youth one. */}
+      <div className="bg-neutral-900 border border-white/10 rounded-xl p-3 md:p-4 mb-6 grid gap-3">
+        <FilterRow label="Season">
+          <Chip href={href({ season: null })} on={!season}>
+            All time
+          </Chip>
+          {records.seasons.map((s) => (
+            <Chip key={s} href={href({ season: s })} on={season === s}>
+              <span className="tabular-nums">{s}</span>
+            </Chip>
+          ))}
+        </FilterRow>
 
-      {/* Competition — combined unless you ask otherwise, because a 9s try and
-          a 13s try are not the same feat. */}
-      <div className="flex gap-1.5 flex-wrap mb-6">
-        <Link
-          href={href({ format: null })}
-          className={`px-3 py-1.5 rounded-lg text-sm border ${
-            !format ? CHIP_ON : CHIP_OFF
-          }`}
-        >
-          All competitions
-        </Link>
-        {records.formats.map((f) => (
-          <Link
-            key={f.key}
-            href={href({ format: f.key })}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${
-              format === f.key ? CHIP_ON : CHIP_OFF
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
+        <FilterRow label="Division">
+          <Chip href={href({ division: null })} on={!division}>
+            All
+          </Chip>
+          {records.divisions.map((d) => (
+            <Chip
+              key={d.key}
+              href={href({ division: d.key })}
+              on={division === d.key}
+            >
+              {d.label}
+            </Chip>
+          ))}
+        </FilterRow>
+
+        <FilterRow label="Competition">
+          <Chip href={href({ format: null })} on={!format}>
+            All
+          </Chip>
+          {records.formats.map((f) => (
+            <Chip
+              key={f.key}
+              href={href({ format: f.key })}
+              on={format === f.key}
+            >
+              {f.label}
+            </Chip>
+          ))}
+        </FilterRow>
       </div>
 
       {nothing ? (
         <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
           {[
             "No",
+            records.divisions.find((d) => d.key === division)?.label,
             records.formats.find((f) => f.key === format)?.label,
             season ? `match from ${season}` : "match",
             "has been recorded yet.",

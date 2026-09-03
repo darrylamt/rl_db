@@ -68,12 +68,27 @@ function formatOf(name: string | null | undefined): string | null {
   return FORMATS.find((f) => f.match.test(name))?.key ?? null;
 }
 
+/**
+ * Who played it, which the competition already records.
+ *
+ * The men's game has been recorded since 2019 and the women's and youth games
+ * only since 2024, so a combined table is a men's table wearing a hat. Any
+ * division the competitions do not use is simply never offered.
+ */
+const DIVISIONS: { key: string; label: string }[] = [
+  { key: "men", label: "Men" },
+  { key: "women", label: "Women" },
+  { key: "youth", label: "Youth" },
+];
+
 export type RecordsData = {
   seasons: string[];
   season: string | null;
   /** Only those a match has actually been played in. */
   formats: { key: string; label: string }[];
   format: string | null;
+  divisions: { key: string; label: string }[];
+  division: string | null;
   playerBoards: RecordBoard[];
   clubBoards: RecordBoard[];
   /** Single facts rather than tables — the biggest win, the highest score. */
@@ -108,6 +123,7 @@ function rank(
 export async function getRecords(
   season?: string | null,
   format?: string | null,
+  division?: string | null,
 ): Promise<RecordsData> {
   const supabase = createPublicClient();
 
@@ -140,16 +156,20 @@ export async function getRecords(
 
   const seasonOf = new Map<string, string | null>();
   const formatOfComp = new Map<string, string | null>();
+  const divisionOf = new Map<string, string | null>();
   for (const c of competitions) {
     seasonOf.set(c.competition_id, c.season ?? null);
     formatOfComp.set(c.competition_id, formatOf(c.name));
+    divisionOf.set(c.competition_id, c.division ?? null);
   }
 
   const fixtureSeason = new Map<string, string | null>();
   const fixtureFormat = new Map<string, string | null>();
+  const fixtureDivision = new Map<string, string | null>();
   for (const f of fixtures) {
     fixtureSeason.set(f.fixture_id, seasonOf.get(f.competition_id) ?? null);
     fixtureFormat.set(f.fixture_id, formatOfComp.get(f.competition_id) ?? null);
+    fixtureDivision.set(f.fixture_id, divisionOf.get(f.competition_id) ?? null);
   }
 
   const seasons = Array.from(
@@ -170,9 +190,20 @@ export async function getRecords(
     label: f.label,
   }));
 
+  const divisionsPlayed = new Set(
+    competitions
+      .filter((c) => played.has(c.competition_id))
+      .map((c) => c.division)
+      .filter(Boolean) as string[]
+  );
+  const divisions = DIVISIONS.filter((d) => divisionsPlayed.has(d.key)).map(
+    (d) => ({ key: d.key, label: d.label })
+  );
+
   const inScope = (fixtureId: string) =>
     (!season || fixtureSeason.get(fixtureId) === season) &&
-    (!format || fixtureFormat.get(fixtureId) === format);
+    (!format || fixtureFormat.get(fixtureId) === format) &&
+    (!division || fixtureDivision.get(fixtureId) === division);
 
   const playerName = new Map(
     players.map((p) => [
@@ -351,6 +382,8 @@ export async function getRecords(
     season: season ?? null,
     formats,
     format: format ?? null,
+    divisions,
+    division: division ?? null,
     playerBoards,
     clubBoards,
     matchFacts,
