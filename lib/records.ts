@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/server";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
+import { formatOf, formatsIn, divisionsIn } from "@/lib/competitionFormat";
 
 /**
  * The record books.
@@ -44,41 +45,6 @@ const PLAYER_BOARDS: { key: string; title: string; types: string[]; note?: strin
   { key: "try_assist", title: "Most try assists", types: ["try_assist"] },
   { key: "appearances", title: "Most appearances", types: [] },
   { key: "cards", title: "Most cards", types: ["yellow_card", "red_card", "sin_bin"], note: "Yellows, reds and sin bins." },
-];
-
-/**
- * What was actually played, which only the competition's name records.
- *
- * These are different games rather than different competitions: a 9s try and a
- * 13s try are not the same feat, and eRugby is not played on a field at all.
- * Combined is still the default, because that is the question most people
- * arrive with — but anyone who wants the 13s record book alone can have it.
- */
-const FORMATS: { key: string; label: string; match: RegExp }[] = [
-  { key: "13s", label: "13s", match: /\b13s\b/i },
-  { key: "9s", label: "9s", match: /\b9s\b/i },
-  { key: "erugby", label: "eRugby", match: /e-?rugby/i },
-  { key: "beach", label: "Beach", match: /beach/i },
-  { key: "presidents", label: "President's Cup", match: /president/i },
-  { key: "origins", label: "Origins Cup", match: /origins/i },
-];
-
-function formatOf(name: string | null | undefined): string | null {
-  if (!name) return null;
-  return FORMATS.find((f) => f.match.test(name))?.key ?? null;
-}
-
-/**
- * Who played it, which the competition already records.
- *
- * The men's game has been recorded since 2019 and the women's and youth games
- * only since 2024, so a combined table is a men's table wearing a hat. Any
- * division the competitions do not use is simply never offered.
- */
-const DIVISIONS: { key: string; label: string }[] = [
-  { key: "men", label: "Men" },
-  { key: "women", label: "Women" },
-  { key: "youth", label: "Youth" },
 ];
 
 export type RecordsData = {
@@ -179,26 +145,11 @@ export async function getRecords(
   // A competition nobody has played in yet is a filter that returns nothing,
   // so it is not offered.
   const played = new Set(fixtures.map((f) => f.competition_id));
-  const formatsPlayed = new Set(
-    competitions
-      .filter((c) => played.has(c.competition_id))
-      .map((c) => formatOf(c.name))
-      .filter(Boolean) as string[]
+  const playedCompetitions = competitions.filter((c) =>
+    played.has(c.competition_id)
   );
-  const formats = FORMATS.filter((f) => formatsPlayed.has(f.key)).map((f) => ({
-    key: f.key,
-    label: f.label,
-  }));
-
-  const divisionsPlayed = new Set(
-    competitions
-      .filter((c) => played.has(c.competition_id))
-      .map((c) => c.division)
-      .filter(Boolean) as string[]
-  );
-  const divisions = DIVISIONS.filter((d) => divisionsPlayed.has(d.key)).map(
-    (d) => ({ key: d.key, label: d.label })
-  );
+  const formats = formatsIn(playedCompetitions);
+  const divisions = divisionsIn(playedCompetitions);
 
   const inScope = (fixtureId: string) =>
     (!season || fixtureSeason.get(fixtureId) === season) &&

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { fetchLineupAppearances } from "@/lib/appearances";
 import { RadarChart } from "@/components/RadarChart";
 import { ATTRIBUTE_AXES, attributeAverage, attributeValues, hasAttributes } from "@/lib/attributes";
+import { formatOf, formatLabel, divisionLabel, formatsIn, divisionsIn } from "@/lib/competitionFormat";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -83,11 +84,13 @@ export default async function PlayerDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { vs?: string };
+  searchParams?: { vs?: string; format?: string; division?: string };
 }) {
   const supabase = createAdminClient();
   const playerId = params.id;
   const vsId = searchParams?.vs || "";
+  const formatId = searchParams?.format || "";
+  const divisionId = searchParams?.division || "";
 
   // Player + team (+ all other players for the H2H dropdown).
   const [{ data: player }, { data: otherPlayers }] = await Promise.all([
@@ -114,11 +117,25 @@ export default async function PlayerDetailPage({
     supabase
       .from("match_events")
       .select(
-        "event_id, event_type, minute, fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score))"
+        "event_id, event_type, minute, fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season, division), result:match_results(home_score, away_score))"
       )
       .eq("player_id", playerId),
     fetchLineupAppearances(supabase, playerId),
   ]);
+
+  /** The competition an event's fixture was played in, however deep the join. */
+  function eventComp(e: any): { name: string | null; division: string | null } {
+    const f: any = Array.isArray(e.fixture) ? e.fixture[0] : e.fixture;
+    const c: any = Array.isArray(f?.competition) ? f.competition[0] : f?.competition;
+    return { name: c?.name ?? null, division: c?.division ?? null };
+  }
+
+  function inScope(e: any) {
+    const c = eventComp(e);
+    if (formatId && formatOf(c.name) !== formatId) return false;
+    if (divisionId && (c.division ?? "men") !== divisionId) return false;
+    return true;
+  }
 
   const stats = tallyEvents(events ?? []);
 
@@ -184,9 +201,21 @@ export default async function PlayerDetailPage({
     careerRating = Math.round(avg * 10) / 10;
   }
 
+  // Which format/division chips are worth offering — only what this player has
+  // actually played in, so a filter never leads to an empty comparison.
+  const h2hFormats = formatsIn((events ?? []).map(eventComp));
+  const h2hDivisions = divisionsIn((events ?? []).map(eventComp));
+  const h2hScope = [divisionLabel(divisionId), formatLabel(formatId)]
+    .filter(Boolean)
+    .join(" ");
+
+  // Career stats, scoped to the chosen format/division if any — kept separate
+  // from `stats` above, which stays the unscoped career total.
+  const h2hStatsMine = tallyEvents((events ?? []).filter(inScope));
+
   // Opponent H2H (player vs player).
   let vsPlayer: any = null;
-  let vsStats: StatMap | null = null;
+  let h2hStatsTheirs: StatMap | null = null;
   if (vsId) {
     const [{ data: vp }, { data: vpEvents }] = await Promise.all([
       supabase
@@ -196,11 +225,13 @@ export default async function PlayerDetailPage({
         .maybeSingle(),
       supabase
         .from("match_events")
-        .select("event_type")
+        .select(
+          "event_type, fixture:fixture_id(competition:competition_id(name, division))"
+        )
         .eq("player_id", vsId),
     ]);
     vsPlayer = vp;
-    vsStats = tallyEvents(vpEvents ?? []);
+    h2hStatsTheirs = tallyEvents((vpEvents ?? []).filter(inScope));
   }
 
   const teamLabel = team?.name ?? "—";
@@ -415,6 +446,44 @@ export default async function PlayerDetailPage({
               ))}
             </select>
           </div>
+          {(h2hDivisions.length > 0 || h2hFormats.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {h2hDivisions.length > 0 && (
+                <label className="text-sm">
+                  <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                    Division
+                  </span>
+                  <select
+                    name="division"
+                    defaultValue={divisionId}
+                    className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+                  >
+                    <option value="">All</option>
+                    {h2hDivisions.map((d) => (
+                      <option key={d.key} value={d.key}>{d.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {h2hFormats.length > 0 && (
+                <label className="text-sm">
+                  <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                    Competition
+                  </span>
+                  <select
+                    name="format"
+                    defaultValue={formatId}
+                    className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+                  >
+                    <option value="">All</option>
+                    {h2hFormats.map((f) => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
           <button
             type="submit"
@@ -422,7 +491,7 @@ export default async function PlayerDetailPage({
           >
             Compare
           </button>
-          {vsId && (
+          {(vsId || formatId || divisionId) && (
             <Link
               href={`/admin/players/${playerId}/view`}
               className="text-xs text-slate-500 hover:underline"
@@ -433,7 +502,7 @@ export default async function PlayerDetailPage({
           </div>
         </form>
 
-        {vsId && vsPlayer && vsStats && (
+        {vsId && vsPlayer && h2hStatsTheirs && (
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center bg-slate-50 border-b border-slate-200 px-4 py-3">
               <div className="text-right">
@@ -456,14 +525,19 @@ export default async function PlayerDetailPage({
                 </div>
               </div>
             </div>
+            {h2hScope && (
+              <p className="text-center text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-200 py-1.5">
+                {h2hScope}
+              </p>
+            )}
             <table className="w-full text-sm">
               <tbody>
                 {STAT_DEFS.map((def) => (
                   <StatCompare
                     key={def.key}
                     label={def.label}
-                    a={stats[def.key]}
-                    b={vsStats![def.key]}
+                    a={h2hStatsMine[def.key]}
+                    b={h2hStatsTheirs![def.key]}
                   />
                 ))}
               </tbody>

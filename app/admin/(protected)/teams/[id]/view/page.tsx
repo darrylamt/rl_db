@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Breadcrumb } from "@/components/admin/Breadcrumb";
+import { formatOf, formatLabel, divisionLabel, formatsIn, divisionsIn } from "@/lib/competitionFormat";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -73,11 +74,13 @@ export default async function TeamDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { vs?: string };
+  searchParams?: { vs?: string; format?: string; division?: string };
 }) {
   const supabase = createAdminClient();
   const teamId = params.id;
   const vsId = searchParams?.vs || "";
+  const formatId = searchParams?.format || "";
+  const divisionId = searchParams?.division || "";
 
   // Team + home venue + full team list (for the compare dropdown).
   const [{ data: team }, { data: allTeams }] = await Promise.all([
@@ -245,8 +248,20 @@ export default async function TeamDetailPage({
     return a.name.localeCompare(b.name);
   });
 
+  // Which format/division chips are worth offering: only ones this team has
+  // actually completed a fixture in, so a filter never leads to an empty box.
+  const playedCompetitions = completed.map((f: any) => {
+    const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
+    return { name: comp?.name ?? null, division: comp?.division ?? null };
+  });
+  const h2hFormats = formatsIn(playedCompetitions);
+  const h2hDivisions = divisionsIn(playedCompetitions);
+  const h2hScope = [divisionLabel(divisionId), formatLabel(formatId)]
+    .filter(Boolean)
+    .join(" ");
+
   // H2H stats — if ?vs= set, compute both sides' aggregate from their shared
-  // completed fixtures.
+  // completed fixtures, scoped to the chosen format/division if any.
   let vsTeam: { team_id: string; name: string } | null = null;
   let ourVs = emptyTally();
   let theirVs = emptyTally();
@@ -263,6 +278,11 @@ export default async function TeamDetailPage({
       const isHome = f.home_team_id === teamId;
       const oppId = isHome ? f.away_team_id : f.home_team_id;
       if (oppId !== vsId) continue;
+
+      const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
+      if (formatId && formatOf(comp?.name) !== formatId) continue;
+      if (divisionId && (comp?.division ?? "men") !== divisionId) continue;
+
       const r = Array.isArray(f.result) ? f.result[0] : f.result;
       if (!r) continue;
       const ourScore = isHome ? r.home_score : r.away_score;
@@ -467,13 +487,47 @@ export default async function TeamDetailPage({
               ))}
             </select>
           </label>
+          {h2hDivisions.length > 0 && (
+            <label className="text-sm">
+              <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Division
+              </span>
+              <select
+                name="division"
+                defaultValue={divisionId}
+                className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+              >
+                <option value="">All</option>
+                {h2hDivisions.map((d) => (
+                  <option key={d.key} value={d.key}>{d.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {h2hFormats.length > 0 && (
+            <label className="text-sm">
+              <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Competition
+              </span>
+              <select
+                name="format"
+                defaultValue={formatId}
+                className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+              >
+                <option value="">All</option>
+                {h2hFormats.map((f) => (
+                  <option key={f.key} value={f.key}>{f.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="submit"
             className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium"
           >
             Compare
           </button>
-          {vsId && (
+          {(vsId || formatId || divisionId) && (
             <Link
               href={`/admin/teams/${teamId}/view`}
               className="text-xs text-slate-500 hover:underline"
@@ -496,9 +550,15 @@ export default async function TeamDetailPage({
                 {vsTeam.name}
               </div>
             </div>
+            {h2hScope && (
+              <p className="text-center text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-200 py-1.5">
+                {h2hScope}
+              </p>
+            )}
             {ourVs.played === 0 ? (
               <div className="px-4 py-6 text-center text-slate-500 text-sm">
-                No completed matches between these teams yet.
+                No completed {h2hScope ? `${h2hScope} ` : ""}matches between
+                these teams yet.
               </div>
             ) : (
               <table className="w-full text-sm">
