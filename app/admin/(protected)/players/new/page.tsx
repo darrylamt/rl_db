@@ -2,14 +2,11 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
+import { PositionFields } from "@/components/admin/PositionFields";
 import { createPlayer } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-const POSITIONS = [
-  "Fullback","Wing","Centre","Stand-off","Scrum-half",
-  "Prop","Hooker","Second-row","Loose forward","Utility",
-];
 const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function NewPlayerPage() {
@@ -43,15 +40,10 @@ export default async function NewPlayerPage() {
           options={teams.map((t: any) => ({ value: t.team_id, label: t.name }))}
         />
       </Field>
+      <PositionFields />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} />
-        </Field>
-        <Field label="Position">
-          <Select name="position" defaultValue="">
-            <option value="">—</option>
-            {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </Select>
         </Field>
         <Field label="Gender">
           <Select name="gender" defaultValue="male">

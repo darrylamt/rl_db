@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { TransferMarket } from "@/components/club/TransferMarket";
 import { getTransferWindow } from "@/lib/transferWindow";
 import { remaining, type Contract } from "@/lib/contracts";
@@ -72,16 +73,19 @@ export default async function ClubTransfersPage({
     // or(...) rather than neq: a player with no club has a null team_id,
     // and "team_id <> ours" is null for them — so neq alone quietly hides
     // every free agent.
-    supabase
-      .from("players")
-      .select(
-        "player_id, first_name, last_name, position, photo_url, category, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking",
-      )
-      .or(`team_id.is.null,team_id.neq.${teamId}`)
-      .eq("playing_status", "active")
-      .eq("approval_status", "approved")
-      .order("last_name")
-      .limit(1000),
+    readWithOptionalColumns(
+      "player_id, first_name, last_name, position, secondary_positions, photo_url, category, team_id, attr_strength, attr_speed, attr_iq, attr_defense, attr_ability, attr_kicking",
+      ["secondary_positions"],
+      (columns) =>
+        supabase
+          .from("players")
+          .select(columns)
+          .or(`team_id.is.null,team_id.neq.${teamId}`)
+          .eq("playing_status", "active")
+          .eq("approval_status", "approved")
+          .order("last_name")
+          .limit(1000),
+    ),
     supabase
       .from("transfer_requests")
       .select(SELECT)

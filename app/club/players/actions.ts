@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
 import { writeWithOptionalColumns } from "@/lib/optionalColumns";
+import { cleanSecondaryPositions } from "@/lib/positions";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -16,6 +17,7 @@ import { revalidatePath } from "next/cache";
 const CLUB_EDITABLE = [
   "photo_url",
   "position",
+  "secondary_positions",
   "jersey_number",
   "date_of_birth",
   "height_cm",
@@ -65,9 +67,14 @@ async function ownedPlayer(playerId: string) {
 export async function updateClubPlayer(playerId: string, fd: FormData) {
   const { supabase } = await ownedPlayer(playerId);
 
+  const position = str(fd, "position");
   const payload: Record<string, unknown> = {
     photo_url: str(fd, "photo"),
-    position: str(fd, "position"),
+    position,
+    secondary_positions: cleanSecondaryPositions(
+      fd.getAll("secondary_positions"),
+      position
+    ),
     jersey_number: intOrNull(fd, "jersey_number"),
     date_of_birth: str(fd, "date_of_birth"),
     height_cm: intOrNull(fd, "height_cm"),
@@ -84,10 +91,11 @@ export async function updateClubPlayer(playerId: string, fd: FormData) {
     if (!(CLUB_EDITABLE as readonly string[]).includes(key)) delete payload[key];
   }
 
-  const { error } = await supabase
-    .from("players")
-    .update(payload)
-    .eq("player_id", playerId);
+  const { error } = await writeWithOptionalColumns(
+    payload,
+    ["secondary_positions"] as const,
+    (values) => supabase.from("players").update(values).eq("player_id", playerId)
+  );
   if (error) throw new Error(error.message);
 
   revalidatePath("/club/players");
@@ -119,6 +127,10 @@ export async function createClubPlayer(fd: FormData) {
     last_name,
     team_id: teamId,
     position: str(fd, "position"),
+    secondary_positions: cleanSecondaryPositions(
+      fd.getAll("secondary_positions"),
+      str(fd, "position")
+    ),
     jersey_number: intOrNull(fd, "jersey_number"),
     date_of_birth: str(fd, "date_of_birth"),
     height_cm: intOrNull(fd, "height_cm"),
@@ -134,7 +146,12 @@ export async function createClubPlayer(fd: FormData) {
     submitted_by: user?.userId ?? null,
     submitted_at: new Date().toISOString(),
     },
-    ["approval_status", "submitted_by", "submitted_at"] as const,
+    [
+      "approval_status",
+      "submitted_by",
+      "submitted_at",
+      "secondary_positions",
+    ] as const,
     (values) => supabase.from("players").insert(values)
   );
   if (error) throw new Error(error.message);

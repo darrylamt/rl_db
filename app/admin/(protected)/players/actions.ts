@@ -2,7 +2,12 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { resolveImageUrl } from "@/lib/upload";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
+import { cleanSecondaryPositions } from "@/lib/positions";
 import { revalidatePath } from "next/cache";
+
+/** Columns that arrive with a migration, so a save works before it is run. */
+const OPTIONAL = ["secondary_positions"] as const;
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -26,8 +31,13 @@ function attrOrNull(fd: FormData, k: string) {
 }
 
 function payload(fd: FormData) {
+  const position = str(fd, "position");
   return {
     team_id: str(fd, "team_id"),
+    secondary_positions: cleanSecondaryPositions(
+      fd.getAll("secondary_positions"),
+      position
+    ),
     first_name: str(fd, "first_name"),
     last_name: str(fd, "last_name"),
     date_of_birth: str(fd, "date_of_birth"),
@@ -35,7 +45,7 @@ function payload(fd: FormData) {
     weight_kg: intOrNull(fd, "weight_kg"),
     nationality: str(fd, "nationality"),
     jersey_number: intOrNull(fd, "jersey_number"),
-    position: str(fd, "position"),
+    position,
     is_captain: boolVal(fd, "is_captain"),
     playing_status: str(fd, "playing_status") ?? "inactive",
     gender: str(fd, "gender") ?? "male",
@@ -58,7 +68,9 @@ export async function createPlayer(fd: FormData) {
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
   p.photo_url = await resolveImageUrl(fd, "photo", "player-photos", "players", null);
-  const { error } = await supabase.from("players").insert(p);
+  const { error } = await writeWithOptionalColumns(p, OPTIONAL, (values) =>
+    supabase.from("players").insert(values)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/players");
   revalidatePath("/admin/dashboard");
@@ -74,7 +86,9 @@ export async function updatePlayer(id: string, fd: FormData) {
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
   p.photo_url = await resolveImageUrl(fd, "photo", "player-photos", "players", existing?.photo_url);
-  const { error } = await supabase.from("players").update(p).eq("player_id", id);
+  const { error } = await writeWithOptionalColumns(p, OPTIONAL, (values) =>
+    supabase.from("players").update(values).eq("player_id", id)
+  );
   if (error) throw new Error(error.message);
   revalidatePath("/admin/players");
   revalidatePath(`/admin/players/${id}`);

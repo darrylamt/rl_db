@@ -34,6 +34,29 @@ export function omit<T extends Record<string, any>>(
 }
 
 /**
+ * The same idea for reads: ask for the full column list, and ask again
+ * without the ones the database has not caught up with yet.
+ *
+ * Selecting a column that isn't there fails the whole query, so without this
+ * a page reading a new column is blank until the SQL is run.
+ */
+export async function readWithOptionalColumns<T>(
+  columns: string,
+  optional: readonly string[],
+  run: (columns: string) => PromiseLike<{ data: T; error: any }>
+): Promise<{ data: T; error: any }> {
+  const first = await run(columns);
+  if (!first.error || !isMissingColumnError(first.error)) return first;
+
+  const reduced = columns
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => c && !optional.includes(c))
+    .join(", ");
+  return run(reduced);
+}
+
+/**
  * Run a write with the full payload; if the database rejects it because one of
  * `optional` isn't there yet, run it again without them.
  *

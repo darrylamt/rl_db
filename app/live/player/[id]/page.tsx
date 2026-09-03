@@ -12,6 +12,7 @@ import {
   hasAttributes,
 } from "@/lib/attributes";
 import { fetchLineupAppearances } from "@/lib/appearances";
+import { cleanSecondaryPositions } from "@/lib/positions";
 import {
   TEAM_STAT_ROWS,
   eventLabel,
@@ -194,6 +195,7 @@ export default async function PublicPlayerPage({
   const overall = attributeAverage(player);
 
   const p: any = player;
+  const cover = cleanSecondaryPositions(p.secondary_positions, p.position);
 
   return (
     <>
@@ -246,6 +248,11 @@ export default async function PublicPlayerPage({
                 <span className="text-slate-500"> · #{p.jersey_number}</span>
               )}
             </p>
+            {cover.length > 0 && (
+              <p className="text-slate-500 text-xs mt-1">
+                Can also cover {cover.join(", ")}
+              </p>
+            )}
             {contract && (
               <p className="text-ghanaYellow-500 text-xs mt-1.5">
                 {contract.label} left on contract

@@ -4,12 +4,9 @@ import { FormShell, Field, Input, Select, Checkbox } from "@/components/admin/Fo
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { AttributeFields } from "@/components/admin/AttributeFields";
+import { PositionFields } from "@/components/admin/PositionFields";
 import { updatePlayer } from "../actions";
 
-const POSITIONS = [
-  "Fullback","Wing","Centre","Stand-off","Scrum-half",
-  "Prop","Hooker","Second-row","Loose forward","Utility",
-];
 const STATUSES = ["active","injured","suspended","retired","inactive"];
 
 export default async function EditPlayerPage({ params }: { params: { id: string } }) {
@@ -56,15 +53,10 @@ export default async function EditPlayerPage({ params }: { params: { id: string 
           options={(clubs ?? []).map((t: any) => ({ value: t.team_id, label: t.name }))}
         />
       </Field>
+      <PositionFields position={p.position} secondary={p.secondary_positions} />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Field label="Jersey #">
           <Input name="jersey_number" type="number" min={0} max={99} defaultValue={p.jersey_number ?? ""} />
-        </Field>
-        <Field label="Position">
-          <Select name="position" defaultValue={p.position ?? ""}>
-            <option value="">—</option>
-            {POSITIONS.map(x => <option key={x} value={x}>{x}</option>)}
-          </Select>
         </Field>
         <Field label="Gender">
           <Select name="gender" defaultValue={p.gender ?? "male"}>

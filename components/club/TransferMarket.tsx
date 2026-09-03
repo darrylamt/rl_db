@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { POSITIONS } from "@/lib/positions";
+import { POSITIONS, coversPosition } from "@/lib/positions";
 import { PLAYER_ATTRIBUTES } from "@/lib/attributes";
 
 const FREE = "__free__";
@@ -12,6 +12,7 @@ type Player = {
   first_name: string | null;
   last_name: string | null;
   position: string | null;
+  secondary_positions?: string[] | null;
   photo_url: string | null;
   category: string | null;
   team_id: string | null;
@@ -91,8 +92,12 @@ export function TransferMarket({
         `${p.first_name ?? ""} ${p.last_name ?? ""}`.toLowerCase().includes(q),
       );
     }
+    // Cover counts: a hooker who can play loose forward is a loose forward you
+    // can sign, and leaving them out is how you miss the player you needed.
     if (position) {
-      base = base.filter((p) => (p.position ?? "") === position);
+      base = base.filter((p) =>
+        coversPosition(position, p.position, p.secondary_positions)
+      );
     }
 
     const sorted = [...base];

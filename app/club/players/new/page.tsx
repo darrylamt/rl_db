@@ -1,7 +1,7 @@
 import { requireClub } from "@/lib/auth";
-import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { FormShell, Field, Input } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
-import { POSITIONS } from "@/lib/positions";
+import { PositionFields } from "@/components/admin/PositionFields";
 import { createClubPlayer } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -29,19 +29,11 @@ export default async function NewClubPlayerPage() {
 
       <PhotoUpload name="photo" label="Player photo" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Position">
-          <Select name="position" defaultValue="">
-            <option value="">— not set —</option>
-            {POSITIONS.map((x) => (
-              <option key={x} value={x}>{x}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Jersey number">
-          <Input name="jersey_number" type="number" min={1} />
-        </Field>
-      </div>
+      <PositionFields />
+
+      <Field label="Jersey number">
+        <Input name="jersey_number" type="number" min={1} />
+      </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Date of birth">

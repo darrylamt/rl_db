@@ -38,6 +38,53 @@ export function positionGroup(position?: string | null) {
   return POSITION_GROUP[position] ?? null;
 }
 
+export function isPosition(value: unknown): value is Position {
+  return (
+    typeof value === "string" && (POSITIONS as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * The other positions a player can cover, cleaned up.
+ *
+ * A player has one main position and may cover others, so the list is only
+ * ever the others: anything repeating the main is dropped rather than
+ * rejected, because ticking your own main position is a mistake worth
+ * absorbing quietly rather than a save worth failing.
+ *
+ * Order follows POSITIONS so two players who cover the same positions read
+ * the same way round.
+ */
+export function cleanSecondaryPositions(
+  values: readonly unknown[] | null | undefined,
+  main?: string | null
+): string[] {
+  const wanted = new Set(
+    (values ?? []).filter(isPosition).filter((p) => p !== main)
+  );
+  return POSITIONS.filter((p) => wanted.has(p));
+}
+
+/** Every position a player can be picked in, main first. */
+export function allPositions(
+  main?: string | null,
+  secondary?: readonly string[] | null
+): string[] {
+  return [
+    ...(isPosition(main) ? [main] : []),
+    ...cleanSecondaryPositions(secondary, main),
+  ];
+}
+
+/** Whether a player can be picked in this position at all. */
+export function coversPosition(
+  position: string,
+  main?: string | null,
+  secondary?: readonly string[] | null
+): boolean {
+  return allPositions(main, secondary).includes(position);
+}
+
 /**
  * Whether a player belongs in a competition of this division.
  *
