@@ -22,6 +22,8 @@ export type Leader = {
   count: number;
   /** Where they rank, with ties sharing a place. */
   place: number;
+  photoUrl?: string | null;
+  clubLogo?: string | null;
 };
 
 export type RecordBoard = {
@@ -44,9 +46,34 @@ const PLAYER_BOARDS: { key: string; title: string; types: string[]; note?: strin
   { key: "cards", title: "Most cards", types: ["yellow_card", "red_card", "sin_bin"], note: "Yellows, reds and sin bins." },
 ];
 
+/**
+ * What was actually played, which only the competition's name records.
+ *
+ * These are different games rather than different competitions: a 9s try and a
+ * 13s try are not the same feat, and eRugby is not played on a field at all.
+ * Combined is still the default, because that is the question most people
+ * arrive with — but anyone who wants the 13s record book alone can have it.
+ */
+const FORMATS: { key: string; label: string; match: RegExp }[] = [
+  { key: "13s", label: "13s", match: /\b13s\b/i },
+  { key: "9s", label: "9s", match: /\b9s\b/i },
+  { key: "erugby", label: "eRugby", match: /e-?rugby/i },
+  { key: "beach", label: "Beach", match: /beach/i },
+  { key: "presidents", label: "President's Cup", match: /president/i },
+  { key: "origins", label: "Origins Cup", match: /origins/i },
+];
+
+function formatOf(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return FORMATS.find((f) => f.match.test(name))?.key ?? null;
+}
+
 export type RecordsData = {
   seasons: string[];
   season: string | null;
+  /** Only those a match has actually been played in. */
+  formats: { key: string; label: string }[];
+  format: string | null;
   playerBoards: RecordBoard[];
   clubBoards: RecordBoard[];
   /** Single facts rather than tables — the biggest win, the highest score. */
@@ -54,7 +81,16 @@ export type RecordsData = {
   totals: { label: string; value: number }[];
 };
 
-function rank(rows: { id: string; name: string; subtitle: string; count: number }[]): Leader[] {
+function rank(
+  rows: {
+    id: string;
+    name: string;
+    subtitle: string;
+    count: number;
+    photoUrl?: string | null;
+    clubLogo?: string | null;
+  }[],
+): Leader[] {
   const sorted = [...rows].filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
   let place = 0;
   let lastCount: number | null = null;
@@ -69,7 +105,10 @@ function rank(rows: { id: string; name: string; subtitle: string; count: number 
   });
 }
 
-export async function getRecords(season?: string | null): Promise<RecordsData> {
+export async function getRecords(
+  season?: string | null,
+  format?: string | null,
+): Promise<RecordsData> {
   const supabase = createPublicClient();
 
   // Paged, because PostgREST stops at 1000 without a word and these are the
@@ -94,25 +133,46 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
       all<any>("fixtures", "fixture_id, competition_id, home_team_id, away_team_id, scheduled_date"),
       all<any>("match_events", "fixture_id, player_id, team_id, event_type"),
       all<any>("match_lineups", "fixture_id, player_id, team_id"),
-      all<any>("players", "player_id, first_name, last_name, team_id"),
-      all<any>("teams", "team_id, name, logo_url"),
+      all<any>("players", "player_id, first_name, last_name, team_id, photo_url"),
+      all<any>("teams", "team_id, name, logo_url, team_type"),
       all<any>("match_results", "fixture_id, home_score, away_score"),
     ]);
 
   const seasonOf = new Map<string, string | null>();
-  for (const c of competitions) seasonOf.set(c.competition_id, c.season ?? null);
+  const formatOfComp = new Map<string, string | null>();
+  for (const c of competitions) {
+    seasonOf.set(c.competition_id, c.season ?? null);
+    formatOfComp.set(c.competition_id, formatOf(c.name));
+  }
 
   const fixtureSeason = new Map<string, string | null>();
+  const fixtureFormat = new Map<string, string | null>();
   for (const f of fixtures) {
     fixtureSeason.set(f.fixture_id, seasonOf.get(f.competition_id) ?? null);
+    fixtureFormat.set(f.fixture_id, formatOfComp.get(f.competition_id) ?? null);
   }
 
   const seasons = Array.from(
     new Set(competitions.map((c) => c.season).filter(Boolean) as string[])
   ).sort((a, b) => b.localeCompare(a));
 
+  // A competition nobody has played in yet is a filter that returns nothing,
+  // so it is not offered.
+  const played = new Set(fixtures.map((f) => f.competition_id));
+  const formatsPlayed = new Set(
+    competitions
+      .filter((c) => played.has(c.competition_id))
+      .map((c) => formatOf(c.name))
+      .filter(Boolean) as string[]
+  );
+  const formats = FORMATS.filter((f) => formatsPlayed.has(f.key)).map((f) => ({
+    key: f.key,
+    label: f.label,
+  }));
+
   const inScope = (fixtureId: string) =>
-    !season || fixtureSeason.get(fixtureId) === season;
+    (!season || fixtureSeason.get(fixtureId) === season) &&
+    (!format || fixtureFormat.get(fixtureId) === format);
 
   const playerName = new Map(
     players.map((p) => [
@@ -121,6 +181,16 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
     ])
   );
   const teamName = new Map(teams.map((t) => [t.team_id, t.name]));
+  const teamLogo = new Map(teams.map((t) => [t.team_id, t.logo_url]));
+
+  // The club tables are between clubs. A national side and a President's XIII
+  // are selections drawn from every club in the league, so ranking them
+  // alongside is counting the same players a second time and calling them a
+  // rival. Their matches still count towards the players who played in them.
+  const isClub = new Set(
+    teams.filter((t) => t.team_type === "club").map((t) => t.team_id)
+  );
+  const playerPhoto = new Map(players.map((p) => [p.player_id, p.photo_url]));
   const playerClub = new Map(players.map((p) => [p.player_id, p.team_id]));
 
   // ── Player tallies ────────────────────────────────────────
@@ -151,6 +221,8 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
     name: playerName.get(id) ?? "Unnamed",
     subtitle: teamName.get(playerClub.get(id) ?? "") ?? "No club",
     count,
+    photoUrl: playerPhoto.get(id) ?? null,
+    clubLogo: teamLogo.get(playerClub.get(id) ?? "") ?? null,
   });
 
   const playerBoards: RecordBoard[] = PLAYER_BOARDS.map((b) => {
@@ -175,7 +247,7 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
   const clubPoints = new Map<string, number>();
   for (const e of events) {
     const club = e.team_id ?? playerClub.get(e.player_id ?? "") ?? null;
-    if (!club || !inScope(e.fixture_id)) continue;
+    if (!club || !isClub.has(club) || !inScope(e.fixture_id)) continue;
     const t = normaliseType(e.event_type);
     if (!perClub.has(club)) perClub.set(club, new Map());
     const m = perClub.get(club)!;
@@ -195,7 +267,7 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
       [f.home_team_id, r.home_score, r.away_score],
       [f.away_team_id, r.away_score, r.home_score],
     ] as [string, number, number][]) {
-      if (!side) continue;
+      if (!side || !isClub.has(side)) continue;
       clubPlayed.set(side, (clubPlayed.get(side) ?? 0) + 1);
       if (ours > theirs) clubWins.set(side, (clubWins.get(side) ?? 0) + 1);
     }
@@ -206,6 +278,8 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
     name: teamName.get(id) ?? "Unknown club",
     subtitle: "",
     count,
+    photoUrl: null,
+    clubLogo: teamLogo.get(id) ?? null,
   });
 
   const clubBoards: RecordBoard[] = [
@@ -272,5 +346,14 @@ export async function getRecords(season?: string | null): Promise<RecordsData> {
     { label: "Players involved", value: new Set(scopedEvents.map((e) => e.player_id).filter(Boolean)).size },
   ];
 
-  return { seasons, season: season ?? null, playerBoards, clubBoards, matchFacts, totals };
+  return {
+    seasons,
+    season: season ?? null,
+    formats,
+    format: format ?? null,
+    playerBoards,
+    clubBoards,
+    matchFacts,
+    totals,
+  };
 }
