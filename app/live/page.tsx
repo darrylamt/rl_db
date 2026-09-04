@@ -2,13 +2,13 @@ import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { MatchCard } from "./MatchCard";
-import { pointsFrom } from "@/lib/matchStats";
+import { Avatar } from "@/components/Avatar";
+import { PredictionCard } from "@/components/live/PredictionCard";
+import { getPredictionCounts } from "@/lib/predictions";
+import { pointsFrom, FIXTURE_SELECT, fmtShortDate, fmtTime } from "@/lib/matchStats";
 
 // Scores must never be served stale.
 export const dynamic = "force-dynamic";
-
-const FIXTURE_SELECT =
-  "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id";
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (Array.isArray(v)) return v[0] ?? null;
@@ -71,6 +71,7 @@ export default async function LiveHubPage({
     { data: todayRows },
     { data: playedRows },
     { data: upcomingRows },
+    { data: clubRows },
   ] = await Promise.all([
     // In progress right now
     supabase
@@ -106,7 +107,17 @@ export default async function LiveHubPage({
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true, nullsFirst: false })
       .limit(24),
+
+    // Clubs row at the top of the page.
+    supabase
+      .from("teams")
+      .select("team_id, name, logo_url")
+      .eq("team_type", "club")
+      .neq("is_public", false)
+      .order("name"),
   ]);
+
+  const clubs = clubRows ?? [];
 
   const live = liveRows ?? [];
   const liveIds = new Set(live.map((f: any) => f.fixture_id));
@@ -176,6 +187,14 @@ export default async function LiveHubPage({
   const tab: TabKey = (TABS.find((t) => t.key === requested)?.key ??
     defaultTab) as TabKey;
 
+  // The next game worth asking a fan to call — the earliest kick-off nobody
+  // has seen the result of yet. Live is deliberately excluded: that game is
+  // already being decided, not predicted.
+  const nextMatch = (todaysMatches[0] ?? upcoming[0] ?? null) as any;
+  const predictionCounts = nextMatch
+    ? await getPredictionCounts(nextMatch.fixture_id)
+    : null;
+
   return (
     <>
       <LiveRefresh tables={["fixtures", "match_results", "match_events"]} />
@@ -189,6 +208,39 @@ export default async function LiveHubPage({
           update on this page as they are recorded, no refresh needed.
         </p>
       </div>
+
+      {/* Clubs */}
+      {clubs.length > 0 && (
+        <div className="flex gap-3 overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+          {clubs.map((c: any) => (
+            <Link
+              key={c.team_id}
+              href={`/live/club/${c.team_id}`}
+              className="shrink-0 snap-start flex flex-col items-center gap-1.5 w-16 group"
+            >
+              <span className="w-14 h-14 rounded-full bg-neutral-900 border border-white/10 group-hover:border-white/30 transition flex items-center justify-center overflow-hidden">
+                <Avatar src={c.logo_url} name={c.name} size={40} contain />
+              </span>
+              <span className="text-[10px] text-slate-400 group-hover:text-slate-200 text-center leading-tight line-clamp-2 w-full">
+                {c.name}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Who will win? */}
+      {nextMatch && predictionCounts && (
+        <PredictionCard
+          fixtureId={nextMatch.fixture_id}
+          home={one<any>(nextMatch.home)}
+          away={one<any>(nextMatch.away)}
+          subtitle={`${one<any>(nextMatch.competition)?.name ?? "Next match"} · ${fmtShortDate(
+            nextMatch.scheduled_date
+          )}${nextMatch.scheduled_time ? ` · ${fmtTime(nextMatch.scheduled_time)}` : ""}`}
+          initialCounts={predictionCounts}
+        />
+      )}
 
       {/* Day tabs */}
       <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-6 max-w-sm">

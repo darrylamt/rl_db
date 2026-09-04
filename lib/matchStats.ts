@@ -7,6 +7,15 @@
 // Both are handled here so the public match centre reads the same either way.
 // ----------------------------------------------------------------------
 
+/**
+ * The columns a fixture needs to render as a MatchCard — crests, the score,
+ * and every field LiveClock reads. Shared so a page that lists fixtures does
+ * not quietly omit one of the clock fields and end up with a card that
+ * renders fine but never ticks.
+ */
+export const FIXTURE_SELECT =
+  "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id";
+
 export const EVENT_LABELS: Record<string, string> = {
   try: "Try",
   try_assist: "Try Assist",

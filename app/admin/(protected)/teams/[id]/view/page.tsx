@@ -179,12 +179,17 @@ export default async function TeamDetailPage({
   }
 
   /**
-   * The same record, split by the competition it was made in.
+   * The same record, split by what was actually played rather than by which
+   * competition and year it happened to be entered as.
    *
-   * A club's overall figures answer nothing on their own here: the 13s, the
-   * 9s and the youth and women's competitions are different games played by
-   * different sides from the same club, and rolling them together hides
-   * exactly the thing somebody opening this page wants to see.
+   * 13s in 2024 and 13s in 2026 are the same game played by the same kind of
+   * side — splitting them by season fragments one picture into several small
+   * ones and hides the thing a club total is for. Format and division are
+   * what's different (13s vs 9s, men vs youth); the year is not, so every
+   * season folds into one row and the row reports the span it covers instead.
+   *
+   * A competition the format regex doesn't recognise still gets its own row,
+   * keyed by name — nothing is dropped, just not artificially split by year.
    *
    * Scheduled fixtures are counted separately from played ones, because a
    * competition a club has entered and not yet played is still a competition
@@ -193,7 +198,7 @@ export default async function TeamDetailPage({
   type CompRow = {
     key: string;
     name: string;
-    season: string | null;
+    seasons: Set<string>;
     division: string;
     played: number;
     won: number;
@@ -209,14 +214,16 @@ export default async function TeamDetailPage({
   for (const f of (fixtures ?? []) as any[]) {
     const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
     if (!comp?.name) continue;
-    const key = `${comp.name}__${comp.season ?? ""}`;
+    const division = comp.division ?? "men";
+    const label = formatLabel(formatOf(comp.name)) ?? comp.name;
+    const key = `${label}__${division}`;
 
     if (!byComp.has(key)) {
       byComp.set(key, {
         key,
-        name: comp.name,
-        season: comp.season ?? null,
-        division: comp.division ?? "men",
+        name: label,
+        seasons: new Set(),
+        division,
         played: 0,
         won: 0,
         drawn: 0,
@@ -227,6 +234,7 @@ export default async function TeamDetailPage({
       });
     }
     const row = byComp.get(key)!;
+    if (comp.season) row.seasons.add(comp.season);
 
     const r = Array.isArray(f.result) ? f.result[0] : f.result;
     const isHome = f.home_team_id === teamId;
@@ -245,11 +253,16 @@ export default async function TeamDetailPage({
     else row.drawn += 1;
   }
 
-  const competitions = Array.from(byComp.values()).sort((a, b) => {
-    const season = (b.season ?? "").localeCompare(a.season ?? "");
-    if (season !== 0) return season;
-    return a.name.localeCompare(b.name);
-  });
+  const seasonSpan = (seasons: Set<string>) => {
+    const sorted = Array.from(seasons).sort();
+    if (sorted.length === 0) return "—";
+    if (sorted.length === 1) return sorted[0];
+    return `${sorted[0]}–${sorted[sorted.length - 1]}`;
+  };
+
+  const competitions = Array.from(byComp.values()).sort(
+    (a, b) => b.played - a.played || a.name.localeCompare(b.name)
+  );
 
   // Which format/division chips are worth offering: only ones this team has
   // actually completed a fixture in, so a filter never leads to an empty box.
@@ -372,16 +385,18 @@ export default async function TeamDetailPage({
             Competitions
           </h2>
           <p className="text-sm text-slate-500 mb-3">
-            Every competition this club has appeared in, and how they did in
-            each. The 13s, the 9s and the youth and women&apos;s competitions
-            are different sides from the same club, so they are counted apart.
+            Every format this club has played, added up across every season —
+            13s in 2024 and 13s in 2026 are the same game, and splitting them
+            by year only fragments the picture. The 13s, the 9s and the youth
+            and women&apos;s competitions are still counted apart, since those
+            are genuinely different sides from the same club.
           </p>
           <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-100 text-slate-700 text-left">
                 <tr>
                   <th className="px-3 py-2.5 font-medium">Competition</th>
-                  <th className="px-3 py-2.5 font-medium">Season</th>
+                  <th className="px-3 py-2.5 font-medium">Seasons</th>
                   <th className="px-3 py-2.5 font-medium text-right">P</th>
                   <th className="px-3 py-2.5 font-medium text-right">W</th>
                   <th className="px-3 py-2.5 font-medium text-right">D</th>
@@ -404,12 +419,12 @@ export default async function TeamDetailPage({
                       <span className="font-medium text-navy-900">{c.name}</span>
                       {c.division && c.division !== "men" && (
                         <span className="ml-2 text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                          {c.division}
+                          {divisionLabel(c.division) ?? c.division}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-slate-600 tabular-nums">
-                      {c.season ?? "—"}
+                      {seasonSpan(c.seasons)}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums font-display text-navy-900">
                       {c.played}
