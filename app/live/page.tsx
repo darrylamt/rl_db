@@ -4,7 +4,7 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { MatchCard } from "./MatchCard";
 import { Avatar } from "@/components/Avatar";
 import { PredictionCard } from "@/components/live/PredictionCard";
-import { getPredictionCounts } from "@/lib/predictions";
+import { getPredictionCountsFor } from "@/lib/predictions";
 import { pointsFrom, FIXTURE_SELECT, fmtShortDate, fmtTime } from "@/lib/matchStats";
 
 // Scores must never be served stale.
@@ -216,13 +216,22 @@ export default async function LiveHubPage({
   const tab: TabKey = (TABS.find((t) => t.key === requested)?.key ??
     defaultTab) as TabKey;
 
-  // The next game worth asking a fan to call — the earliest kick-off nobody
-  // has seen the result of yet. Live is deliberately excluded: that game is
-  // already being decided, not predicted.
-  const nextMatch = (todaysMatches[0] ?? upcoming[0] ?? null) as any;
-  const predictionCounts = nextMatch
-    ? await getPredictionCounts(nextMatch.fixture_id)
-    : null;
+  // The games worth asking a fan to call — the earliest kick-offs nobody has
+  // seen the result of yet. Live is deliberately excluded: that game is
+  // already being decided, not predicted. Five is enough to page through
+  // without turning the card into a fixture list.
+  const pollFixtures = [...todaysMatches, ...upcoming].slice(0, 5) as any[];
+  const pollCounts = await getPredictionCountsFor(
+    pollFixtures.map((f) => f.fixture_id)
+  );
+  const pollMatches = pollFixtures.map((f) => ({
+    fixtureId: f.fixture_id,
+    home: one<any>(f.home),
+    away: one<any>(f.away),
+    competition: one<any>(f.competition)?.name ?? "Next match",
+    kickoff: kickoffLabel(f.scheduled_date, f.scheduled_time, today),
+    counts: pollCounts[f.fixture_id] ?? { home: 0, away: 0 },
+  }));
 
   return (
     <>
@@ -259,20 +268,7 @@ export default async function LiveHubPage({
       )}
 
       {/* Who will win? */}
-      {nextMatch && predictionCounts && (
-        <PredictionCard
-          fixtureId={nextMatch.fixture_id}
-          home={one<any>(nextMatch.home)}
-          away={one<any>(nextMatch.away)}
-          competition={one<any>(nextMatch.competition)?.name ?? "Next match"}
-          kickoff={kickoffLabel(
-            nextMatch.scheduled_date,
-            nextMatch.scheduled_time,
-            today
-          )}
-          initialCounts={predictionCounts}
-        />
-      )}
+      {pollMatches.length > 0 && <PredictionCard matches={pollMatches} />}
 
       {/* Day tabs */}
       <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-6 max-w-sm">

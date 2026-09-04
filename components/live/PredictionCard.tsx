@@ -3,11 +3,21 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { castPrediction } from "@/app/live/actions";
+import { dominantColour } from "@/lib/logoColour";
 
 type Team = { team_id?: string; name: string | null; logo_url: string | null } | null;
 
+export type PollMatch = {
+  fixtureId: string;
+  home: Team;
+  away: Team;
+  competition: string;
+  kickoff: string;
+  counts: { home: number; away: number };
+};
+
 /**
- * "Who will win the next game?" — a poll, and nothing else.
+ * "Who will win?" — a poll, and nothing else.
  *
  * No likes, comments or share row: a fan taps a crest, sees where the
  * predictions are running, and that is the whole feature. A vote is tied to
@@ -15,29 +25,20 @@ type Team = { team_id?: string; name: string | null; logo_url: string | null } |
  * since there is no fan login here — soft protection against voting twice,
  * which is all a poll like this needs.
  *
- * The bars show from the start rather than after voting. Hiding them would
- * make the card look broken to somebody who has already voted from another
- * device, and the split is the interesting part either way.
+ * A pick can be changed. The database upserts on (fixture, device) so
+ * switching moves the vote rather than adding one, and somebody who taps the
+ * wrong crest should not be stuck with it.
  */
-export function PredictionCard({
-  fixtureId,
-  home,
-  away,
-  competition,
-  kickoff,
-  initialCounts,
-}: {
-  fixtureId: string;
-  home: Team;
-  away: Team;
-  competition: string;
-  kickoff: string;
-  initialCounts: { home: number; away: number };
-}) {
+export function PredictionCard({ matches }: { matches: PollMatch[] }) {
+  const [index, setIndex] = useState(0);
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [voted, setVoted] = useState<"home" | "away" | null>(null);
-  const [counts, setCounts] = useState(initialCounts);
+  const [votes, setVotes] = useState<Record<string, "home" | "away">>({});
+  const [counts, setCounts] = useState<Record<string, { home: number; away: number }>>(
+    () => Object.fromEntries(matches.map((m) => [m.fixtureId, m.counts]))
+  );
   const [pending, setPending] = useState(false);
+
+  const match = matches[index];
 
   useEffect(() => {
     try {
@@ -48,19 +49,33 @@ export function PredictionCard({
       }
       setDeviceId(id);
 
-      const stored = localStorage.getItem(`rlfg_predicted_${fixtureId}`);
-      if (stored === "home" || stored === "away") setVoted(stored);
+      const found: Record<string, "home" | "away"> = {};
+      for (const m of matches) {
+        const stored = localStorage.getItem(`rlfg_predicted_${m.fixtureId}`);
+        if (stored === "home" || stored === "away") found[m.fixtureId] = stored;
+      }
+      setVotes(found);
     } catch {
       // Private browsing or storage disabled — the poll still works, it just
       // will not remember a vote on the next visit.
     }
-  }, [fixtureId]);
+  }, [matches]);
 
   async function vote(choice: "home" | "away") {
-    if (pending || voted) return;
+    if (pending || !match) return;
+    const fixtureId = match.fixtureId;
+    const previous = votes[fixtureId];
+    if (previous === choice) return;
+
     setPending(true);
-    setVoted(choice);
-    setCounts((c) => ({ ...c, [choice]: c[choice] + 1 }));
+    setVotes((v) => ({ ...v, [fixtureId]: choice }));
+    setCounts((c) => {
+      const cur = c[fixtureId] ?? { home: 0, away: 0 };
+      const next = { ...cur, [choice]: cur[choice] + 1 };
+      // Switching moves the vote rather than adding a second one.
+      if (previous) next[previous] = Math.max(0, next[previous] - 1);
+      return { ...c, [fixtureId]: next };
+    });
     try {
       localStorage.setItem(`rlfg_predicted_${fixtureId}`, choice);
     } catch {
@@ -75,7 +90,11 @@ export function PredictionCard({
     setPending(false);
   }
 
-  const total = counts.home + counts.away;
+  if (!match) return null;
+
+  const mine = votes[match.fixtureId] ?? null;
+  const tally = counts[match.fixtureId] ?? { home: 0, away: 0 };
+  const total = tally.home + tally.away;
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
 
   return (
@@ -88,60 +107,98 @@ export function PredictionCard({
           alt=""
           className="w-9 h-9 rounded-full shrink-0"
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-tight truncate">
             Rugby League Federation Ghana
           </p>
           <p className="text-[11px] text-violet-300/70 leading-tight truncate">
-            {competition}
+            {match.competition}
           </p>
         </div>
+
+        {matches.length > 1 && (
+          <div className="flex items-center gap-1 shrink-0">
+            <Arrow
+              dir="prev"
+              disabled={index === 0}
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+            />
+            <span className="text-[11px] tabular-nums text-violet-300/70 w-8 text-center">
+              {index + 1}/{matches.length}
+            </span>
+            <Arrow
+              dir="next"
+              disabled={index === matches.length - 1}
+              onClick={() => setIndex((i) => Math.min(matches.length - 1, i + 1))}
+            />
+          </div>
+        )}
       </div>
 
       <h2 className="font-display text-xl md:text-2xl leading-tight mb-5">
-        Who will win the next game?
+        Who will win {matches.length > 1 && index > 0 ? "this game" : "the next game"}?
       </h2>
 
       {/* The two sides */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-5">
-        <Crest team={home} onClick={() => vote("home")} picked={voted === "home"} locked={!!voted} />
+        <Crest team={match.home} onClick={() => vote("home")} picked={mine === "home"} />
 
         <div className="flex flex-col items-center gap-2">
           <span className="font-display text-lg text-white/90">VS</span>
           <span className="rounded-full bg-black/40 border border-white/10 px-3 py-1.5 text-center leading-tight">
             <span className="block text-[11px] text-white/80 whitespace-nowrap">
-              {kickoff}
+              {match.kickoff}
             </span>
           </span>
         </div>
 
-        <Crest team={away} onClick={() => vote("away")} picked={voted === "away"} locked={!!voted} />
+        <Crest team={match.away} onClick={() => vote("away")} picked={mine === "away"} />
       </div>
 
       {/* Where the predictions are running */}
       <div className="space-y-2 rounded-2xl bg-black/30 border border-white/5 p-3">
-        <Bar
-          team={home}
-          pct={pct(counts.home)}
-          picked={voted === "home"}
-          tint="from-indigo-500 to-violet-500"
-        />
-        <Bar
-          team={away}
-          pct={pct(counts.away)}
-          picked={voted === "away"}
-          tint="from-fuchsia-600 to-violet-500"
-        />
+        <Bar team={match.home} pct={pct(tally.home)} picked={mine === "home"} fallback="#6366f1" />
+        <Bar team={match.away} pct={pct(tally.away)} picked={mine === "away"} fallback="#c026d3" />
       </div>
 
       <p className="text-[11px] text-violet-300/60 text-center mt-3">
         {total === 0
           ? "No predictions yet — have the first say."
           : `${total} prediction${total === 1 ? "" : "s"}${
-              voted ? "" : " · tap a crest to pick"
+              mine ? " · tap the other crest to change your mind" : " · tap a crest to pick"
             }`}
       </p>
     </div>
+  );
+}
+
+function Arrow({
+  dir,
+  disabled,
+  onClick,
+}: {
+  dir: "prev" | "next";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === "prev" ? "Previous match" : "Next match"}
+      className="w-7 h-7 rounded-full border border-white/15 bg-white/5 grid place-items-center text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 transition"
+    >
+      <svg viewBox="0 0 20 20" fill="none" className="w-3.5 h-3.5">
+        <path
+          d={dir === "prev" ? "M12 4l-6 6 6 6" : "M8 4l6 6-6 6"}
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
   );
 }
 
@@ -149,24 +206,19 @@ function Crest({
   team,
   onClick,
   picked,
-  locked,
 }: {
   team: Team;
   onClick: () => void;
   picked: boolean;
-  locked: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={locked}
-      className={`flex flex-col items-center gap-2 min-w-0 transition ${
-        locked ? "cursor-default" : "hover:scale-[1.03]"
-      } ${locked && !picked ? "opacity-60" : ""}`}
+      className="flex flex-col items-center gap-2 min-w-0 transition hover:scale-[1.03]"
     >
       <span
-        className={`rounded-full p-1 ${
+        className={`rounded-full p-1 transition ${
           picked ? "ring-2 ring-ghanaYellow-500" : "ring-1 ring-white/15"
         }`}
       >
@@ -183,25 +235,44 @@ function Bar({
   team,
   pct,
   picked,
-  tint,
+  fallback,
 }: {
   team: Team;
   pct: number;
   picked: boolean;
-  tint: string;
+  fallback: string;
 }) {
+  const [colour, setColour] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    dominantColour(team?.logo_url).then((c) => {
+      if (live) setColour(c);
+    });
+    return () => {
+      live = false;
+    };
+  }, [team?.logo_url]);
+
+  const base = colour ?? fallback;
+
   return (
     <div className="flex items-center gap-2">
       <div className="relative flex-1 h-9 rounded-full bg-white/5 overflow-hidden">
+        {/* Sheen sits on top as its own layer rather than being mixed into
+            the colour — the club colour can arrive as hsl() or hex, and
+            string-splicing an alpha onto either is how that breaks. */}
         <div
-          className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${tint} transition-all duration-500`}
-          style={{ width: `${Math.max(pct, pct > 0 ? 12 : 0)}%` }}
-        />
+          className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 overflow-hidden"
+          style={{ width: `${Math.max(pct, pct > 0 ? 12 : 0)}%`, background: base }}
+        >
+          <span className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+        </div>
         <div className="absolute inset-0 flex items-center justify-between px-1.5">
           <Avatar src={team?.logo_url} name={team?.name} size={24} contain />
           <span
-            className={`text-xs tabular-nums font-semibold pr-2 ${
-              picked ? "text-ghanaYellow-500" : "text-white/90"
+            className={`text-xs tabular-nums font-semibold pr-2 drop-shadow ${
+              picked ? "text-ghanaYellow-500" : "text-white"
             }`}
           >
             {pct}%

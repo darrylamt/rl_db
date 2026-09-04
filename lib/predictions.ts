@@ -14,19 +14,37 @@ export type PredictionCounts = { home: number; away: number };
 export async function getPredictionCounts(
   fixtureId: string
 ): Promise<PredictionCounts> {
+  return (await getPredictionCountsFor([fixtureId]))[fixtureId] ?? {
+    home: 0,
+    away: 0,
+  };
+}
+
+/**
+ * Counts for several fixtures in one query — the poll can be paged through
+ * the next few matches, and one round trip per card would be a query per
+ * fixture for a card only one of which is on screen.
+ */
+export async function getPredictionCountsFor(
+  fixtureIds: string[]
+): Promise<Record<string, PredictionCounts>> {
+  const out: Record<string, PredictionCounts> = {};
+  for (const id of fixtureIds) out[id] = { home: 0, away: 0 };
+  if (fixtureIds.length === 0) return out;
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("match_predictions")
-    .select("choice")
-    .eq("fixture_id", fixtureId);
+    .select("fixture_id, choice")
+    .in("fixture_id", fixtureIds);
 
-  if (error || !data) return { home: 0, away: 0 };
+  if (error || !data) return out;
 
-  let home = 0;
-  let away = 0;
   for (const row of data as any[]) {
-    if (row.choice === "home") home++;
-    else if (row.choice === "away") away++;
+    const bucket = out[row.fixture_id];
+    if (!bucket) continue;
+    if (row.choice === "home") bucket.home++;
+    else if (row.choice === "away") bucket.away++;
   }
-  return { home, away };
+  return out;
 }
