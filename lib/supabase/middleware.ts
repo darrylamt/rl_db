@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { TERMS_VERSION } from "@/lib/terms";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -66,12 +67,31 @@ export async function updateSession(request: NextRequest) {
   let hasRoles = true;
   let onHold = false;
   let mustChange = false;
+  let termsVersion: string | null = null;
+  let termsColumnPresent = true;
   if (user && (isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute || isLoginRoute)) {
-    const { data, error } = await supabase
+    // terms_version arrives with supabase/player_terms.sql. Asking for a
+    // column that is not there yet fails the whole row, and a null row here
+    // reads as "unprovisioned" — which would lock every account out of the
+    // app until the migration ran. So it is asked for, and dropped if the
+    // database has not caught up.
+    let { data, error } = await supabase
       .from("app_users")
-      .select("role, status, must_change_password")
+      .select("role, status, must_change_password, terms_version")
       .eq("user_id", user.id)
       .maybeSingle();
+    if (error && (error as any).code === "42703") {
+      // No column yet, so there is nothing to hold anybody to. The gate below
+      // stays shut off entirely rather than sending every player to a screen
+      // whose "I agree" it has nowhere to record — which would be a loop, and
+      // a loop here is every player locked out of their own portal.
+      termsColumnPresent = false;
+      ({ data, error } = await supabase
+        .from("app_users")
+        .select("role, status, must_change_password")
+        .eq("user_id", user.id)
+        .maybeSingle());
+    }
     if (error && (error as any).code === "42P01") {
       // Roles have not been introduced yet: behave exactly as before.
       hasRoles = false;
@@ -83,6 +103,7 @@ export async function updateSession(request: NextRequest) {
           ? data.role
           : "federation";
       mustChange = (data as any).must_change_password === true;
+      termsVersion = (data as any).terms_version ?? null;
       // The column only exists once account_holds_and_audit.sql has run;
       // before that nothing is held, exactly as before.
       onHold = (data as any).status === "on_hold";
@@ -124,6 +145,25 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/player/password";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Then what the federation shares about them, which they are asked once per
+  // version. After the password on purpose: the first thing anybody does is
+  // make the account theirs, and only then are they asked to agree to
+  // anything from it.
+  if (
+    user &&
+    role === "player" &&
+    !mustChange &&
+    termsColumnPresent &&
+    termsVersion !== TERMS_VERSION &&
+    !isLogoutRoute &&
+    pathname !== "/player/terms"
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/player/terms";
     url.search = "";
     return NextResponse.redirect(url);
   }

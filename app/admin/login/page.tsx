@@ -26,7 +26,11 @@ async function clubLogos(): Promise<string[]> {
   }
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { declined?: string };
+}) {
   const logos = await clubLogos();
 
   return (
@@ -34,6 +38,15 @@ export default async function LoginPage() {
       <style dangerouslySetInnerHTML={{ __html: crestFieldStyles() }} />
       <CrestField logos={logos} />
       <div className="relative w-full max-w-md">
+        {/* Somebody who has just declined the terms is signed out on the spot.
+            Landing back here with no explanation reads as a fault. */}
+        {searchParams?.declined && (
+          <div className="mb-4 bg-navy-900/90 border border-white/15 rounded-lg px-4 py-3 text-sm text-navy-100">
+            You have been signed out because you did not agree to the terms.
+            Your playing registration is unaffected. Sign in again if you want
+            to read them once more.
+          </div>
+        )}
         <Suspense fallback={<div className="h-[28rem]" />}>
           <LoginForm />
         </Suspense>
