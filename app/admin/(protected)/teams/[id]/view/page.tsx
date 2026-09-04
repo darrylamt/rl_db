@@ -158,8 +158,11 @@ export default async function TeamDetailPage({
     const away: any = Array.isArray(f.away) ? f.away[0] : f.away;
     const division: string = comp?.division ?? "men";
 
-    // Only include in overall tally for men's fixtures
-    if (division === "men") overall = applyMatch(overall, ourScore, theirScore);
+    // Every completed fixture, whichever side of the club played it — the
+    // Competitions table two sections down sums the same way, and a top
+    // figure that quietly dropped women's and youth matches while that one
+    // didn't was two numbers on one page both claiming to be the total.
+    overall = applyMatch(overall, ourScore, theirScore);
     matchRows.push({
       fixture_id: f.fixture_id,
       date: f.scheduled_date,

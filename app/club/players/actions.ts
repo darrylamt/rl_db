@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
 import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 import { cleanSecondaryPositions } from "@/lib/positions";
+import { resolveImageUrl } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -53,7 +54,7 @@ async function ownedPlayer(playerId: string) {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("players")
-    .select("player_id, team_id")
+    .select("player_id, team_id, photo_url")
     .eq("player_id", playerId)
     .maybeSingle();
 
@@ -61,15 +62,18 @@ async function ownedPlayer(playerId: string) {
   if (data.team_id !== teamId) {
     throw new Error("That player is not on your squad");
   }
-  return { supabase, teamId };
+  return { supabase, teamId, photoUrl: data.photo_url as string | null };
 }
 
 export async function updateClubPlayer(playerId: string, fd: FormData) {
-  const { supabase } = await ownedPlayer(playerId);
+  const { supabase, photoUrl } = await ownedPlayer(playerId);
 
+  // A file input posts an empty File, not an empty string, when nothing new
+  // is chosen — reading it as text always looked blank and wiped the photo
+  // on every save, not only one that touched the upload field.
   const position = str(fd, "position");
   const payload: Record<string, unknown> = {
-    photo_url: str(fd, "photo"),
+    photo_url: await resolveImageUrl(fd, "photo", "player-photos", "players", photoUrl),
     position,
     secondary_positions: cleanSecondaryPositions(
       fd.getAll("secondary_positions"),
@@ -116,6 +120,7 @@ export async function createClubPlayer(fd: FormData) {
   if (!first_name || !last_name) throw new Error("First and last name are required");
 
   const user = await getAppUser();
+  const photoUrl = await resolveImageUrl(fd, "photo", "player-photos", "players", null);
 
   // Pending, not on the register. A club naming a player is a claim; the
   // federation decides who is actually registered. The columns arrive with
@@ -138,7 +143,7 @@ export async function createClubPlayer(fd: FormData) {
     nationality: str(fd, "nationality"),
     phone: str(fd, "phone"),
     email: str(fd, "email"),
-    photo_url: str(fd, "photo"),
+    photo_url: photoUrl,
     // A new player is on record but not registered — that is the federation's
     // to grant, for a season.
     playing_status: "inactive",
