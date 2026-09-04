@@ -123,8 +123,8 @@ function Chip({
       href={href}
       className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border transition-colors ${
         on
-          ? "bg-purple-950 text-white border-purple-950 font-semibold"
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+          ? "bg-ghanaYellow-500 text-black border-ghanaYellow-500 font-semibold"
+          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
       }`}
     >
       {children}
@@ -182,12 +182,12 @@ export default async function RecordsPage({
   };
 
   return (
-    <div className="bg-slate-100 text-slate-900 rounded-3xl p-4 md:p-6 -mx-1">
+    <>
       <div className="mb-6">
-        <h1 className="text-3xl md:text-5xl font-extrabold text-purple-950 leading-tight">
+        <h1 className="font-display text-3xl md:text-5xl leading-tight">
           Records
         </h1>
-        <p className="text-slate-500 text-sm mt-2 max-w-2xl">
+        <p className="text-slate-400 text-sm mt-2 max-w-2xl">
           Every figure here is counted from recorded match data, so it moves as
           the season does.
         </p>
@@ -195,7 +195,7 @@ export default async function RecordsPage({
 
       {/* Everything is combined unless you ask otherwise: a 9s try and a 13s
           try are not the same feat, and neither are a men's and a youth one. */}
-      <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-6 grid gap-3">
+      <div className="bg-neutral-900 border border-white/10 rounded-xl p-3 md:p-4 mb-6 grid gap-3">
         <FilterRow label="Season">
           <Chip href={href({ season: null })} on={!season}>
             All time
@@ -239,7 +239,7 @@ export default async function RecordsPage({
       </div>
 
       {nothing ? (
-        <p className="bg-white rounded-2xl shadow-sm px-4 py-10 text-center text-slate-500 text-sm">
+        <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
           {[
             "No",
             records.divisions.find((d) => d.key === division)?.label,
@@ -257,12 +257,12 @@ export default async function RecordsPage({
             {records.totals.map((t) => (
               <div
                 key={t.label}
-                className="bg-white rounded-2xl shadow-sm px-3 py-3 text-center"
+                className="bg-neutral-900 border border-white/10 rounded-lg px-3 py-3 text-center"
               >
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">
                   {t.label}
                 </div>
-                <div className="text-2xl font-extrabold text-purple-950 mt-1 tabular-nums">
+                <div className="font-display text-2xl mt-1 tabular-nums">
                   {t.value}
                 </div>
               </div>
@@ -274,28 +274,28 @@ export default async function RecordsPage({
               {records.matchFacts.map((f) => (
                 <div
                   key={f.label}
-                  className="bg-white rounded-2xl shadow-sm px-4 py-3"
+                  className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3"
                 >
                   <p className="text-[10px] uppercase tracking-wider text-slate-500">
                     {f.label}
                   </p>
-                  <p className="text-2xl font-extrabold text-purple-950 tabular-nums leading-tight mt-0.5">
+                  <p className="font-display text-2xl text-ghanaYellow-500 tabular-nums leading-tight mt-0.5">
                     {f.value}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">{f.detail}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{f.detail}</p>
                 </div>
               ))}
             </div>
           )}
 
-          <h2 className="text-xl font-bold text-purple-950 mb-3">Players</h2>
+          <h2 className="font-display text-xl mb-3">Players</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-8">
             {records.playerBoards.map((b) => (
               <Board key={b.key} board={b} />
             ))}
           </div>
 
-          <h2 className="text-xl font-bold text-purple-950 mb-1">Clubs</h2>
+          <h2 className="font-display text-xl mb-1">Clubs</h2>
           <p className="text-slate-500 text-xs mb-3">
             Clubs only. The national sides and the President&apos;s XIII pick
             from every club in the league, so they are not ranked against them.
@@ -310,10 +310,10 @@ export default async function RecordsPage({
 
       <p className="text-xs text-slate-500 mt-8">
         Counted from recorded match data.{" "}
-        <Link href="/live" className="text-purple-800 font-medium hover:underline">
+        <Link href="/live" className="text-ghanaYellow-500 hover:underline">
           Back to the scores
         </Link>
       </p>
-    </div>
+    </>
   );
 }
