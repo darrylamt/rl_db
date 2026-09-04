@@ -60,8 +60,7 @@ export default function LiveLayout({
 
       <footer className="border-t border-white/10 mt-8">
         <div className="max-w-5xl mx-auto px-4 py-6 text-slate-500 text-xs">
-          © {new Date().getFullYear()} Rugby League Federation Ghana. Scores
-          update automatically as officials record them.
+          © {new Date().getFullYear()} Rugby League Federation Ghana.
         </div>
       </footer>
     </div>

@@ -164,7 +164,15 @@ export function MatchCard({
           )}
           <div className="mt-1.5 flex items-center justify-center gap-1.5 whitespace-nowrap">
             <StatusPill status={fixture.status} />
-            <LiveClock fixture={fixture as any} className="text-ghanaYellow-500 text-[11px]" />
+            {/* Only while it is actually being played. Once it is over the
+                pill already says Full time, and the clock's own "FT" beside
+                it was the same thing said twice. */}
+            {isLive && (
+              <LiveClock
+                fixture={fixture as any}
+                className="text-ghanaYellow-500 text-[11px]"
+              />
+            )}
           </div>
         </div>
 

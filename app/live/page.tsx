@@ -269,8 +269,8 @@ export default async function LiveHubPage({
           Rugby League Federation Ghana
         </h1>
         <p className="text-slate-400 text-sm mt-2 max-w-2xl">
-          Every club, every fixture, every result — updating as officials
-          record them. Call the next game before it kicks off.
+          Every club, every fixture, every result. Call the next game before
+          it kicks off.
         </p>
       </div>
 
