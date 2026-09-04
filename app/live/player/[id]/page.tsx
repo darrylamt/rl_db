@@ -14,6 +14,15 @@ import {
 import { fetchLineupAppearances } from "@/lib/appearances";
 import { cleanSecondaryPositions } from "@/lib/positions";
 import {
+  formatOf,
+  formatLabel,
+  divisionLabel,
+  formatsIn,
+  divisionsIn,
+  seasonsIn,
+  inSeasonRange,
+} from "@/lib/competitionFormat";
+import {
   TEAM_STAT_ROWS,
   eventLabel,
   fmtShortDate,
@@ -58,11 +67,21 @@ export default async function PublicPlayerPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { vs?: string };
+  searchParams?: {
+    vs?: string;
+    format?: string;
+    division?: string;
+    from?: string;
+    to?: string;
+  };
 }) {
   const supabase = createPublicClient();
   const playerId = params.id;
   const vsId = searchParams?.vs || "";
+  const formatId = searchParams?.format || "";
+  const divisionId = searchParams?.division || "";
+  const fromSeason = searchParams?.from || "";
+  const toSeason = searchParams?.to || "";
 
   const [
     { data: player },
@@ -81,7 +100,7 @@ export default async function PublicPlayerPage({
     supabase
       .from("match_events")
       .select(
-        "event_type, fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score))"
+        "event_type, fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season, division), result:match_results(home_score, away_score))"
       )
       .eq("player_id", playerId),
     fetchLineupAppearances(supabase, playerId),
@@ -121,18 +140,61 @@ export default async function PublicPlayerPage({
     (t: any) => t.team_id === (player as any).team_id
   ) as any;
 
-  // Optional head-to-head comparison on the radar.
+  /** The competition an event's fixture was played in, however deep the join. */
+  const eventComp = (e: any) => {
+    const f = one<any>(e.fixture);
+    const c = one<any>(f?.competition);
+    return {
+      name: c?.name ?? null,
+      division: c?.division ?? null,
+      season: c?.season ?? null,
+    };
+  };
+
+  const inScope = (e: any) => {
+    const c = eventComp(e);
+    if (formatId && formatOf(c.name) !== formatId) return false;
+    if (divisionId && (c.division ?? "men") !== divisionId) return false;
+    if (!inSeasonRange(c.season, fromSeason, toSeason)) return false;
+    return true;
+  };
+
+  // Optional comparison with another player.
   let vsPlayer: any = null;
+  let vsStats: StatMap | null = null;
   if (vsId && vsId !== playerId) {
-    const { data } = await supabase
-      .from("public_players")
-      .select(PLAYER_SELECT)
-      .eq("player_id", vsId)
-      .maybeSingle();
+    const [{ data }, { data: vpEvents }] = await Promise.all([
+      supabase
+        .from("public_players")
+        .select(PLAYER_SELECT)
+        .eq("player_id", vsId)
+        .maybeSingle(),
+      supabase
+        .from("match_events")
+        .select(
+          "event_type, fixture:fixture_id(competition:competition_id(name, season, division))"
+        )
+        .eq("player_id", vsId),
+    ]);
     vsPlayer = data;
+    vsStats = tally(((vpEvents ?? []) as any[]).filter(inScope));
   }
 
-  const allEvents = (events ?? []) as any[];
+  const everyEvent = (events ?? []) as any[];
+  const scopeFilters = formatsIn(everyEvent.map(eventComp));
+  const scopeDivisions = divisionsIn(everyEvent.map(eventComp));
+  const scopeSeasons = seasonsIn(everyEvent.map(eventComp));
+  const scopeLabel = [
+    divisionLabel(divisionId),
+    formatLabel(formatId),
+    fromSeason || toSeason
+      ? `${fromSeason || "start"}–${toSeason || "now"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const allEvents = everyEvent.filter(inScope);
   const stats: StatMap = tally(allEvents);
   const totalPoints = pointsFrom(allEvents);
 
@@ -151,6 +213,10 @@ export default async function PublicPlayerPage({
   for (const l of lineups) {
     const f = l.fixture;
     if (!f?.fixture_id || perMatch.has(f.fixture_id)) continue;
+    // A squad selection carries the same competition as an event does, so
+    // the filters have to reach it too — otherwise narrowing to the 9s still
+    // counts every 13s match this player was named in.
+    if (!inScope({ fixture: f })) continue;
     perMatch.set(f.fixture_id, { fixture: f, stats: {} });
   }
 
@@ -285,8 +351,121 @@ export default async function PublicPlayerPage({
         </div>
       )}
 
+      {/* What is being counted, and who against */}
+      <form className="bg-neutral-900 border border-white/10 rounded-xl p-3 mb-6 flex flex-wrap items-end gap-2">
+        <label className="text-sm flex-1 min-w-[12rem]">
+          <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1">
+            Compare with
+          </span>
+          <select
+            name="vs"
+            defaultValue={vsId}
+            className="w-full px-3 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
+          >
+            <option value="">— nobody —</option>
+            {((allPlayers ?? []) as any[])
+              .filter((o) => o.player_id !== playerId)
+              .map((o) => (
+                <option key={o.player_id} value={o.player_id}>
+                  {o.first_name} {o.last_name}
+                  {o.team_id && teamName.get(o.team_id)
+                    ? ` · ${teamName.get(o.team_id)}`
+                    : ""}
+                </option>
+              ))}
+          </select>
+        </label>
+
+        {scopeDivisions.length > 0 && (
+          <label className="text-sm">
+            <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1">
+              Division
+            </span>
+            <select
+              name="division"
+              defaultValue={divisionId}
+              className="px-3 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
+            >
+              <option value="">All</option>
+              {scopeDivisions.map((d) => (
+                <option key={d.key} value={d.key}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {scopeFilters.length > 0 && (
+          <label className="text-sm">
+            <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1">
+              Competition
+            </span>
+            <select
+              name="format"
+              defaultValue={formatId}
+              className="px-3 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
+            >
+              <option value="">All</option>
+              {scopeFilters.map((f) => (
+                <option key={f.key} value={f.key}>{f.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {scopeSeasons.length > 1 && (
+          <label className="text-sm">
+            <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1">
+              Seasons
+            </span>
+            <span className="flex items-center gap-1">
+              <select
+                name="from"
+                defaultValue={fromSeason}
+                className="px-2 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
+              >
+                <option value="">Any</option>
+                {scopeSeasons.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <span className="text-slate-500 text-xs">to</span>
+              <select
+                name="to"
+                defaultValue={toSeason}
+                className="px-2 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
+              >
+                <option value="">Any</option>
+                {scopeSeasons.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </span>
+          </label>
+        )}
+
+        <button
+          type="submit"
+          className="px-4 py-1.5 rounded bg-ghanaGreen-600 hover:bg-ghanaGreen-700 text-white text-sm font-medium transition"
+        >
+          Apply
+        </button>
+        {(vsId || formatId || divisionId || fromSeason || toSeason) && (
+          <Link
+            href={`/live/player/${playerId}`}
+            className="text-xs text-slate-500 hover:text-white pb-2"
+          >
+            clear
+          </Link>
+        )}
+      </form>
+
       {/* Headline numbers */}
-      <div className="flex gap-2 overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 snap-x">
+      {scopeLabel && (
+        <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
+          {scopeLabel}
+        </p>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         <Stat label="Matches" value={matchesPlayed} />
         <Stat label="Points" value={totalPoints} />
         <Stat label="Tries" value={statValue(stats, ["try"])} />
@@ -350,51 +529,68 @@ export default async function PublicPlayerPage({
                 </div>
               </div>
 
-              {/* Compare with another player */}
-              <form className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center gap-2">
-                <label
-                  htmlFor="vs"
-                  className="text-[11px] uppercase tracking-wider text-slate-500"
-                >
-                  Compare with
-                </label>
-                <select
-                  id="vs"
-                  name="vs"
-                  defaultValue={vsId}
-                  className="flex-1 min-w-[12rem] px-3 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
-                >
-                  <option value="">— pick a player —</option>
-                  {((allPlayers ?? []) as any[])
-                    .filter((o) => o.player_id !== playerId)
-                    .map((o) => (
-                      <option key={o.player_id} value={o.player_id}>
-                        {o.first_name} {o.last_name}
-                        {o.team_id && teamName.get(o.team_id)
-                          ? ` · ${teamName.get(o.team_id)}`
-                          : ""}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded bg-ghanaGreen-600 hover:bg-ghanaGreen-700 text-white text-sm font-medium transition"
-                >
-                  Compare
-                </button>
-                {vsId && (
-                  <Link
-                    href={`/live/player/${playerId}`}
-                    className="text-xs text-slate-500 hover:text-white"
-                  >
-                    clear
-                  </Link>
-                )}
-              </form>
+              <p className="mt-4 pt-3 border-t border-white/10 text-[11px] text-slate-500">
+                Attributes are scouting ratings for the player overall, so the
+                filters above do not change them — the stats and match log
+                they do change.
+              </p>
             </>
           )}
         </div>
       </section>
+
+      {/* Stats side by side, on whatever is currently filtered */}
+      {vsPlayer && vsStats && (
+        <section className="mb-6">
+          <h2 className="font-display text-xl mb-1">Stats compared</h2>
+          <p className="text-[11px] text-slate-500 mb-3">
+            {scopeLabel || "All competitions, all seasons"}
+          </p>
+          <div className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center bg-white/5 border-b border-white/10 px-4 py-3 text-sm">
+              <div className="text-right font-medium truncate">
+                {p.first_name} {p.last_name}
+              </div>
+              <div className="px-4 text-[11px] uppercase tracking-wider text-slate-500">
+                vs
+              </div>
+              <div className="text-left font-medium truncate">
+                {vsPlayer.first_name} {vsPlayer.last_name}
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {TEAM_STAT_ROWS.map((row) => {
+                  const a = statValue(stats, row.keys);
+                  const b = statValue(vsStats!, row.keys);
+                  if (a === 0 && b === 0) return null;
+                  return (
+                    <tr key={row.label} className="border-t border-white/5">
+                      <td
+                        className={`px-4 py-2 text-right tabular-nums w-[40%] ${
+                          a > b ? "text-ghanaYellow-500 font-semibold" : ""
+                        }`}
+                      >
+                        {a}
+                      </td>
+                      <td className="px-4 py-2 text-center text-[11px] uppercase tracking-wider text-slate-500 w-[20%]">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-left tabular-nums w-[40%] ${
+                          b > a ? "text-ghanaYellow-500 font-semibold" : ""
+                        }`}
+                      >
+                        {b}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Career stats */}
       {careerStats.length > 0 && (
@@ -418,50 +614,76 @@ export default async function PublicPlayerPage({
             No matches played yet.
           </p>
         ) : (
-          <div className="space-y-2">
-            {matchRows.map(({ fixture, stats: s }) => {
-              const r = one<any>(fixture.result);
-              const home = one<any>(fixture.home);
-              const away = one<any>(fixture.away);
-              const comp = one<any>(fixture.competition);
-              const contribs = Object.entries(s)
-                .map(([k, v]) => `${v}× ${eventLabel(k)}`)
-                .join(" · ");
-              return (
-                <Link
-                  key={fixture.fixture_id}
-                  href={`/live/${fixture.fixture_id}`}
-                  className="block bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 hover:border-white/25 transition"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium truncate">
-                      {home?.name ?? "?"}{" "}
-                      <span className="text-slate-500">v</span>{" "}
-                      {away?.name ?? "?"}
-                    </span>
-                    <span className="font-display tabular-nums shrink-0">
-                      {r ? `${r.home_score} – ${r.away_score}` : "—"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
-                    <span>{fmtShortDate(fixture.scheduled_date)}</span>
-                    {comp?.name && (
-                      <span>
-                        · {comp.name}
-                        {comp.season ? ` ${comp.season}` : ""}
-                      </span>
-                    )}
-                    {contribs && (
-                      <span className="text-ghanaYellow-500">· {contribs}</span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <>
+            {/* Five is enough to see form; the rest is a career and belongs
+                behind a tap rather than down a page nobody scrolls. */}
+            <div className="space-y-2">
+              {matchRows.slice(0, 5).map((m) => (
+                <MatchRow key={m.fixture.fixture_id} row={m} />
+              ))}
+            </div>
+
+            {matchRows.length > 5 && (
+              <details className="group mt-2 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="list-none cursor-pointer select-none text-center text-xs text-slate-400 hover:text-white bg-neutral-900 border border-white/10 rounded-lg py-2.5">
+                  <span className="group-open:hidden">
+                    Show {matchRows.length - 5} more
+                  </span>
+                  <span className="hidden group-open:inline">Show fewer</span>
+                </summary>
+                <div className="space-y-2 mt-2">
+                  {matchRows.slice(5).map((m) => (
+                    <MatchRow key={m.fixture.fixture_id} row={m} />
+                  ))}
+                </div>
+              </details>
+            )}
+          </>
         )}
       </section>
     </>
+  );
+}
+
+function MatchRow({
+  row,
+}: {
+  row: { fixture: any; stats: StatMap };
+}) {
+  const { fixture, stats: s } = row;
+  const r = one<any>(fixture.result);
+  const home = one<any>(fixture.home);
+  const away = one<any>(fixture.away);
+  const comp = one<any>(fixture.competition);
+  const contribs = Object.entries(s)
+    .map(([k, v]) => `${v}× ${eventLabel(k)}`)
+    .join(" · ");
+
+  return (
+    <Link
+      href={`/live/${fixture.fixture_id}`}
+      className="block bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 hover:border-white/25 transition"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium truncate">
+          {home?.name ?? "?"} <span className="text-slate-500">v</span>{" "}
+          {away?.name ?? "?"}
+        </span>
+        <span className="font-display tabular-nums shrink-0">
+          {r ? `${r.home_score} – ${r.away_score}` : "—"}
+        </span>
+      </div>
+      <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
+        <span>{fmtShortDate(fixture.scheduled_date)}</span>
+        {comp?.name && (
+          <span>
+            · {comp.name}
+            {comp.season ? ` ${comp.season}` : ""}
+          </span>
+        )}
+        {contribs && <span className="text-ghanaYellow-500">· {contribs}</span>}
+      </div>
+    </Link>
   );
 }
 
@@ -475,7 +697,7 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="shrink-0 snap-start bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 min-w-[6rem] text-center">
+    <div className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 text-center">
       <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">
         {label}
       </div>

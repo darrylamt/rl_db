@@ -2,7 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Breadcrumb } from "@/components/admin/Breadcrumb";
-import { formatOf, formatLabel, divisionLabel, formatsIn, divisionsIn } from "@/lib/competitionFormat";
+import {
+  formatOf,
+  formatLabel,
+  divisionLabel,
+  formatsIn,
+  divisionsIn,
+  seasonsIn,
+  inSeasonRange,
+} from "@/lib/competitionFormat";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -74,13 +82,21 @@ export default async function TeamDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { vs?: string; format?: string; division?: string };
+  searchParams?: {
+    vs?: string;
+    format?: string;
+    division?: string;
+    from?: string;
+    to?: string;
+  };
 }) {
   const supabase = createAdminClient();
   const teamId = params.id;
   const vsId = searchParams?.vs || "";
   const formatId = searchParams?.format || "";
   const divisionId = searchParams?.division || "";
+  const fromSeason = searchParams?.from || "";
+  const toSeason = searchParams?.to || "";
 
   // Team + home venue + full team list (for the compare dropdown).
   const [{ data: team }, { data: allTeams }] = await Promise.all([
@@ -268,11 +284,22 @@ export default async function TeamDetailPage({
   // actually completed a fixture in, so a filter never leads to an empty box.
   const playedCompetitions = completed.map((f: any) => {
     const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
-    return { name: comp?.name ?? null, division: comp?.division ?? null };
+    return {
+      name: comp?.name ?? null,
+      division: comp?.division ?? null,
+      season: comp?.season ?? null,
+    };
   });
   const h2hFormats = formatsIn(playedCompetitions);
   const h2hDivisions = divisionsIn(playedCompetitions);
-  const h2hScope = [divisionLabel(divisionId), formatLabel(formatId)]
+  const h2hSeasons = seasonsIn(playedCompetitions);
+  const h2hScope = [
+    divisionLabel(divisionId),
+    formatLabel(formatId),
+    fromSeason || toSeason
+      ? `${fromSeason || "start"}–${toSeason || "now"}`
+      : null,
+  ]
     .filter(Boolean)
     .join(" ");
 
@@ -298,6 +325,7 @@ export default async function TeamDetailPage({
       const comp: any = Array.isArray(f.competition) ? f.competition[0] : f.competition;
       if (formatId && formatOf(comp?.name) !== formatId) continue;
       if (divisionId && (comp?.division ?? "men") !== divisionId) continue;
+      if (!inSeasonRange(comp?.season, fromSeason, toSeason)) continue;
 
       const r = Array.isArray(f.result) ? f.result[0] : f.result;
       if (!r) continue;
@@ -539,13 +567,43 @@ export default async function TeamDetailPage({
               </select>
             </label>
           )}
+          {h2hSeasons.length > 1 && (
+            <label className="text-sm">
+              <span className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
+                Seasons
+              </span>
+              <span className="flex items-center gap-1">
+                <select
+                  name="from"
+                  defaultValue={fromSeason}
+                  className="px-2 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+                >
+                  <option value="">Any</option>
+                  {h2hSeasons.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <span className="text-slate-400 text-xs">to</span>
+                <select
+                  name="to"
+                  defaultValue={toSeason}
+                  className="px-2 py-1.5 rounded border border-slate-300 bg-white text-sm text-navy-900"
+                >
+                  <option value="">Any</option>
+                  {h2hSeasons.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </span>
+            </label>
+          )}
           <button
             type="submit"
             className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium"
           >
             Compare
           </button>
-          {(vsId || formatId || divisionId) && (
+          {(vsId || formatId || divisionId || fromSeason || toSeason) && (
             <Link
               href={`/admin/teams/${teamId}/view`}
               className="text-xs text-slate-500 hover:underline"

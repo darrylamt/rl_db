@@ -67,3 +67,32 @@ export function divisionsIn(
   );
   return DIVISIONS.filter((d) => seen.has(d.key));
 }
+
+/** Every season present, newest first. */
+export function seasonsIn(
+  competitions: { season?: string | null }[]
+): string[] {
+  return Array.from(
+    new Set(competitions.map((c) => c.season).filter(Boolean) as string[])
+  ).sort((a, b) => b.localeCompare(a));
+}
+
+/**
+ * Whether a season falls inside a from/to range, either end optional.
+ *
+ * Seasons are years held as text, so a string compare orders them correctly
+ * and an open end simply means "no bound that way" — 2022 with no upper
+ * bound reads as "2022 onwards", which is how somebody asking for a span
+ * usually means it.
+ */
+export function inSeasonRange(
+  season: string | null | undefined,
+  from?: string | null,
+  to?: string | null
+): boolean {
+  if (!from && !to) return true;
+  if (!season) return false;
+  if (from && season < from) return false;
+  if (to && season > to) return false;
+  return true;
+}

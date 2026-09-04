@@ -38,6 +38,33 @@ function dayLabel(date: string, today: string): string {
   });
 }
 
+/**
+ * "Today at 15:00" where that is true, otherwise the date and the time.
+ * The two lines on the poll card are small, so the day is worth naming
+ * rather than making somebody read a date to work out it is tonight.
+ */
+function kickoffLabel(
+  date: string | null,
+  time: string | null,
+  today: string
+): string {
+  const when = fmtTime(time);
+  if (!date) return when || "Date to be confirmed";
+
+  const d = new Date(`${date}T00:00:00`);
+  const tomorrow = new Date(`${today}T00:00:00`);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const day =
+    date === today
+      ? "Today"
+      : d.toDateString() === tomorrow.toDateString()
+      ? "Tomorrow"
+      : fmtShortDate(date);
+
+  return when ? `${day} at ${when}` : day;
+}
+
 /** Played matches, newest day first, each day keeping its kick-off order. */
 function byDay(fixtures: any[]): { date: string; matches: any[] }[] {
   const days = new Map<string, any[]>();
@@ -235,9 +262,12 @@ export default async function LiveHubPage({
           fixtureId={nextMatch.fixture_id}
           home={one<any>(nextMatch.home)}
           away={one<any>(nextMatch.away)}
-          subtitle={`${one<any>(nextMatch.competition)?.name ?? "Next match"} · ${fmtShortDate(
-            nextMatch.scheduled_date
-          )}${nextMatch.scheduled_time ? ` · ${fmtTime(nextMatch.scheduled_time)}` : ""}`}
+          competition={one<any>(nextMatch.competition)?.name ?? "Next match"}
+          kickoff={kickoffLabel(
+            nextMatch.scheduled_date,
+            nextMatch.scheduled_time,
+            today
+          )}
           initialCounts={predictionCounts}
         />
       )}

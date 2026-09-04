@@ -20,7 +20,7 @@ export function embedded<T>(value: T | T[] | null | undefined): T | null {
 
 /** Fixture columns every appearance-aware screen needs, as a PostgREST embed. */
 export const APPEARANCE_FIXTURE_EMBED =
-  "fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score))";
+  "fixture:fixture_id(fixture_id, status, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season, division), result:match_results(home_score, away_score))";
 
 /**
  * True once a match has actually been played. Being named in the squad for a
