@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { kickoffAt } from "@/lib/predictions";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -20,6 +21,25 @@ export async function castPrediction(
   if (choice !== "home" && choice !== "away") throw new Error("Invalid choice");
 
   const supabase = createAdminClient();
+
+  // A prediction made after kick-off is not a prediction. The card hides the
+  // buttons, but that is presentation — this is the part that decides.
+  const { data: fixture } = await supabase
+    .from("fixtures")
+    .select("scheduled_date, scheduled_time, status")
+    .eq("fixture_id", fixtureId)
+    .maybeSingle();
+
+  if (fixture) {
+    const f = fixture as any;
+    if (f.status && !["scheduled", "postponed"].includes(f.status)) {
+      throw new Error("That match has already started");
+    }
+    const closesAt = kickoffAt(f.scheduled_date, f.scheduled_time);
+    if (closesAt && Date.now() >= closesAt) {
+      throw new Error("Predictions closed at kick-off");
+    }
+  }
   const { error } = await supabase
     .from("match_predictions")
     .upsert(

@@ -4,7 +4,7 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { MatchCard } from "./MatchCard";
 import { Avatar } from "@/components/Avatar";
 import { PredictionCard } from "@/components/live/PredictionCard";
-import { getPredictionCountsFor } from "@/lib/predictions";
+import { getPredictionCountsFor, kickoffAt } from "@/lib/predictions";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { pointsFrom, FIXTURE_SELECT, fmtShortDate, fmtTime } from "@/lib/matchStats";
 
@@ -232,7 +232,15 @@ export default async function LiveHubPage({
   // seen the result of yet. Live is deliberately excluded: that game is
   // already being decided, not predicted. Five is enough to page through
   // without turning the card into a fixture list.
-  const pollFixtures = [...todaysMatches, ...upcoming].slice(0, 5) as any[];
+  // Only what has not kicked off. A match today at noon is still in
+  // todaysMatches at three o'clock, and asking who will win it then is not a
+  // prediction.
+  const pollFixtures = ([...todaysMatches, ...upcoming] as any[])
+    .filter((f) => {
+      const at = kickoffAt(f.scheduled_date, f.scheduled_time);
+      return at == null || at > Date.now();
+    })
+    .slice(0, 5);
   const pollCounts = await getPredictionCountsFor(
     pollFixtures.map((f) => f.fixture_id)
   );
@@ -245,6 +253,10 @@ export default async function LiveHubPage({
     away: withColour(one<any>(f.away)),
     competition: one<any>(f.competition)?.name ?? "Next match",
     kickoff: kickoffLabel(f.scheduled_date, f.scheduled_time, today),
+    closesAt: (() => {
+      const at = kickoffAt(f.scheduled_date, f.scheduled_time);
+      return at == null ? null : new Date(at).toISOString();
+    })(),
     counts: pollCounts[f.fixture_id] ?? { home: 0, away: 0 },
   }));
 

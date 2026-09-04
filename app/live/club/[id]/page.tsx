@@ -8,6 +8,7 @@ import { FIXTURE_SELECT } from "@/lib/matchStats";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { GRADES, normaliseGrade } from "@/lib/grades";
 import { formatOf, formatLabel, divisionLabel } from "@/lib/competitionFormat";
+import { Pagination } from "@/components/admin/Pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +32,20 @@ export async function generateMetadata({
   return { title: `${data.name} — RLFG Live` };
 }
 
+const TABS = [
+  { key: "squad", label: "Squad" },
+  { key: "fixtures", label: "Fixtures" },
+  { key: "results", label: "Results" },
+  { key: "record", label: "Record" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default async function PublicClubPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { tab?: string; page?: string };
 }) {
   const supabase = createPublicClient();
   const teamId = params.id;
@@ -84,12 +95,19 @@ export default async function PublicClubPage({
   const all = (fixtures ?? []) as any[];
   const upcoming = all
     .filter((f) => f.status === "scheduled" && f.scheduled_date >= today)
-    .sort((a, b) =>
-      (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "") ||
-      (a.scheduled_time ?? "").localeCompare(b.scheduled_time ?? "")
-    )
-    .slice(0, 8);
-  const recent = all.filter((f) => hasScore(f)).slice(0, 12);
+    .sort(
+      (a, b) =>
+        (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "") ||
+        (a.scheduled_time ?? "").localeCompare(b.scheduled_time ?? "")
+    );
+  const recent = all.filter((f) => hasScore(f));
+
+  const tab: TabKey =
+    (TABS.find((t) => t.key === searchParams?.tab)?.key as TabKey) ?? "squad";
+
+  const PAGE_SIZE = 10;
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const resultsPage = recent.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   /**
    * What this club actually plays, and how it has gone in each.
@@ -173,9 +191,48 @@ export default async function PublicClubPage({
         </div>
       </div>
 
-      {lines.length > 0 && (
+      {/* Sections rather than one long scroll — a club page is four
+          different questions and nobody is asking all of them at once. */}
+      <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-6 max-w-md">
+        {TABS.map((t) => {
+          const count =
+            t.key === "squad"
+              ? squadRows.length
+              : t.key === "fixtures"
+              ? upcoming.length
+              : t.key === "results"
+              ? recent.length
+              : lines.length;
+          const active = t.key === tab;
+          return (
+            <Link
+              key={t.key}
+              href={
+                t.key === "squad"
+                  ? `/live/club/${teamId}`
+                  : `/live/club/${teamId}?tab=${t.key}`
+              }
+              className={`flex-1 text-center text-xs sm:text-sm font-medium rounded-full py-1.5 transition ${
+                active ? "bg-white text-black" : "text-slate-300 hover:text-white"
+              }`}
+            >
+              {t.label}
+              {count > 0 && (
+                <span
+                  className={`ml-1 text-[11px] tabular-nums ${
+                    active ? "text-black/50" : "text-slate-500"
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {tab === "record" && (
         <section className="mb-8">
-          <h2 className="font-display text-xl mb-1">Sides</h2>
           <p className="text-[11px] text-slate-500 mb-3">
             The club fields more than one team. Every season counted together.
           </p>
@@ -207,35 +264,57 @@ export default async function PublicClubPage({
               </div>
             ))}
           </div>
+          {lines.length === 0 && (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+              Nothing played yet.
+            </p>
+          )}
         </section>
       )}
 
-      {upcoming.length > 0 && (
+      {tab === "fixtures" && (
         <section className="mb-8">
-          <h2 className="font-display text-xl mb-3">Upcoming</h2>
-          <div className="space-y-2">
-            {upcoming.map((f) => (
-              <MatchCard key={f.fixture_id} fixture={f} />
-            ))}
-          </div>
+          {upcoming.length > 0 ? (
+            <div className="space-y-2">
+              {upcoming.map((f) => (
+                <MatchCard key={f.fixture_id} fixture={f} />
+              ))}
+            </div>
+          ) : (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+              Nothing scheduled yet.
+            </p>
+          )}
         </section>
       )}
 
-      {recent.length > 0 && (
+      {tab === "results" && (
         <section className="mb-8">
-          <h2 className="font-display text-xl mb-3">Recent results</h2>
-          <div className="space-y-2">
-            {recent.map((f) => (
-              <MatchCard key={f.fixture_id} fixture={f} />
-            ))}
-          </div>
+          {recent.length > 0 ? (
+            <>
+              <div className="space-y-2">
+                {resultsPage.map((f) => (
+                  <MatchCard key={f.fixture_id} fixture={f} />
+                ))}
+              </div>
+              {recent.length > PAGE_SIZE && (
+                <Pagination
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  total={recent.length}
+                />
+              )}
+            </>
+          ) : (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+              No results recorded yet.
+            </p>
+          )}
         </section>
       )}
 
+      {tab === "squad" && (
       <section>
-        <h2 className="font-display text-xl mb-3">
-          Squad ({squadRows.length})
-        </h2>
         {squadRows.length === 0 ? (
           <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
             No active squad listed yet.
@@ -279,6 +358,7 @@ export default async function PublicClubPage({
           ))
         )}
       </section>
+      )}
     </>
   );
 }

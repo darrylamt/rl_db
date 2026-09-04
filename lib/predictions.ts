@@ -3,6 +3,26 @@ import { createAdminClient } from "@/lib/supabase/server";
 export type PredictionCounts = { home: number; away: number };
 
 /**
+ * When a fixture kicks off, as milliseconds — the moment predictions shut.
+ *
+ * Ghana keeps GMT all year, so a date and time recorded against a fixture is
+ * already UTC and needs no offset applied. A fixture with no time set closes
+ * at the end of its day rather than the start of it, since "some time on
+ * Saturday" should stay open on Saturday morning.
+ */
+export function kickoffAt(
+  date: string | null | undefined,
+  time: string | null | undefined
+): number | null {
+  if (!date) return null;
+  // Times arrive as HH:MM or HH:MM:SS.
+  const clock = time ? (time.length === 5 ? `${time}:00` : time.slice(0, 8)) : null;
+  const stamp = clock ? `${date}T${clock}Z` : `${date}T23:59:59Z`;
+  const ms = Date.parse(stamp);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
  * Vote counts for one fixture. Reads via the service role, like the write
  * side — match_predictions has no anon policies, so a page using the public
  * client would just see nothing.
