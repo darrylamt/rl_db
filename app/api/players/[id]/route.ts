@@ -52,8 +52,13 @@ export async function GET(
   }
   const matchesPlayed = playedFixtureIds.size;
 
+  // "*" keeps this resilient to the view gaining columns, so the two that
+  // must not go out are taken back off here rather than by enumerating every
+  // other column and having to remember this file each time one is added.
+  const { date_of_birth, age, ...publicPlayer } = player as any;
+
   return ok({
-    ...player,
+    ...publicPlayer,
     stats: {
       matches_played: matchesPlayed,
       ...stats,

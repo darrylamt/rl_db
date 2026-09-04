@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("public_officials")
     .select(
-      "official_id, first_name, last_name, role, region, nationality, date_of_birth, age, photo_url, status",
+      "official_id, first_name, last_name, role, region, nationality, photo_url, status",
       { count: "exact" }
     )
     .order("last_name")

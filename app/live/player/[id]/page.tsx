@@ -353,7 +353,10 @@ export default async function PublicPlayerPage({
 
       {/* Below the fold of the hero — bio and contract, kept plain rather
           than fighting the photo for attention. */}
-      {(contract || cover.length > 0 || p.age != null || p.height_cm || p.weight_kg || p.nationality) && (
+      {/* Age is deliberately not here. It is on the record because the
+          federation needs it for eligibility; it is not something a public
+          profile owes anybody, and a good part of this register is juniors. */}
+      {(contract || cover.length > 0 || p.height_cm || p.weight_kg || p.nationality) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 text-xs">
           {contract && (
             <span className="text-ghanaYellow-500">
@@ -364,7 +367,6 @@ export default async function PublicPlayerPage({
           {cover.length > 0 && (
             <span className="text-slate-500">Can also cover {cover.join(", ")}</span>
           )}
-          {p.age != null && <span className="text-slate-500">Age {p.age}</span>}
           {p.height_cm && <span className="text-slate-500">{p.height_cm} cm</span>}
           {p.weight_kg && <span className="text-slate-500">{p.weight_kg} kg</span>}
           {p.nationality && <span className="text-slate-500">{p.nationality}</span>}

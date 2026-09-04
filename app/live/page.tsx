@@ -266,7 +266,7 @@ export default async function LiveHubPage({
 
       <div className="mb-6">
         <h1 className="font-display text-3xl md:text-5xl leading-tight">
-          Ghana Rugby League
+          Rugby League Federation Ghana
         </h1>
         <p className="text-slate-400 text-sm mt-2 max-w-2xl">
           Every club, every fixture, every result — updating as officials
