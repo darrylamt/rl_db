@@ -207,24 +207,39 @@ export default async function PublicPlayerPage({
       </Link>
 
       {/* Identity */}
-      <div className="bg-neutral-900 border border-white/10 rounded-lg p-4 md:p-6 mb-6">
-        <div className="flex items-start gap-4">
+      <div className="relative rounded-2xl overflow-hidden mb-4 bg-gradient-to-br from-navy-800 via-navy-900 to-neutral-950 border border-white/10">
+        <div className="relative h-56 md:h-72">
           {p.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <Avatar
+            <img
               src={p.photo_url}
-              name={`${p.first_name ?? ""} ${p.last_name ?? ""}`}
-              size={88}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 w-full h-full object-cover object-top"
             />
           ) : (
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 text-slate-400 text-2xl font-bold flex items-center justify-center shrink-0">
-              {p.first_name?.[0]}
-              {p.last_name?.[0]}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="font-display text-[7rem] md:text-[9rem] leading-none text-white/10">
+                {p.first_name?.[0]}
+                {p.last_name?.[0]}
+              </span>
             </div>
           )}
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl md:text-4xl leading-tight">
-              {p.first_name} {p.last_name}
+          {/* Name reads over a photo of anyone — this is what makes it legible
+              rather than what makes it moody. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/10" />
+
+          {team?.logo_url && (
+            <div className="absolute top-4 right-4">
+              <Avatar src={team.logo_url} name={team.name} size={40} contain />
+            </div>
+          )}
+
+          <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+            <h1 className="font-display text-3xl md:text-5xl leading-[0.95] text-white">
+              {p.first_name}
+              <br />
+              {p.last_name}
               {p.playing_status && (
                 <span
                   className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
@@ -233,45 +248,45 @@ export default async function PublicPlayerPage({
                   title={p.playing_status === "active" ? "Active" : "Not active"}
                 />
               )}
+            </h1>
+            <p className="text-slate-200 text-sm mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {team?.name ?? "Unattached"}
+              {p.position && <span className="text-slate-400">· {p.position}</span>}
+              {p.jersey_number != null && (
+                <span className="text-slate-400">· #{p.jersey_number}</span>
+              )}
               {p.is_captain && (
-                <span className="ml-2 align-middle text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-ghanaYellow-500/15 text-ghanaYellow-500">
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-ghanaYellow-500/15 text-ghanaYellow-500">
                   Captain
                 </span>
               )}
-            </h1>
-            <p className="text-slate-300 text-sm mt-1">
-              {team?.name ?? "Unattached"}
-              {p.position && (
-                <span className="text-slate-500"> · {p.position}</span>
-              )}
-              {p.jersey_number != null && (
-                <span className="text-slate-500"> · #{p.jersey_number}</span>
-              )}
-            </p>
-            {cover.length > 0 && (
-              <p className="text-slate-500 text-xs mt-1">
-                Can also cover {cover.join(", ")}
-              </p>
-            )}
-            {contract && (
-              <p className="text-ghanaYellow-500 text-xs mt-1.5">
-                {contract.label} left on contract
-                {contractClub ? ` with ${contractClub}` : ""}
-              </p>
-            )}
-            <p className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-              {p.age != null && <span>Age {p.age}</span>}
-              {p.height_cm && <span>{p.height_cm} cm</span>}
-              {p.weight_kg && <span>{p.weight_kg} kg</span>}
-              {p.nationality && <span>{p.nationality}</span>}
-
             </p>
           </div>
         </div>
       </div>
 
+      {/* Below the fold of the hero — bio and contract, kept plain rather
+          than fighting the photo for attention. */}
+      {(contract || cover.length > 0 || p.age != null || p.height_cm || p.weight_kg || p.nationality) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 text-xs">
+          {contract && (
+            <span className="text-ghanaYellow-500">
+              {contract.label} left on contract
+              {contractClub ? ` with ${contractClub}` : ""}
+            </span>
+          )}
+          {cover.length > 0 && (
+            <span className="text-slate-500">Can also cover {cover.join(", ")}</span>
+          )}
+          {p.age != null && <span className="text-slate-500">Age {p.age}</span>}
+          {p.height_cm && <span className="text-slate-500">{p.height_cm} cm</span>}
+          {p.weight_kg && <span className="text-slate-500">{p.weight_kg} kg</span>}
+          {p.nationality && <span className="text-slate-500">{p.nationality}</span>}
+        </div>
+      )}
+
       {/* Headline numbers */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 snap-x">
         <Stat label="Matches" value={matchesPlayed} />
         <Stat label="Points" value={totalPoints} />
         <Stat label="Tries" value={statValue(stats, ["try"])} />
@@ -460,7 +475,7 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="bg-neutral-900 border border-white/10 rounded-lg px-3 py-2.5 text-center">
+    <div className="shrink-0 snap-start bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 min-w-[6rem] text-center">
       <div className="text-[10px] uppercase tracking-wider text-slate-500 leading-tight">
         {label}
       </div>

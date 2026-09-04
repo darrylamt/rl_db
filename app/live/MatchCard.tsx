@@ -2,10 +2,41 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { LiveClock } from "@/components/LiveClock";
 import { fmtShortDate, fmtTime } from "@/lib/matchStats";
+import { formatOf } from "@/lib/competitionFormat";
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (Array.isArray(v)) return v[0] ?? null;
   return v ?? null;
+}
+
+/**
+ * A tint per format rather than per team — nobody has entered team colours,
+ * and a wall of identical grey cards is the thing worth fixing here. Live
+ * status still wins on top of whichever tint, via the gold score and pill.
+ */
+const FORMAT_TINT: Record<string, string> = {
+  "13s": "from-navy-900 via-navy-950 to-neutral-950",
+  "9s": "from-amber-950 via-neutral-950 to-neutral-950",
+  erugby: "from-violet-950 via-neutral-950 to-neutral-950",
+  beach: "from-cyan-950 via-neutral-950 to-neutral-950",
+  presidents: "from-ghanaRed-950 via-neutral-950 to-neutral-950",
+  origins: "from-ghanaGreen-950 via-neutral-950 to-neutral-950",
+};
+const DEFAULT_TINT = "from-neutral-900 to-neutral-900";
+
+function TeamColumn({
+  team,
+}: {
+  team: any;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 min-w-0">
+      <Avatar src={team?.logo_url} name={team?.name} size={40} />
+      <span className="text-xs md:text-sm font-medium text-center leading-tight line-clamp-2 w-full">
+        {team?.name ?? "TBC"}
+      </span>
+    </div>
+  );
 }
 
 export function TeamBadge({
@@ -99,50 +130,55 @@ export function MatchCard({
     : running;
   const hasScore = !!shown;
   const isLive = fixture.status === "live";
+  const tint = FORMAT_TINT[formatOf(comp?.name) ?? ""] ?? DEFAULT_TINT;
 
   return (
     <Link
       href={`/live/${fixture.fixture_id}`}
-      className="block bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 hover:border-white/25 hover:bg-neutral-800/70 transition"
+      className={`block rounded-2xl border border-white/10 bg-gradient-to-br ${tint} px-4 py-4 hover:border-white/25 transition`}
     >
-      <div className="flex items-center justify-between gap-3 mb-2.5 text-[11px] text-slate-400">
-        <span className="truncate">
-          {comp?.name ?? "Friendly"}
-          {comp?.season ? ` · ${comp.season}` : ""}
-          {fixture.round ? ` · ${fixture.round}` : ""}
-        </span>
-        <StatusPill status={fixture.status} />
-        <LiveClock fixture={fixture as any} className="text-ghanaYellow-500 text-xs ml-1.5" />
+      <div className="text-center text-[10px] uppercase tracking-wider text-slate-400 mb-3 truncate">
+        {comp?.name ?? "Friendly"}
+        {comp?.season ? ` · ${comp.season}` : ""}
+        {fixture.round ? ` · ${fixture.round}` : ""}
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <TeamBadge team={home} />
-        {shown ? (
-          <div
-            className={`font-display text-2xl md:text-3xl tabular-nums whitespace-nowrap px-2 ${
-              isLive ? "text-ghanaYellow-500" : ""
-            }`}
-          >
-            {shown.home}
-            <span className="text-slate-600 mx-1.5">–</span>
-            {shown.away}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+        <TeamColumn team={home} />
+
+        <div className="text-center px-1 pt-1">
+          {shown ? (
+            <div
+              className={`font-display text-3xl md:text-4xl tabular-nums leading-none whitespace-nowrap ${
+                isLive ? "text-ghanaYellow-500" : "text-white"
+              }`}
+            >
+              {shown.home}
+              <span className="text-slate-600 mx-1">–</span>
+              {shown.away}
+            </div>
+          ) : (
+            <div className="text-slate-200 text-base font-semibold whitespace-nowrap">
+              {fmtTime(fixture.scheduled_time) || "vs"}
+            </div>
+          )}
+          <div className="mt-1.5 flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <StatusPill status={fixture.status} />
+            <LiveClock fixture={fixture as any} className="text-ghanaYellow-500 text-[11px]" />
           </div>
-        ) : (
-          <div className="text-slate-400 text-sm font-medium whitespace-nowrap px-2">
-            {fmtTime(fixture.scheduled_time) || "vs"}
-          </div>
-        )}
-        <TeamBadge team={away} align="right" />
+        </div>
+
+        <TeamColumn team={away} />
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between gap-3 text-[11px] text-slate-500">
+      <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-slate-500">
         <span className="truncate">
           {fmtShortDate(fixture.scheduled_date)}
           {fixture.scheduled_time && hasScore
             ? ` · ${fmtTime(fixture.scheduled_time)}`
             : ""}
         </span>
-        <span className="truncate">{venue?.name ?? ""}</span>
+        {venue?.name && <span className="truncate">· {venue.name}</span>}
       </div>
     </Link>
   );

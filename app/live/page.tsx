@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { MatchCard } from "./MatchCard";
@@ -50,31 +51,18 @@ function byDay(fixtures: any[]): { date: string; matches: any[] }[] {
     .map(([date, matches]) => ({ date, matches }));
 }
 
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mb-8">
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 className="font-display text-xl md:text-2xl text-white">{title}</h2>
-        {subtitle && (
-          <span className="text-[11px] uppercase tracking-wider text-slate-500">
-            {subtitle}
-          </span>
-        )}
-      </div>
-      <div className="space-y-2">{children}</div>
-    </section>
-  );
-}
+const TABS = [
+  { key: "today", label: "Today" },
+  { key: "results", label: "Results" },
+  { key: "upcoming", label: "Upcoming" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
 
-export default async function LiveHubPage() {
+export default async function LiveHubPage({
+  searchParams,
+}: {
+  searchParams?: { tab?: string };
+}) {
   const supabase = createPublicClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -108,7 +96,8 @@ export default async function LiveHubPage() {
       .order("scheduled_time", { ascending: false, nullsFirst: false })
       .limit(30),
 
-    // Next up
+    // Next up — its own tab now rather than a teaser at the foot of the page,
+    // so it earns a longer list than the 12 it used to share room for.
     supabase
       .from("fixtures")
       .select(FIXTURE_SELECT)
@@ -116,7 +105,7 @@ export default async function LiveHubPage() {
       .eq("status", "scheduled")
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time", { ascending: true, nullsFirst: false })
-      .limit(12),
+      .limit(24),
   ]);
 
   const live = liveRows ?? [];
@@ -174,23 +163,24 @@ export default async function LiveHubPage() {
   const resultDays = byDay(results);
 
   const todayIds = new Set(todaysMatches.map((f: any) => f.fixture_id));
-  const upcoming = (upcomingRows ?? [])
-    .filter(
-      (f: any) => !liveIds.has(f.fixture_id) && !todayIds.has(f.fixture_id)
-    )
-    .slice(0, 8);
+  const upcoming = (upcomingRows ?? []).filter(
+    (f: any) => !liveIds.has(f.fixture_id) && !todayIds.has(f.fixture_id)
+  );
 
-  const nothingAtAll =
-    live.length === 0 &&
-    todaysMatches.length === 0 &&
-    resultDays.length === 0 &&
-    upcoming.length === 0;
+  // Today whenever there is something to show today; otherwise whichever tab
+  // is not empty, so a Tuesday morning does not land on a blank "Today".
+  const todayCount = live.length + todaysMatches.length;
+  const defaultTab: TabKey =
+    todayCount > 0 ? "today" : resultDays.length > 0 ? "results" : "upcoming";
+  const requested = searchParams?.tab;
+  const tab: TabKey = (TABS.find((t) => t.key === requested)?.key ??
+    defaultTab) as TabKey;
 
   return (
     <>
       <LiveRefresh tables={["fixtures", "match_results", "match_events"]} />
 
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-display text-3xl md:text-5xl leading-tight">
           Live Scores
         </h1>
@@ -200,8 +190,46 @@ export default async function LiveHubPage() {
         </p>
       </div>
 
-      {live.length > 0 && (
-        <Section title="Live now" subtitle={`${live.length} in progress`}>
+      {/* Day tabs */}
+      <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-6 max-w-sm">
+        {TABS.map((t) => {
+          const count =
+            t.key === "today"
+              ? todayCount
+              : t.key === "results"
+              ? results.length
+              : upcoming.length;
+          const active = t.key === tab;
+          return (
+            <Link
+              key={t.key}
+              href={t.key === defaultTab ? "/live" : `/live?tab=${t.key}`}
+              className={`relative flex-1 text-center text-sm font-medium rounded-full py-1.5 transition ${
+                active
+                  ? "bg-white text-black"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              {t.label}
+              {t.key === "today" && live.length > 0 && !active && (
+                <span className="absolute top-1 right-3 w-1.5 h-1.5 rounded-full bg-ghanaRed-500 animate-pulse" />
+              )}
+              {count > 0 && (
+                <span
+                  className={`ml-1.5 text-xs tabular-nums ${
+                    active ? "text-black/50" : "text-slate-500"
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {tab === "today" && (
+        <div className="space-y-2">
           {live.map((f: any) => (
             <MatchCard
               key={f.fixture_id}
@@ -209,11 +237,6 @@ export default async function LiveHubPage() {
               liveScore={scoreFor.get(f.fixture_id)}
             />
           ))}
-        </Section>
-      )}
-
-      {todaysMatches.length > 0 && (
-        <Section title="Today" subtitle="Kick-off times">
           {todaysMatches.map((f: any) => (
             <MatchCard
               key={f.fixture_id}
@@ -221,41 +244,47 @@ export default async function LiveHubPage() {
               liveScore={scoreFor.get(f.fixture_id)}
             />
           ))}
-        </Section>
+          {todayCount === 0 && (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
+              Nothing on today. Check Upcoming for what&apos;s next.
+            </p>
+          )}
+        </div>
       )}
 
-      {upcoming.length > 0 && (
-        <Section title="Coming up">
-          {upcoming.map((f: any) => (
-            <MatchCard key={f.fixture_id} fixture={f} />
-          ))}
-        </Section>
-      )}
-
-      {resultDays.length > 0 && (
-        <section className="mb-8">
-          <h2 className="font-display text-xl md:text-2xl text-white mb-3">
-            Results
-          </h2>
-          {resultDays.map(({ date, matches }) => (
-            <div key={date} className="mb-6 last:mb-0">
-              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2 pb-1 border-b border-white/10">
-                {date ? dayLabel(date, today) : "Date unknown"}
-              </h3>
-              <div className="space-y-2">
-                {matches.map((f: any) => (
-                  <MatchCard key={f.fixture_id} fixture={f} />
-                ))}
+      {tab === "results" && (
+        <>
+          {resultDays.length > 0 ? (
+            resultDays.map(({ date, matches }) => (
+              <div key={date} className="mb-6 last:mb-0">
+                <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2 pb-1 border-b border-white/10">
+                  {date ? dayLabel(date, today) : "Date unknown"}
+                </h3>
+                <div className="space-y-2">
+                  {matches.map((f: any) => (
+                    <MatchCard key={f.fixture_id} fixture={f} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
+            ))
+          ) : (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
+              No results recorded yet.
+            </p>
+          )}
+        </>
       )}
 
-      {nothingAtAll && (
-        <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
-          No matches to show yet. Check back on match day.
-        </p>
+      {tab === "upcoming" && (
+        <div className="space-y-2">
+          {upcoming.length > 0 ? (
+            upcoming.map((f: any) => <MatchCard key={f.fixture_id} fixture={f} />)
+          ) : (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
+              Nothing scheduled yet.
+            </p>
+          )}
+        </div>
       )}
     </>
   );
