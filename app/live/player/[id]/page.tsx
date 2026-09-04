@@ -479,6 +479,60 @@ export default async function PublicPlayerPage({
         )}
       </form>
 
+      {/* The comparison belongs against the control that asked for it, not
+          further down past the attributes. */}
+      {vsPlayer && vsStats && (
+        <section className="mb-6">
+          <h2 className="font-display text-xl mb-1">Stats compared</h2>
+          <p className="text-[11px] text-slate-500 mb-3">
+            {scopeLabel || "All competitions, all seasons"}
+          </p>
+          <div className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center bg-white/5 border-b border-white/10 px-4 py-3 text-sm">
+              <div className="text-right font-medium truncate">
+                {p.first_name} {p.last_name}
+              </div>
+              <div className="px-4 text-[11px] uppercase tracking-wider text-slate-500">
+                vs
+              </div>
+              <div className="text-left font-medium truncate">
+                {vsPlayer.first_name} {vsPlayer.last_name}
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {TEAM_STAT_ROWS.map((row) => {
+                  const a = statValue(stats, row.keys);
+                  const b = statValue(vsStats!, row.keys);
+                  if (a === 0 && b === 0) return null;
+                  return (
+                    <tr key={row.label} className="border-t border-white/5">
+                      <td
+                        className={`px-4 py-2 text-right tabular-nums w-[40%] ${
+                          a > b ? "text-ghanaYellow-500 font-semibold" : ""
+                        }`}
+                      >
+                        {a}
+                      </td>
+                      <td className="px-4 py-2 text-center text-[11px] uppercase tracking-wider text-slate-500 w-[20%]">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-left tabular-nums w-[40%] ${
+                          b > a ? "text-ghanaYellow-500 font-semibold" : ""
+                        }`}
+                      >
+                        {b}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* Headline numbers */}
       {scopeLabel && (
         <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
@@ -558,59 +612,6 @@ export default async function PublicPlayerPage({
           )}
         </div>
       </section>
-
-      {/* Stats side by side, on whatever is currently filtered */}
-      {vsPlayer && vsStats && (
-        <section className="mb-6">
-          <h2 className="font-display text-xl mb-1">Stats compared</h2>
-          <p className="text-[11px] text-slate-500 mb-3">
-            {scopeLabel || "All competitions, all seasons"}
-          </p>
-          <div className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center bg-white/5 border-b border-white/10 px-4 py-3 text-sm">
-              <div className="text-right font-medium truncate">
-                {p.first_name} {p.last_name}
-              </div>
-              <div className="px-4 text-[11px] uppercase tracking-wider text-slate-500">
-                vs
-              </div>
-              <div className="text-left font-medium truncate">
-                {vsPlayer.first_name} {vsPlayer.last_name}
-              </div>
-            </div>
-            <table className="w-full text-sm">
-              <tbody>
-                {TEAM_STAT_ROWS.map((row) => {
-                  const a = statValue(stats, row.keys);
-                  const b = statValue(vsStats!, row.keys);
-                  if (a === 0 && b === 0) return null;
-                  return (
-                    <tr key={row.label} className="border-t border-white/5">
-                      <td
-                        className={`px-4 py-2 text-right tabular-nums w-[40%] ${
-                          a > b ? "text-ghanaYellow-500 font-semibold" : ""
-                        }`}
-                      >
-                        {a}
-                      </td>
-                      <td className="px-4 py-2 text-center text-[11px] uppercase tracking-wider text-slate-500 w-[20%]">
-                        {row.label}
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-left tabular-nums w-[40%] ${
-                          b > a ? "text-ghanaYellow-500 font-semibold" : ""
-                        }`}
-                      >
-                        {b}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
 
       {/* Career stats */}
       {careerStats.length > 0 && (

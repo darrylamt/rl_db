@@ -5,6 +5,7 @@ import { MatchCard } from "./MatchCard";
 import { Avatar } from "@/components/Avatar";
 import { PredictionCard } from "@/components/live/PredictionCard";
 import { getPredictionCountsFor } from "@/lib/predictions";
+import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { pointsFrom, FIXTURE_SELECT, fmtShortDate, fmtTime } from "@/lib/matchStats";
 
 // Scores must never be served stale.
@@ -137,16 +138,27 @@ export default async function LiveHubPage({
       .order("scheduled_time", { ascending: true, nullsFirst: false })
       .limit(24),
 
-    // Clubs row at the top of the page.
-    supabase
-      .from("teams")
-      .select("team_id, name, logo_url")
-      .eq("team_type", "club")
-      .neq("is_public", false)
-      .order("name"),
+    // Clubs row at the top of the page. brand_color arrives with
+    // supabase/team_brand_color.sql and is read separately from the fixture
+    // query on purpose — a column that is not there yet must not take the
+    // scores down with it.
+    readWithOptionalColumns(
+      "team_id, name, logo_url, brand_color",
+      ["brand_color"],
+      (columns) =>
+        supabase
+          .from("teams")
+          .select(columns)
+          .eq("team_type", "club")
+          .neq("is_public", false)
+          .order("name")
+    ),
   ]);
 
-  const clubs = clubRows ?? [];
+  const clubs = (clubRows ?? []) as any[];
+  const brandColour = new Map<string, string | null>(
+    clubs.map((c: any) => [c.team_id, c.brand_color ?? null])
+  );
 
   const live = liveRows ?? [];
   const liveIds = new Set(live.map((f: any) => f.fixture_id));
@@ -224,10 +236,13 @@ export default async function LiveHubPage({
   const pollCounts = await getPredictionCountsFor(
     pollFixtures.map((f) => f.fixture_id)
   );
+  const withColour = (t: any) =>
+    t ? { ...t, brandColor: brandColour.get(t.team_id) ?? null } : t;
+
   const pollMatches = pollFixtures.map((f) => ({
     fixtureId: f.fixture_id,
-    home: one<any>(f.home),
-    away: one<any>(f.away),
+    home: withColour(one<any>(f.home)),
+    away: withColour(one<any>(f.away)),
     competition: one<any>(f.competition)?.name ?? "Next match",
     kickoff: kickoffLabel(f.scheduled_date, f.scheduled_time, today),
     counts: pollCounts[f.fixture_id] ?? { home: 0, away: 0 },
@@ -239,22 +254,23 @@ export default async function LiveHubPage({
 
       <div className="mb-6">
         <h1 className="font-display text-3xl md:text-5xl leading-tight">
-          Live Scores
+          Ghana Rugby League
         </h1>
         <p className="text-slate-400 text-sm mt-2 max-w-2xl">
-          Follow every Rugby League Federation Ghana match — scores and stats
-          update on this page as they are recorded, no refresh needed.
+          Every club, every fixture, every result — updating as officials
+          record them. Call the next game before it kicks off.
         </p>
       </div>
 
-      {/* Clubs */}
+      {/* Clubs — stacked into rows rather than a scroller, so every club is
+          on screen at once instead of hidden off the side. */}
       {clubs.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-1 mb-6 px-1 snap-x">
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-x-2 gap-y-4 mb-6">
           {clubs.map((c: any) => (
             <Link
               key={c.team_id}
               href={`/live/club/${c.team_id}`}
-              className="shrink-0 snap-start flex flex-col items-center gap-1.5 w-16 group"
+              className="flex flex-col items-center gap-1.5 group min-w-0"
             >
               <span className="w-14 h-14 rounded-full bg-neutral-900 border border-white/10 group-hover:border-white/30 transition flex items-center justify-center overflow-hidden">
                 <Avatar src={c.logo_url} name={c.name} size={40} contain />

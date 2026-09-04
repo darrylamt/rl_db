@@ -5,7 +5,13 @@ import { Avatar } from "@/components/Avatar";
 import { castPrediction } from "@/app/live/actions";
 import { dominantColour } from "@/lib/logoColour";
 
-type Team = { team_id?: string; name: string | null; logo_url: string | null } | null;
+type Team = {
+  team_id?: string;
+  name: string | null;
+  logo_url: string | null;
+  /** Set by the federation where the crest reads wrong; wins when present. */
+  brandColor?: string | null;
+} | null;
 
 export type PollMatch = {
   fixtureId: string;
@@ -243,8 +249,10 @@ function Bar({
   fallback: string;
 }) {
   const [colour, setColour] = useState<string | null>(null);
+  const set = team?.brandColor ?? null;
 
   useEffect(() => {
+    if (set) return; // told explicitly; no need to guess from the badge
     let live = true;
     dominantColour(team?.logo_url).then((c) => {
       if (live) setColour(c);
@@ -252,9 +260,9 @@ function Bar({
     return () => {
       live = false;
     };
-  }, [team?.logo_url]);
+  }, [team?.logo_url, set]);
 
-  const base = colour ?? fallback;
+  const base = set ?? colour ?? fallback;
 
   return (
     <div className="flex items-center gap-2">

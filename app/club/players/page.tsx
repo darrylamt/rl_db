@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GRADES, isGrade, gradeLabel } from "@/lib/grades";
 import { Avatar } from "@/components/Avatar";
+import { Pagination } from "@/components/admin/Pagination";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -34,11 +35,24 @@ export default async function ClubSquadPage({
   const { data, error } = await query;
   let players = data ?? [];
 
+  if (only === "no-position") players = players.filter((p: any) => !p.position);
+  if (only === "no-photo") players = players.filter((p: any) => !p.photo_url);
+
+  // Counts for the grade tabs, taken before the grade itself is applied —
+  // otherwise every tab but the open one would read zero.
+  const gradeCounts = GRADES.map((g) => ({
+    ...g,
+    count: players.filter((p: any) => isGrade(p.category, g.value)).length,
+  }));
+  const allGrades = players.length;
+
   // A club's men, women and juniors are one list until this is chosen.
   if (grade) players = players.filter((p: any) => isGrade(p.category, grade));
 
-  if (only === "no-position") players = players.filter((p: any) => !p.position);
-  if (only === "no-photo") players = players.filter((p: any) => !p.photo_url);
+  const PAGE_SIZE = 10;
+  const matched = players.length;
+  const page = Math.max(1, parseInt(first(searchParams?.page) ?? "1", 10) || 1);
+  players = players.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const total = (data ?? []).length;
   const missingPosition = (data ?? []).filter((p: any) => !p.position).length;
@@ -100,17 +114,7 @@ export default async function ClubSquadPage({
           placeholder="Search your squad…"
           className="flex-1 min-w-[12rem] px-3 py-1.5 rounded border border-slate-300 text-sm"
         />
-        <select
-          name="grade"
-          defaultValue={grade}
-          className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm"
-          aria-label="Grade"
-        >
-          <option value="">All grades</option>
-          {GRADES.map((g) => (
-            <option key={g.value} value={g.value}>{g.label}</option>
-          ))}
-        </select>
+        {grade && <input type="hidden" name="grade" value={grade} />}
         {only && <input type="hidden" name="only" value={only} />}
         <button className="px-3 py-1.5 rounded bg-navy-900 text-white text-xs font-medium">
           Search
@@ -121,6 +125,38 @@ export default async function ClubSquadPage({
           </Link>
         )}
       </form>
+
+      {/* Men, women and juniors are different sides from one club, so they
+          are picked between rather than mixed down one list. */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {[{ value: "", label: "All", count: allGrades }, ...gradeCounts]
+          .filter((g) => g.value === "" || g.count > 0)
+          .map((g) => {
+            const sp = new URLSearchParams();
+            if (q) sp.set("q", q);
+            if (only) sp.set("only", only);
+            if (g.value) sp.set("grade", g.value);
+            const qs = sp.toString();
+            const on = grade === g.value;
+            return (
+              <Link
+                key={g.value || "all"}
+                href={`/club/players${qs ? `?${qs}` : ""}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                  on
+                    ? "bg-navy-900 text-white border-navy-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-navy-300"
+                }`}
+              >
+                {g.label}
+                <span className={on ? "text-white/60" : "text-slate-400"}>
+                  {" "}
+                  {g.count}
+                </span>
+              </Link>
+            );
+          })}
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2 rounded mb-4">
@@ -192,6 +228,10 @@ export default async function ClubSquadPage({
             </li>
           ))}
         </ul>
+      )}
+
+      {matched > PAGE_SIZE && (
+        <Pagination page={page} pageSize={PAGE_SIZE} total={matched} />
       )}
     </div>
   );

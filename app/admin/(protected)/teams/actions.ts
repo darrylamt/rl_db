@@ -44,12 +44,19 @@ function payloadFromForm(fd: FormData) {
     legal_name: str(fd, "legal_name"),
     instagram_url: str(fd, "instagram_url"),
     is_public: fd.get("is_public") === "on",
+    brand_color: str(fd, "brand_color"),
     logo_url: null as string | null,
   };
 }
 
-// Added by integration_schema.sql; a deploy can land before the migration.
-const OPTIONAL_TEAM_COLUMNS = ["legal_name", "is_public", "division"] as const;
+// Added by integration_schema.sql and team_brand_color.sql; a deploy can land
+// before the migration.
+const OPTIONAL_TEAM_COLUMNS = [
+  "legal_name",
+  "is_public",
+  "division",
+  "brand_color",
+] as const;
 
 /** Keep slugs URL-safe without silently changing what was typed. */
 function slugify(v: string | null) {

@@ -1,5 +1,6 @@
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { Pagination } from "@/components/admin/Pagination";
 import { Avatar } from "@/components/Avatar";
 import { OfferContractForm } from "@/components/club/OfferContractForm";
 import {
@@ -43,7 +44,7 @@ const TONE: Record<string, string> = {
 export default async function ClubContractsPage({
   searchParams,
 }: {
-  searchParams?: { error?: string; note?: string };
+  searchParams?: { error?: string; note?: string; page?: string };
 }) {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
@@ -70,6 +71,15 @@ export default async function ClubContractsPage({
   const open = rows.filter((c) => c.status === "offered");
   const countered = rows.filter((c) => c.status === "countered");
   const signed = rows.filter((c) => c.status === "accepted");
+
+  // The queues above are short by nature; the signed list is the whole squad
+  // and is the one that runs long.
+  const SIGNED_PAGE_SIZE = 10;
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const signedPage = signed.slice(
+    (page - 1) * SIGNED_PAGE_SIZE,
+    page * SIGNED_PAGE_SIZE
+  );
   const past = rows.filter((c) =>
     ["declined", "withdrawn", "terminated"].includes(c.status),
   );
@@ -365,11 +375,20 @@ export default async function ClubContractsPage({
                 Nobody is signed yet.
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {signed.map((c) => (
-                  <Card key={c.contract_id} c={c} />
-                ))}
-              </div>
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {signedPage.map((c) => (
+                    <Card key={c.contract_id} c={c} />
+                  ))}
+                </div>
+                {signed.length > SIGNED_PAGE_SIZE && (
+                  <Pagination
+                    page={page}
+                    pageSize={SIGNED_PAGE_SIZE}
+                    total={signed.length}
+                  />
+                )}
+              </>
             )}
           </section>
 

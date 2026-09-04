@@ -1,5 +1,6 @@
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { Pagination } from "@/components/admin/Pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ function isPlayed(f: any): boolean {
   return ["completed", "abandoned", "cancelled"].includes(f?.status ?? "");
 }
 
-export default async function ClubFixturesPage() {
+export default async function ClubFixturesPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
 
@@ -38,6 +43,12 @@ export default async function ClubFixturesPage() {
   const past = rows.filter(
     (f: any) => isPlayed(f) || (f.scheduled_date ?? "") < today
   );
+
+  // Coming up is a handful and reads as one list. Played is a season or
+  // several, so it is the half that gets paged.
+  const PAGE_SIZE = 10;
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const playedPage = past.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const Table = ({ list, title }: { list: any[]; title: string }) =>
     list.length === 0 ? null : (
@@ -87,7 +98,10 @@ export default async function ClubFixturesPage() {
       ) : (
         <>
           <Table list={upcoming} title="Coming up" />
-          <Table list={past} title="Played" />
+          <Table list={playedPage} title="Played" />
+          {past.length > PAGE_SIZE && (
+            <Pagination page={page} pageSize={PAGE_SIZE} total={past.length} />
+          )}
         </>
       )}
     </div>

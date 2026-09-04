@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { Pagination } from "@/components/admin/Pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,11 @@ function stillToPlay(f: any): boolean {
   return !["completed", "abandoned", "cancelled"].includes(f?.status ?? "");
 }
 
-export default async function ClubTeamSheetsPage() {
+export default async function ClubTeamSheetsPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
@@ -77,10 +82,13 @@ export default async function ClubTeamSheetsPage() {
       .map((s) => s.fixture_id)
   );
 
-  const rows = ((fixtures ?? []) as any[])
+  const all = ((fixtures ?? []) as any[])
     .filter((f) => stillToPlay(f) || needsWork.has(f.fixture_id))
-    .sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""))
-    .slice(0, 30);
+    .sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""));
+
+  const PAGE_SIZE = 10;
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const rows = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const notMigrated = !!error && /team_sheets/.test(error.message);
 
   return (
@@ -166,6 +174,10 @@ export default async function ClubTeamSheetsPage() {
             );
           })}
         </ul>
+      )}
+
+      {all.length > PAGE_SIZE && (
+        <Pagination page={page} pageSize={PAGE_SIZE} total={all.length} />
       )}
     </div>
   );

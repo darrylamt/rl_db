@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { POSITIONS, coversPosition } from "@/lib/positions";
 import { PLAYER_ATTRIBUTES } from "@/lib/attributes";
@@ -120,6 +120,20 @@ export function TransferMarket({
     return sorted;
   }, [players, club, q, position, bestAt]);
 
+  // Ten at a time. Every active player in the league is nearly two hundred
+  // names, and a market you have to scroll past all of them to use is one
+  // nobody uses.
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  // Narrowing the list while on page 4 should not leave you staring at an
+  // empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [club, q, position, bestAt]);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const visible = shown.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
   const teamName = (id: string | null) =>
     id ? (teams.find((t) => t.team_id === id)?.name ?? "") : "no club";
 
@@ -236,7 +250,7 @@ export function TransferMarket({
         </div>
       ) : (
         <ul className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {shown.map((p) => {
+          {visible.map((p) => {
             const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
             const already = open.has(p.player_id);
             return (
@@ -367,6 +381,36 @@ export function TransferMarket({
             );
           })}
         </ul>
+      )}
+
+      {shown.length > PAGE_SIZE && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-sm text-slate-600">
+          <span>
+            Showing {(current - 1) * PAGE_SIZE + 1}–
+            {Math.min(current * PAGE_SIZE, shown.length)} of {shown.length}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPage(current - 1)}
+              disabled={current <= 1}
+              className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              ← Prev
+            </button>
+            <span className="px-2 text-xs text-slate-500 whitespace-nowrap">
+              Page {current} / {pages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(current + 1)}
+              disabled={current >= pages}
+              className="px-3 py-1.5 rounded border border-slate-300 bg-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              Next →
+            </button>
+          </span>
+        </div>
       )}
     </div>
   );

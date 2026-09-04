@@ -78,6 +78,26 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
       <Field label="Club Logo">
         <PhotoUpload name="logo" currentUrl={team.logo_url} label="Logo" shape="square" />
       </Field>
+      <Field
+        label="Club colour"
+        hint="Used for the club's bar in the match poll. Left empty, it is worked out from the crest — set it here when that guess is wrong."
+      >
+        <div className="flex items-center gap-2">
+          <Input
+            name="brand_color"
+            defaultValue={team.brand_color ?? ""}
+            placeholder="#dc2626"
+            className="flex-1"
+          />
+          {team.brand_color && (
+            <span
+              aria-hidden
+              className="w-9 h-9 rounded border border-slate-300 shrink-0"
+              style={{ background: team.brand_color }}
+            />
+          )}
+        </div>
+      </Field>
     </FormShell>
   );
 }
