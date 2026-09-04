@@ -273,8 +273,17 @@ export default async function PublicPlayerPage({
       </Link>
 
       {/* Identity */}
-      <div className="relative rounded-2xl overflow-hidden mb-4 bg-gradient-to-br from-navy-800 via-navy-900 to-neutral-950 border border-white/10">
-        <div className="relative h-56 md:h-72">
+      <div className="relative rounded-3xl overflow-hidden mb-4 bg-gradient-to-b from-violet-900 via-purple-900 to-violet-950 border border-white/10">
+        <div className="relative h-72 md:h-96">
+          {/* The surname behind the head, the way a shirt number sits behind
+              a player — decoration that still says whose page this is. */}
+          <span
+            aria-hidden
+            className="absolute top-4 inset-x-0 text-center font-display text-[4.5rem] md:text-[7rem] leading-none text-white/10 tracking-tight select-none truncate px-2"
+          >
+            {(p.last_name || p.first_name || "").toUpperCase()}
+          </span>
+
           {p.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -285,48 +294,59 @@ export default async function PublicPlayerPage({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="font-display text-[7rem] md:text-[9rem] leading-none text-white/10">
+              <span className="font-display text-[7rem] md:text-[9rem] leading-none text-white/15">
                 {p.first_name?.[0]}
                 {p.last_name?.[0]}
               </span>
             </div>
           )}
-          {/* Name reads over a photo of anyone — this is what makes it legible
-              rather than what makes it moody. */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/10" />
 
-          {team?.logo_url && (
-            <div className="absolute top-4 right-4">
-              <Avatar src={team.logo_url} name={team.name} size={40} contain />
+          {/* Violet over the photo, deepening to the foot of the card so the
+              name reads over anybody's picture. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-violet-950 via-violet-950/70 to-transparent" />
+          <div className="absolute inset-0 bg-violet-800/20 mix-blend-overlay" />
+
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7 flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl md:text-5xl leading-[0.95] text-white drop-shadow">
+                {p.first_name}
+                <br />
+                {p.last_name}
+                {p.playing_status && (
+                  <span
+                    className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
+                      p.playing_status === "active" ? "bg-emerald-400" : "bg-red-500"
+                    }`}
+                    title={p.playing_status === "active" ? "Active" : "Not active"}
+                  />
+                )}
+              </h1>
+              <p className="text-violet-100/90 text-sm mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                {team?.name ?? "Unattached"}
+                {p.position && (
+                  <span className="text-violet-200/60">· {p.position}</span>
+                )}
+                {p.jersey_number != null && (
+                  <span className="text-violet-200/60">· #{p.jersey_number}</span>
+                )}
+                {p.is_captain && (
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-ghanaYellow-500/20 text-ghanaYellow-500">
+                    Captain
+                  </span>
+                )}
+              </p>
             </div>
-          )}
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-            <h1 className="font-display text-3xl md:text-5xl leading-[0.95] text-white">
-              {p.first_name}
-              <br />
-              {p.last_name}
-              {p.playing_status && (
-                <span
-                  className={`inline-block align-middle ml-2.5 w-2.5 h-2.5 rounded-full ${
-                    p.playing_status === "active" ? "bg-emerald-500" : "bg-red-500"
-                  }`}
-                  title={p.playing_status === "active" ? "Active" : "Not active"}
-                />
-              )}
-            </h1>
-            <p className="text-slate-200 text-sm mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-              {team?.name ?? "Unattached"}
-              {p.position && <span className="text-slate-400">· {p.position}</span>}
-              {p.jersey_number != null && (
-                <span className="text-slate-400">· #{p.jersey_number}</span>
-              )}
-              {p.is_captain && (
-                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-ghanaYellow-500/15 text-ghanaYellow-500">
-                  Captain
-                </span>
-              )}
-            </p>
+            {team?.logo_url && (
+              <Avatar
+                src={team.logo_url}
+                name={team.name}
+                size={56}
+                rounded="none"
+                className="rounded-xl shrink-0 drop-shadow"
+                contain
+              />
+            )}
           </div>
         </div>
       </div>

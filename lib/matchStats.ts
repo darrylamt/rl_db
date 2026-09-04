@@ -14,7 +14,7 @@
  * renders fine but never ticks.
  */
 export const FIXTURE_SELECT =
-  "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id";
+  "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name), competition:competition_id(name, season, division), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id";
 
 export const EVENT_LABELS: Record<string, string> = {
   try: "Try",

@@ -78,10 +78,12 @@ function byDay(fixtures: any[]): { date: string; matches: any[] }[] {
     .map(([date, matches]) => ({ date, matches }));
 }
 
+// Upcoming, Today, Results — the day runs left to right, so what is next
+// sits ahead of now and what is done sits behind it.
 const TABS = [
+  { key: "upcoming", label: "Upcoming" },
   { key: "today", label: "Today" },
   { key: "results", label: "Results" },
-  { key: "upcoming", label: "Upcoming" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -238,7 +240,7 @@ export default async function LiveHubPage({
 
       {/* Clubs */}
       {clubs.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+        <div className="flex gap-3 overflow-x-auto pb-1 mb-6 px-1 snap-x">
           {clubs.map((c: any) => (
             <Link
               key={c.team_id}
