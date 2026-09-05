@@ -21,6 +21,9 @@ import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 
 export type ValueGroup = "spine" | "outside" | "forward" | "utility";
 
+/** Men's, women's and youth are different competitions, not one ladder. */
+export type ValueGrade = "senior_men" | "senior_women" | "youth" | "unknown";
+
 export type Driver = { label: string; percentile: number; weight: number };
 
 export type Valuation = {
@@ -29,6 +32,9 @@ export type Valuation = {
   score: number;
   base: number;
   group: ValueGroup;
+  grade: ValueGrade;
+  /** How many peers the ranking was made against. */
+  cohortSize: number;
   appearances: number;
   points: number;
   pointsPerAppearance: number;
@@ -172,7 +178,7 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
   // The admin client on purpose: date of birth is not on the public view and
   // should not be. It is read here, used, and never returned.
   const [players, events, lineups, fixtures, results] = await Promise.all([
-    all<any>(supabase, "players", "player_id, position, team_id, date_of_birth"),
+    all<any>(supabase, "players", "player_id, position, team_id, date_of_birth, category"),
     all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
     all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
     all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id"),
@@ -273,11 +279,21 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
   type Row = {
     id: string;
     group: ValueGroup;
+    grade: ValueGrade;
     apps: number;
     pts: number;
     rate: number;
     team: string | null;
     age: number | null;
+  };
+
+  const gradeOf = (category: string | null | undefined): ValueGrade => {
+    const c = (category ?? "").toLowerCase().replace(/\s+/g, "_");
+    if (c === "senior_men" || c === "male" || c === "men") return "senior_men";
+    if (c === "senior_women" || c === "female" || c === "women")
+      return "senior_women";
+    if (c === "youth") return "youth";
+    return "unknown";
   };
 
   const rows: Row[] = players.map((p): Row => {
@@ -286,6 +302,7 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     return {
       id: p.player_id as string,
       group: groupOf(p.position),
+      grade: gradeOf(p.category),
       apps,
       pts,
       rate: apps > 0 ? pts / apps : 0,
@@ -298,19 +315,35 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     };
   });
 
-  const byGroup = new Map<ValueGroup, Row[]>();
+  /**
+   * Grade first, then position inside it.
+   *
+   * The women's game has nine recorded matches to the men's two hundred, so
+   * ranking a women's player against men measures how much rugby her
+   * competition has played, not how well she plays it. Everybody is ranked
+   * against the people they actually line up against.
+   */
+  const byCohort = new Map<string, Row[]>();
   for (const r of rows) {
-    if (!byGroup.has(r.group)) byGroup.set(r.group, []);
-    byGroup.get(r.group)!.push(r);
+    const key = `${r.grade}:${r.group}`;
+    if (!byCohort.has(key)) byCohort.set(key, []);
+    byCohort.get(key)!.push(r);
   }
 
   const out = new Map<string, Valuation>();
 
-  for (const [group, cohortRaw] of Array.from(byGroup)) {
-    // A group too small to rank inside is ranked against everybody instead.
-    // Only 106 of 525 players have a position, so most sit in "utility" for
-    // now and move into their real group the day somebody enters one.
-    const cohort = cohortRaw.length >= MIN_COHORT ? cohortRaw : rows;
+  for (const [key, cohortRaw] of Array.from(byCohort)) {
+    const grade = cohortRaw[0].grade;
+    // Too few to rank against falls back to the rest of the same grade before
+    // it ever falls back to everybody — a women's hooker is better compared
+    // with women than with men who happen to play the same position.
+    const sameGrade = rows.filter((r) => r.grade === grade);
+    const cohort =
+      cohortRaw.length >= MIN_COHORT
+        ? cohortRaw
+        : sameGrade.length >= MIN_COHORT
+        ? sameGrade
+        : rows;
 
     // Shrunk scoring rate: a player's own number, pulled toward his peers'
     // in proportion to how little evidence stands behind it.
@@ -361,6 +394,8 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
         score,
         base,
         group: r.group,
+        grade: r.grade,
+        cohortSize: cohort.length,
         appearances: r.apps,
         points: r.pts,
         pointsPerAppearance: r.apps > 0 ? r.pts / r.apps : 0,
