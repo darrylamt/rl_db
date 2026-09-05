@@ -30,6 +30,14 @@ export type Valuation = {
   value: number;
   /** 0–1 against peers, before the base is applied. */
   score: number;
+  /**
+   * The same score with team strength taken out.
+   *
+   * Club value is built from squad quality, and player value already contains
+   * how strong the club is — feeding one into the other would let a club's
+   * record inflate its players and those players inflate the record back.
+   */
+  scoreExTeam: number;
   base: number;
   group: ValueGroup;
   grade: ValueGrade;
@@ -388,10 +396,18 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
           ? parts.reduce((s, p) => s + (WEIGHTS[p.key] / total) * p.pct, 0)
           : 0;
 
+      const exTeam = parts.filter((p) => p.key !== "team");
+      const exTotal = exTeam.reduce((s, p) => s + WEIGHTS[p.key], 0);
+      const scoreExTeam =
+        exTotal > 0
+          ? exTeam.reduce((s, p) => s + (WEIGHTS[p.key] / exTotal) * p.pct, 0)
+          : 0;
+
       const base = BASE[r.group as ValueGroup];
       out.set(r.id, {
         value: Math.round(base * (1 + SPREAD * score)),
         score,
+        scoreExTeam,
         base,
         group: r.group,
         grade: r.grade,

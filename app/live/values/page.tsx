@@ -8,13 +8,14 @@ import {
   type ValueGroup,
   type ValueGrade,
 } from "@/lib/playerValue";
+import { getClubValues } from "@/lib/clubValue";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Player values — RLFG Live",
+  title: "Values — RLFG Live",
   description:
-    "What every registered player is worth, worked out from their recorded record.",
+    "What every club and player is worth, worked out from the recorded record.",
 };
 
 const GRADES: { key: ValueGrade; label: string }[] = [
@@ -36,12 +37,14 @@ const PAGE_SIZE = 25;
 export default async function ValuesPage({
   searchParams,
 }: {
-  searchParams?: { grade?: string; group?: string; page?: string };
+  searchParams?: { view?: string; grade?: string; group?: string; page?: string };
 }) {
   const supabase = createPublicClient();
+  const view = searchParams?.view === "clubs" ? "clubs" : "players";
 
-  const [values, { data: players }, { data: teams }] = await Promise.all([
+  const [values, clubValues, { data: players }, { data: teams }] = await Promise.all([
     getPlayerValues(),
+    getClubValues(),
     supabase
       .from("public_players")
       .select("player_id, first_name, last_name, position, photo_url, team_id")
@@ -87,15 +90,100 @@ export default async function ValuesPage({
     <>
       <div className="mb-6">
         <h1 className="font-display text-3xl md:text-5xl leading-tight">
-          Player values
+          {view === "clubs" ? "Club values" : "Player values"}
         </h1>
-        <p className="text-slate-400 text-sm mt-2 max-w-2xl">
-          What the record says each player is worth, measured against others in
-          the same competition and position. A short record counts for less
-          than a long one, so nobody is judged on a single afternoon.
-        </p>
+        {view === "players" && (
+          <p className="text-slate-400 text-sm mt-2 max-w-2xl">
+            What the record says each player is worth, measured against others
+            in the same competition and position. A short record counts for
+            less than a long one, so nobody is judged on a single afternoon.
+          </p>
+        )}
       </div>
 
+      <div className="flex gap-1.5 mb-5">
+        {[
+          { key: "players", label: "Players" },
+          { key: "clubs", label: "Clubs" },
+        ].map((v) => (
+          <Link
+            key={v.key}
+            href={v.key === "players" ? "/live/values" : "/live/values?view=clubs"}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+              view === v.key
+                ? "bg-white text-black border-white"
+                : "border-white/15 text-slate-300 hover:border-white/40"
+            }`}
+          >
+            {v.label}
+          </Link>
+        ))}
+      </div>
+
+      {view === "clubs" && (
+        <>
+          <p className="text-slate-400 text-sm mb-5 max-w-2xl">
+            A club is worth what it puts into the game, not what its first team
+            did last Sunday. Running men&apos;s, women&apos;s and youth sides
+            season after season counts for more here than a good year — which
+            is why the club with the best record is not the one at the top.
+          </p>
+          <ol className="space-y-2">
+            {clubValues.map((c, i) => (
+              <li key={c.teamId}>
+                <Link
+                  href={`/live/club/${c.teamId}`}
+                  className="block bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 hover:border-white/25 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 shrink-0 text-center font-display tabular-nums text-sm text-slate-500">
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium truncate">
+                        {c.name}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 truncate">
+                        {c.gradesFielded.length} grade
+                        {c.gradesFielded.length === 1 ? "" : "s"} ·{" "}
+                        {c.seasons} season{c.seasons === 1 ? "" : "s"} ·{" "}
+                        {c.won}/{c.played} won
+                      </span>
+                    </span>
+                    <span className="font-display text-xl text-ghanaYellow-500 tabular-nums shrink-0">
+                      {c.value}
+                    </span>
+                  </div>
+
+                  <dl className="mt-3 grid grid-cols-4 gap-2">
+                    {[
+                      ["Breadth", c.parts.breadth],
+                      ["Squad", c.parts.squad],
+                      ["Continuity", c.parts.continuity],
+                      ["Record", c.parts.record],
+                    ].map(([label, v]) => (
+                      <div key={label as string}>
+                        <dt className="text-[10px] uppercase tracking-wider text-slate-500">
+                          {label as string}
+                        </dt>
+                        <dd className="mt-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                          <span
+                            className="block h-full rounded-full bg-ghanaYellow-500/70"
+                            style={{ width: `${Math.round((v as number) * 100)}%` }}
+                          />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+
+      {view === "players" && (
+      <>
       {/* The women's game has nine recorded matches to the men's two hundred,
           so these are separate ladders rather than one. */}
       <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-3 max-w-sm">
@@ -217,6 +305,9 @@ export default async function ValuesPage({
             <Pagination page={page} pageSize={PAGE_SIZE} total={rows.length} />
           )}
         </>
+      )}
+
+      </>
       )}
 
       <p className="text-xs text-slate-500 mt-8">
