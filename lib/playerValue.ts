@@ -173,8 +173,8 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
   // should not be. It is read here, used, and never returned.
   const [players, events, lineups, fixtures, results] = await Promise.all([
     all<any>(supabase, "players", "player_id, position, team_id, date_of_birth"),
-    all<any>(supabase, "match_events", "player_id, fixture_id, event_type"),
-    all<any>(supabase, "match_lineups", "player_id, fixture_id"),
+    all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
+    all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
     all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id"),
     all<any>(supabase, "match_results", "fixture_id, home_score, away_score"),
   ]);
@@ -182,10 +182,25 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
   // ── What each player has actually done ──
   const points = new Map<string, number>();
   const played = new Map<string, Set<string>>();
+  /** Appearances per club, so a career can be weighted by where it happened. */
+  const appsByClub = new Map<string, Map<string, number>>();
+  /** Fixtures already counted for a club, so an event and a sheet are one. */
+  const countedFor = new Map<string, Set<string>>();
 
   const seen = (id: string) => {
     if (!played.has(id)) played.set(id, new Set());
     return played.get(id)!;
+  };
+
+  const creditClub = (playerId: string, club: string | null, fixture: string) => {
+    if (!club) return;
+    if (!countedFor.has(playerId)) countedFor.set(playerId, new Set());
+    const key = `${club}:${fixture}`;
+    if (countedFor.get(playerId)!.has(key)) return;
+    countedFor.get(playerId)!.add(key);
+    if (!appsByClub.has(playerId)) appsByClub.set(playerId, new Map());
+    const m = appsByClub.get(playerId)!;
+    m.set(club, (m.get(club) ?? 0) + 1);
   };
 
   for (const e of events) {
@@ -193,11 +208,15 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     const p = EVENT_POINTS[normaliseType(e.event_type)] ?? 0;
     points.set(e.player_id, (points.get(e.player_id) ?? 0) + p);
     // An event is proof of playing; team sheets only exist from 2024.
-    if (e.fixture_id) seen(e.player_id).add(e.fixture_id);
+    if (e.fixture_id) {
+      seen(e.player_id).add(e.fixture_id);
+      creditClub(e.player_id, e.team_id ?? null, e.fixture_id);
+    }
   }
   for (const l of lineups) {
     if (!l.player_id || !l.fixture_id) continue;
     seen(l.player_id).add(l.fixture_id);
+    creditClub(l.player_id, l.team_id ?? null, l.fixture_id);
   }
 
   // ── How strong the club around them is ──
@@ -221,6 +240,34 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     if (n < 3) continue; // three matches is not a season
     clubStrength.set(club, (clubWins.get(club) ?? 0) / n);
   }
+
+  /**
+   * The strength of the sides a player actually played in, weighted by how
+   * many appearances he made for each.
+   *
+   * Reading it off his current club credits a whole career to whoever signed
+   * him last — somebody with seven seasons at one club and one at another
+   * would be judged entirely on the new one. The club is taken from the
+   * appearance itself, so the years land where they were played.
+   *
+   * Ranked once across every player rather than inside each position group.
+   * A club's strength is not a positional trait, and ranking it per group
+   * gave one club four different numbers depending on who else happened to
+   * be in the cohort.
+   */
+  const careerStrength = new Map<string, number>();
+  for (const [playerId, clubs] of Array.from(appsByClub)) {
+    let weighted = 0;
+    let total = 0;
+    for (const [club, apps] of Array.from(clubs)) {
+      const strength = clubStrength.get(club);
+      if (strength == null) continue;
+      weighted += strength * apps;
+      total += apps;
+    }
+    if (total > 0) careerStrength.set(playerId, weighted / total);
+  }
+  const teamPercentile = percentiles(careerStrength);
 
   // ── Group everybody, then rank inside the group ──
   type Row = {
@@ -275,28 +322,25 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
 
     const shrunk = new Map<string, number>();
     const appsMap = new Map<string, number>();
-    const teamMap = new Map<string, number>();
     const ageMap = new Map<string, number>();
 
     for (const r of cohort) {
       shrunk.set(r.id, (r.pts + SHRINK * cohortRate) / (r.apps + SHRINK));
       appsMap.set(r.id, r.apps);
-      const strength = r.team ? clubStrength.get(r.team) : undefined;
-      if (strength != null) teamMap.set(r.id, strength);
       const prime = primeScore(r.age);
       if (prime != null) ageMap.set(r.id, prime);
     }
 
     const pPoints = percentiles(shrunk);
     const pApps = percentiles(appsMap);
-    const pTeam = percentiles(teamMap);
     const pAge = percentiles(ageMap);
 
     for (const r of cohortRaw) {
       const parts: { key: keyof typeof WEIGHTS; pct: number }[] = [];
       const pts = pPoints.get(r.id);
       const apps = pApps.get(r.id);
-      const team = pTeam.get(r.id);
+      // Where the appearances were actually made, not who owns him today.
+      const team = teamPercentile.get(r.id);
       const age = pAge.get(r.id);
       if (pts != null) parts.push({ key: "points", pct: pts });
       if (apps != null) parts.push({ key: "appearances", pct: apps });

@@ -45,6 +45,12 @@ export default function LiveLayout({
           </Link>
           <nav className="ml-auto flex gap-1 shrink-0">
             <Link
+              href="/live/values"
+              className="px-3 py-1.5 rounded text-xs text-slate-300 hover:text-ghanaYellow-500 hover:bg-white/5"
+            >
+              Values
+            </Link>
+            <Link
               href="/live/records"
               className="px-3 py-1.5 rounded text-xs text-slate-300 hover:text-ghanaYellow-500 hover:bg-white/5"
             >

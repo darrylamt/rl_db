@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getRecords, type RecordBoard } from "@/lib/records";
 import { Avatar } from "@/components/Avatar";
+import { formatLabel, divisionLabel } from "@/lib/competitionFormat";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ function Chevron() {
     <svg
       viewBox="0 0 20 20"
       fill="none"
-      className="w-5 h-5 text-purple-900/40 shrink-0 transition-transform duration-150 group-open:rotate-90"
+      className="w-5 h-5 text-slate-600 shrink-0 transition-transform duration-150 group-open:rotate-90"
     >
       <path
         d="M7 4l6 6-6 6"
@@ -35,9 +36,9 @@ function Board({ board }: { board: RecordBoard }) {
   if (!leader) return null;
 
   return (
-    <details className="group bg-white text-slate-900 rounded-2xl shadow-sm overflow-hidden [&_summary::-webkit-details-marker]:hidden">
+    <details className="group bg-neutral-900 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition [&_summary::-webkit-details-marker]:hidden">
       <summary className="list-none cursor-pointer px-5 pt-5 pb-2 flex items-center gap-2 select-none">
-        <span className="text-lg md:text-xl font-bold text-purple-950 truncate">
+        <span className="text-lg md:text-xl font-bold truncate">
           {board.title}
         </span>
         <Chevron />
@@ -48,7 +49,7 @@ function Board({ board }: { board: RecordBoard }) {
           <p className="text-[11px] text-slate-400 mb-2">{board.note}</p>
         )}
 
-        <div className="text-5xl md:text-6xl font-extrabold text-purple-950 tabular-nums leading-none mb-4">
+        <div className="text-5xl md:text-6xl font-extrabold text-ghanaYellow-500 tabular-nums leading-none mb-4">
           {leader.count}
         </div>
 
@@ -62,9 +63,7 @@ function Board({ board }: { board: RecordBoard }) {
             contain={!leader.photoUrl}
           />
           <div className="min-w-0">
-            <p className="font-bold text-[15px] text-purple-950 truncate">
-              {leader.name}
-            </p>
+            <p className="font-bold text-[15px] truncate">{leader.name}</p>
             {leader.subtitle && (
               <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                 {leader.clubLogo && (
@@ -85,19 +84,19 @@ function Board({ board }: { board: RecordBoard }) {
         </div>
 
         {rest.length > 0 && (
-          <ol className="mt-4 pt-3 border-t border-slate-100 divide-y divide-slate-100">
+          <ol className="mt-4 pt-3 border-t border-white/10 divide-y divide-white/5">
             {rest.map((l) => (
               <li
                 key={l.id}
                 className="py-1.5 flex items-center gap-2.5 text-sm"
               >
-                <span className="w-5 shrink-0 text-center text-slate-400 tabular-nums text-xs">
+                <span className="w-5 shrink-0 text-center text-slate-500 tabular-nums text-xs">
                   {l.place}
                 </span>
-                <span className="flex-1 min-w-0 truncate text-slate-700">
+                <span className="flex-1 min-w-0 truncate text-slate-300">
                   {l.name}
                 </span>
-                <span className="tabular-nums font-semibold text-slate-900 shrink-0">
+                <span className="tabular-nums font-semibold shrink-0">
                   {l.count}
                 </span>
               </li>
@@ -194,8 +193,31 @@ export default async function RecordsPage({
       </div>
 
       {/* Everything is combined unless you ask otherwise: a 9s try and a 13s
-          try are not the same feat, and neither are a men's and a youth one. */}
-      <div className="bg-neutral-900 border border-white/10 rounded-xl p-3 md:p-4 mb-6 grid gap-3">
+          try are not the same feat, and neither are a men's and a youth one.
+          Folded away, because three rows of chips before a single record is
+          a lot of furniture in front of the thing people came for. */}
+      <details
+        className="group bg-neutral-900 border border-white/10 rounded-xl mb-6 [&_summary::-webkit-details-marker]:hidden"
+        open={!!(season || format || division)}
+      >
+        <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-2 text-sm">
+          <span className="text-slate-300">
+            {[
+              divisionLabel(division),
+              formatLabel(format),
+              season ?? "All time",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          <span className="text-[11px] text-slate-500 group-open:hidden">
+            Change
+          </span>
+          <span className="text-[11px] text-slate-500 hidden group-open:inline">
+            Done
+          </span>
+        </summary>
+        <div className="px-3 md:px-4 pb-4 grid gap-3">
         <FilterRow label="Season">
           <Chip href={href({ season: null })} on={!season}>
             All time
@@ -236,7 +258,8 @@ export default async function RecordsPage({
             </Chip>
           ))}
         </FilterRow>
-      </div>
+        </div>
+      </details>
 
       {nothing ? (
         <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
