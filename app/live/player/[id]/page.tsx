@@ -13,6 +13,7 @@ import {
 } from "@/lib/attributes";
 import { fetchLineupAppearances } from "@/lib/appearances";
 import { cleanSecondaryPositions } from "@/lib/positions";
+import { getPlayerValue } from "@/lib/playerValue";
 import {
   formatOf,
   formatLabel,
@@ -262,6 +263,11 @@ export default async function PublicPlayerPage({
 
   const p: any = player;
   const cover = cleanSecondaryPositions(p.secondary_positions, p.position);
+
+  // Deliberately outside the filters above. A value is a career figure, and
+  // having it move because somebody narrowed the page to the 9s would say
+  // something the model does not mean.
+  const valuation = await getPlayerValue(playerId);
 
   return (
     <>
@@ -531,6 +537,75 @@ export default async function PublicPlayerPage({
                 })}
               </tbody>
             </table>
+          </div>
+        </section>
+      )}
+
+      {/* What the record says they are worth */}
+      {valuation && (
+        <section className="mb-6">
+          <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 md:p-5">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                  Player value
+                </p>
+                <p className="font-display text-4xl md:text-5xl text-ghanaYellow-500 tabular-nums leading-none mt-1">
+                  {valuation.value}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                  Confidence
+                </p>
+                <p
+                  className={`text-sm font-medium mt-1 ${
+                    valuation.confidence === "good"
+                      ? "text-emerald-400"
+                      : valuation.confidence === "fair"
+                      ? "text-slate-200"
+                      : "text-amber-400"
+                  }`}
+                >
+                  {valuation.confidence === "none"
+                    ? "No match record"
+                    : valuation.confidence === "low"
+                    ? `Thin — ${valuation.appearances} appearance${
+                        valuation.appearances === 1 ? "" : "s"
+                      }`
+                    : valuation.confidence === "fair"
+                    ? `${valuation.appearances} appearances`
+                    : `${valuation.appearances} appearances`}
+                </p>
+              </div>
+            </div>
+
+            {valuation.drivers.length > 0 && (
+              <dl className="mt-4 space-y-1.5">
+                {valuation.drivers.map((d) => (
+                  <div key={d.label} className="flex items-center gap-3 text-xs">
+                    <dt className="w-24 shrink-0 text-slate-400">{d.label}</dt>
+                    <dd className="flex-1 flex items-center gap-2">
+                      <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <span
+                          className="block h-full rounded-full bg-ghanaYellow-500/70"
+                          style={{ width: `${Math.round(d.percentile * 100)}%` }}
+                        />
+                      </span>
+                      <span className="w-10 text-right tabular-nums text-slate-400">
+                        {Math.round(d.percentile * 100)}
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            <p className="text-[11px] text-slate-500 mt-3">
+              Worked out from what has been recorded, against players in the
+              same position. A short record counts for less than a long one, so
+              nobody is priced on a single afternoon.
+            </p>
           </div>
         </section>
       )}
