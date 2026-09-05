@@ -24,10 +24,6 @@ SELECT
   team_id,
   first_name,
   last_name,
-  date_of_birth,
-  CASE WHEN date_of_birth IS NULL THEN NULL
-       ELSE extract(year FROM age(date_of_birth))::integer
-  END AS age,
   height_cm,
   weight_kg,
   nationality,
@@ -35,6 +31,10 @@ SELECT
   position,
   secondary_positions,
   category,
+  -- No date_of_birth and no age: see public_players_drop_age.sql. They are
+  -- left out here too so these two files agree. They both drop and recreate
+  -- this view, so whichever runs last decides — and with the columns still
+  -- listed here, re-running this one quietly put them back.
   is_captain,
   playing_status,
   photo_url,
