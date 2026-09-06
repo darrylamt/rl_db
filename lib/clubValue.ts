@@ -56,8 +56,8 @@ const WEIGHTS = {
  * than a base and a multiplier, for the same reason as the player model — the
  * sentence "a club is worth between 100 and 250" can be checked by reading it.
  */
-const FLOOR = 100;
-const CEILING = 250;
+const FLOOR = 1000;
+const CEILING = 2500;
 
 /** The side a club can actually put out: thirteen plus a bench. */
 const MATCHDAY = 17;

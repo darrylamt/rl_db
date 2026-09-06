@@ -28,10 +28,10 @@ export const LEVY_RATE = 0.1;
  * stronger. This measures obligation: what a club has to field, and how long
  * it has been turning up. A club running three grades needs three squads.
  */
-export const BASE_ALLOCATION = 300;
-export const PER_EXTRA_GRADE = 100;
-export const PER_SEASON = 25;
-export const SEASON_BONUS_CAP = 150;
+export const BASE_ALLOCATION = 3000;
+export const PER_EXTRA_GRADE = 1000;
+export const PER_SEASON = 250;
+export const SEASON_BONUS_CAP = 1500;
 
 /**
  * How much of an allocation may be carried into the next season.

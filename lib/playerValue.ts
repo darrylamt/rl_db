@@ -82,10 +82,10 @@ const GROUP_OF: Record<string, ValueGroup> = {
  * arithmetic that nobody can read.
  */
 const RANGE: Record<ValueGroup, { floor: number; ceiling: number }> = {
-  spine: { floor: 60, ceiling: 150 },
-  outside: { floor: 52, ceiling: 130 },
-  forward: { floor: 46, ceiling: 115 },
-  utility: { floor: 50, ceiling: 125 },
+  spine: { floor: 600, ceiling: 1500 },
+  outside: { floor: 520, ceiling: 1300 },
+  forward: { floor: 460, ceiling: 1150 },
+  utility: { floor: 500, ceiling: 1250 },
 };
 
 /**
