@@ -19,8 +19,14 @@ export default async function BuildTeamSheetPage({
   const supabase = createAdminClient();
   const fixtureId = params.fixtureId;
 
-  const [{ data: fixture }, { data: squad }, { data: sheet }, { data: named }, { data: availability }] =
-    await Promise.all([
+  const [
+    { data: fixture },
+    { data: squad },
+    { data: sheet },
+    { data: named },
+    { data: availability },
+    { data: coaches },
+  ] = await Promise.all([
       supabase
         .from("fixtures")
         .select(
@@ -35,7 +41,7 @@ export default async function BuildTeamSheetPage({
         .order("last_name"),
       supabase
         .from("team_sheets")
-        .select("status, review_note, submitted_at")
+        .select("status, review_note, submitted_at, head_coach_id, assistant_coach_id")
         .eq("fixture_id", fixtureId)
         .eq("team_id", teamId)
         .maybeSingle(),
@@ -49,6 +55,15 @@ export default async function BuildTeamSheetPage({
         .from("player_availability")
         .select("player_id, status")
         .eq("fixture_id", fixtureId),
+      // The federation's register, narrowed to who this club may name: its
+      // own coaches, plus anyone left open to every club. Absent the table,
+      // the picker simply does not appear.
+      supabase
+        .from("coaches")
+        .select("coach_id, first_name, last_name, role, team_id, status")
+        .eq("status", "active")
+        .or(`team_id.eq.${teamId},team_id.is.null`)
+        .order("last_name"),
     ]);
 
   if (!fixture) notFound();
@@ -130,6 +145,43 @@ export default async function BuildTeamSheetPage({
 
       <form action={saveTeamSheet.bind(null, fixtureId)}>
         <fieldset disabled={locked} className="disabled:opacity-60 border-0 p-0 m-0 min-w-0">
+          {/* Who is in charge on the day. The federation keeps the register;
+              a club picks its own coaches from it and nobody else's. */}
+          {(coaches ?? []).length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4">
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+                Coaches for this match
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[
+                  { name: "head_coach_id", label: "Head coach", value: (sheet as any)?.head_coach_id },
+                  { name: "assistant_coach_id", label: "Assistant", value: (sheet as any)?.assistant_coach_id },
+                ].map((slot) => (
+                  <label key={slot.name} className="text-xs text-slate-600">
+                    <span className="block mb-1">{slot.label}</span>
+                    <select
+                      name={slot.name}
+                      defaultValue={slot.value ?? ""}
+                      className="w-full px-2 py-2 rounded border border-slate-300 text-sm"
+                    >
+                      <option value="">— none —</option>
+                      {(coaches ?? []).map((c: any) => (
+                        <option key={c.coach_id} value={c.coach_id}>
+                          {`${c.first_name} ${c.last_name}`.trim()}
+                          {c.role ? ` — ${c.role}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Saved with the side, and changeable until the sheet is with the
+                federation. Ask them to add a coach who is not listed.
+              </p>
+            </div>
+          )}
+
           {eligible.length === 0 ? (
             <p className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500 text-sm">
               No {division ? `${division}’s ` : ""}players on your squad yet.{" "}

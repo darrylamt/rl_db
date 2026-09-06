@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
 import { requireClub, getAppUser } from "@/lib/auth";
 
 type Outcome = { error: string } | { note: string };
@@ -115,6 +116,39 @@ export async function saveTeamSheet(fixtureId: string, fd: FormData) {
           .upsert(rows, { onConflict: "fixture_id,team_id,player_id" });
         if (error) throw new Error(error.message);
       }
+
+      // Who is in charge. Checked rather than trusted: a posted coach id is
+      // the caller's claim, and a club may only name its own coaches or one
+      // the federation has left open to everybody.
+      const wanted = ["head_coach_id", "assistant_coach_id"]
+        .map((k) => ({ k, id: ((fd.get(k) as string) ?? "").trim() || null }));
+
+      const asked = wanted.map((w) => w.id).filter(Boolean) as string[];
+      const allowed = new Set<string>();
+      if (asked.length > 0) {
+        const { data: theirs } = await supabase
+          .from("coaches")
+          .select("coach_id")
+          .in("coach_id", asked)
+          .or(`team_id.eq.${teamId},team_id.is.null`);
+        for (const c of (theirs ?? []) as any[]) allowed.add(c.coach_id);
+      }
+
+      const coachUpdate: Record<string, string | null> = {};
+      for (const w of wanted) {
+        coachUpdate[w.k] = w.id && allowed.has(w.id) ? w.id : null;
+      }
+      // Absent supabase/coaches.sql the columns are not there yet, so this
+      // is allowed to fail without taking the side down with it.
+      await writeWithOptionalColumns(
+        coachUpdate,
+        ["head_coach_id", "assistant_coach_id"],
+        (values) =>
+          supabase
+            .from("team_sheets")
+            .update(values)
+            .eq("sheet_id", sheet.sheet_id),
+      );
 
       // A declined sheet that has been edited is a draft again, not a
       // standing refusal.

@@ -48,6 +48,7 @@ const navSections = [
       { href: "/admin/finance", label: "LeagueX" },
       { href: "/admin/club-accounts", label: "Club Accounts" },
       { href: "/admin/player-accounts", label: "Player Accounts" },
+      { href: "/admin/coaches", label: "Coaches" },
       { href: "/admin/recorders", label: "Match Recorders" },
       { href: "/admin/officials", label: "Officials" },
     ],
