@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ListHeader } from "@/components/admin/ListHeader";
+import {
+  changesIn,
+  headline,
+  resolveNames,
+  type AuditEntry,
+} from "@/lib/auditPlain";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +63,10 @@ export default async function AuditPage({
 
   const { data, error, count } = await query;
   const rows = (data ?? []) as any[];
+
+  // Every id on the page resolved to a name in one pass, so a row can say
+  // "moved to Bulls" rather than showing a uuid nobody can read.
+  const names = await resolveNames(rows as AuditEntry[]);
   const total = count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
 
@@ -145,26 +155,34 @@ export default async function AuditPage({
                     })}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span
-                      className={`inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded mr-2 ${tone(
-                        r.action
-                      )}`}
+                    <Link
+                      href={`/admin/audit/${r.entry_id}`}
+                      className="block group"
                     >
-                      {verb(r.action)}
-                    </span>
-                    <span className="text-navy-900">
-                      {r.summary ?? (r.entity ?? "").replace(/_/g, " ")}
-                    </span>
-                    {changedFields(r.detail).length > 0 && (
-                      <span className="block text-xs text-slate-500 mt-0.5">
-                        {changedFields(r.detail).slice(0, 6).join(", ")}
+                      <span
+                        className={`inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded mr-2 ${tone(
+                          r.action
+                        )}`}
+                      >
+                        {verb(r.action)}
                       </span>
-                    )}
-                    {r.detail?.reason && (
-                      <span className="block text-xs text-slate-500 mt-0.5">
-                        {r.detail.reason}
+                      <span className="text-navy-900 group-hover:underline">
+                        {headline(r as AuditEntry, names)}
                       </span>
-                    )}
+                      {changesIn(r.detail, names).length > 0 && (
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {changesIn(r.detail, names)
+                            .slice(0, 4)
+                            .map((c) => `${c.label}: ${c.before} → ${c.after}`)
+                            .join(" · ")}
+                        </span>
+                      )}
+                      {r.detail?.reason && (
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {r.detail.reason}
+                        </span>
+                      )}
+                    </Link>
                   </td>
                   <td className="hidden md:table-cell px-4 py-2.5 text-slate-600 text-xs">
                     {r.actor_email ? (
