@@ -77,8 +77,8 @@ const GROUP_OF: Record<string, ValueGroup> = {
  * ceiling, and somewhere between the two according to the score.
  *
  * Written as two plain numbers rather than a base and a multiplier. "A
- * stand-off is worth between 60 and 150" is a sentence anybody can check; a
- * base of 60 times one-plus-one-and-a-half-times-a-score is the same
+ * stand-off is worth between 600 and 1,500" is a sentence anybody can check;
+ * a base of 600 times one-plus-one-and-a-half-times-a-score is the same
  * arithmetic that nobody can read.
  */
 const RANGE: Record<ValueGroup, { floor: number; ceiling: number }> = {

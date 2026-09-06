@@ -64,7 +64,7 @@ export type LedgerEntry = {
   created_at: string;
 };
 
-/** "650 LX". The suffix, never a prefix — it is not a dollar. */
+/** "6,500 LX". The suffix, never a prefix — it is not a dollar. */
 export function formatLX(amount: number): string {
   return `${Math.round(amount).toLocaleString("en-GB")} LX`;
 }

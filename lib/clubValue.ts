@@ -51,10 +51,10 @@ const WEIGHTS = {
 } as const;
 
 /**
- * The range a club is valued in: 100 at the floor, 250 at the ceiling, and
+ * The range a club is valued in: 1,000 at the floor, 2,500 at the ceiling, and
  * somewhere between the two according to the score. Two plain numbers rather
  * than a base and a multiplier, for the same reason as the player model — the
- * sentence "a club is worth between 100 and 250" can be checked by reading it.
+ * sentence "a club is worth between 1,000 and 2,500" can be read and checked.
  */
 const FLOOR = 1000;
 const CEILING = 2500;
