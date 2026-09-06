@@ -79,6 +79,25 @@ from (
 group by d.season
 on conflict (season) do nothing;
 
+-- ── Row level security ──────────────────────────────────────
+-- These dates decide which season a grant belongs to and when the next one
+-- may be made, so a table anybody could write to is a table anybody could
+-- use to mint a budget. Without this, the anon key — which ships in every
+-- browser bundle and is public by design — could insert, move or delete a
+-- season.
+--
+-- Reached only through server actions holding the service key, which check
+-- who is asking themselves. RLS on with no policy denies every client, which
+-- is the intent and matches lx_ledger and transfer_requests.
+alter table seasons enable row level security;
+
+-- Proves it: both should come back true.
+select
+  relrowsecurity                                             as rls_is_on,
+  (select count(*) from pg_policies where tablename = 'seasons') = 0
+                                                             as no_client_policies
+from pg_class where relname = 'seasons';
+
 -- ── What is on record ───────────────────────────────────────
 select
   s.season,
