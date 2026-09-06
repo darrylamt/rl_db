@@ -50,9 +50,14 @@ const WEIGHTS = {
   record: 0.18,
 } as const;
 
-/** A club at its best is worth this much more than one at its floor. */
-const BASE = 100;
-const SPREAD = 1.5;
+/**
+ * The range a club is valued in: 100 at the floor, 250 at the ceiling, and
+ * somewhere between the two according to the score. Two plain numbers rather
+ * than a base and a multiplier, for the same reason as the player model — the
+ * sentence "a club is worth between 100 and 250" can be checked by reading it.
+ */
+const FLOOR = 100;
+const CEILING = 250;
 
 /** The side a club can actually put out: thirteen plus a bench. */
 const MATCHDAY = 17;
@@ -216,7 +221,7 @@ export async function getClubValues(): Promise<ClubValue[]> {
     rows.push({
       teamId: club.team_id,
       name: club.name,
-      value: Math.round(BASE * (1 + SPREAD * score)),
+      value: Math.round(FLOOR + (CEILING - FLOOR) * score),
       score,
       parts: { breadth, squad: squadScore, continuity, record },
       gradesFielded: Array.from(fielded),

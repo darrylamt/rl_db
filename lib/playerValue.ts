@@ -72,15 +72,21 @@ const GROUP_OF: Record<string, ValueGroup> = {
   Utility: "utility",
 };
 
-const BASE: Record<ValueGroup, number> = {
-  spine: 60,
-  outside: 52,
-  forward: 46,
-  utility: 50,
+/**
+ * The range each position is valued in: worth this at the floor, this at the
+ * ceiling, and somewhere between the two according to the score.
+ *
+ * Written as two plain numbers rather than a base and a multiplier. "A
+ * stand-off is worth between 60 and 150" is a sentence anybody can check; a
+ * base of 60 times one-plus-one-and-a-half-times-a-score is the same
+ * arithmetic that nobody can read.
+ */
+const RANGE: Record<ValueGroup, { floor: number; ceiling: number }> = {
+  spine: { floor: 60, ceiling: 150 },
+  outside: { floor: 52, ceiling: 130 },
+  forward: { floor: 46, ceiling: 115 },
+  utility: { floor: 50, ceiling: 125 },
 };
-
-/** How far the best player sits above somebody with nothing recorded. */
-const SPREAD = 1.5;
 
 /**
  * Weights, summing to one. Add a metric here and rebalance; nothing else
@@ -93,26 +99,36 @@ const SPREAD = 1.5;
  * decision. Weighting either today would be weighting noise.
  */
 const WEIGHTS = {
-  points: 0.42,
-  appearances: 0.38,
-  team: 0.14,
+  points: 0.38,
+  appearances: 0.34,
+  interest: 0.12,
+  team: 0.10,
   age: 0.06,
 } as const;
+
+/**
+ * How many clubs asking after a player counts as maximum interest.
+ *
+ * Capped so that interest can lift a player without running away, and so
+ * that clubs cannot inflate somebody by agreeing to ask about him. Four
+ * separate clubs wanting a player says what six would.
+ */
+const INTEREST_CAP = 4;
+
+/**
+ * How many matches of evidence before a player is judged mostly on his own
+ * record rather than his position's average. At five matches it is half and
+ * half; at fifteen, three quarters his own; at thirty-five, nearly all.
+ */
+const SHRINK = 5;
 
 /** Labels for what a player is shown. Age is held back deliberately. */
 const PUBLIC_DRIVERS: Record<string, string> = {
   points: "Scoring",
   appearances: "Game time",
+  interest: "Clubs asking",
   team: "Team strength",
 };
-
-/**
- * How much evidence it takes before a player's own rate outweighs his
- * position's average. Median appearances is five, so five is the point at
- * which somebody is judged half on himself and half on his peers — and one
- * try in one game stops making anybody the best player in the country.
- */
-const SHRINK = 5;
 
 /** A group needs this many players before ranking inside it means anything. */
 const MIN_COHORT = 8;
@@ -185,12 +201,13 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
 
   // The admin client on purpose: date of birth is not on the public view and
   // should not be. It is read here, used, and never returned.
-  const [players, events, lineups, fixtures, results] = await Promise.all([
+  const [players, events, lineups, fixtures, results, requests] = await Promise.all([
     all<any>(supabase, "players", "player_id, position, team_id, date_of_birth, category"),
     all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
     all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
     all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id"),
     all<any>(supabase, "match_results", "fixture_id, home_score, away_score"),
+    all<any>(supabase, "transfer_requests", "player_id, to_team_id"),
   ]);
 
   // ── What each player has actually done ──
@@ -231,6 +248,21 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     if (!l.player_id || !l.fixture_id) continue;
     seen(l.player_id).add(l.fixture_id);
     creditClub(l.player_id, l.team_id ?? null, l.fixture_id);
+  }
+
+  /**
+   * How many separate clubs have asked after a player.
+   *
+   * The point of a value here is to put a number on a transfer, and nothing
+   * says what somebody is worth like other clubs wanting him. Counted as
+   * distinct clubs rather than requests, so one club asking five times is one
+   * club asking.
+   */
+  const askedBy = new Map<string, Set<string>>();
+  for (const q of requests) {
+    if (!q.player_id || !q.to_team_id) continue;
+    if (!askedBy.has(q.player_id)) askedBy.set(q.player_id, new Set());
+    askedBy.get(q.player_id)!.add(q.to_team_id);
   }
 
   // ── How strong the club around them is ──
@@ -366,7 +398,13 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     const ageMap = new Map<string, number>();
 
     for (const r of cohort) {
-      shrunk.set(r.id, (r.pts + SHRINK * cohortRate) / (r.apps + SHRINK));
+      // How far a player's own scoring rate is trusted over his position's
+      // average: five matches is half and half, and it climbs from there.
+      // Identical arithmetic to the usual one-line form, written out because
+      // this is the step people most need to be able to follow.
+      const trust = r.apps / (r.apps + SHRINK);
+      const own = r.apps > 0 ? r.pts / r.apps : 0;
+      shrunk.set(r.id, own * trust + cohortRate * (1 - trust));
       appsMap.set(r.id, r.apps);
       const prime = primeScore(r.age);
       if (prime != null) ageMap.set(r.id, prime);
@@ -386,6 +424,13 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
       if (pts != null) parts.push({ key: "points", pct: pts });
       if (apps != null) parts.push({ key: "appearances", pct: apps });
       if (team != null) parts.push({ key: "team", pct: team });
+      const asked = askedBy.get(r.id)?.size ?? 0;
+      if (asked > 0) {
+        parts.push({
+          key: "interest",
+          pct: Math.min(asked, INTEREST_CAP) / INTEREST_CAP,
+        });
+      }
       if (age != null) parts.push({ key: "age", pct: age });
 
       // Metrics a player has no data for drop out and the rest renormalise,
@@ -403,9 +448,10 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
           ? exTeam.reduce((s, p) => s + (WEIGHTS[p.key] / exTotal) * p.pct, 0)
           : 0;
 
-      const base = BASE[r.group as ValueGroup];
+      const { floor, ceiling } = RANGE[r.group as ValueGroup];
+      const base = floor;
       out.set(r.id, {
-        value: Math.round(base * (1 + SPREAD * score)),
+        value: Math.round(floor + (ceiling - floor) * score),
         score,
         scoreExTeam,
         base,
