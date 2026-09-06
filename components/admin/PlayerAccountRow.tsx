@@ -52,7 +52,7 @@ export function PlayerAccountRow({
           )}
         </p>
         <p className="text-xs text-slate-500 truncate">
-          {[player.team?.name, gradeLabel(player.category), player.position]
+          {[player.team?.name, gradeLabel(player.category, player.gender), player.position]
             .filter(Boolean)
             .join(" · ") || "No club"}
         </p>

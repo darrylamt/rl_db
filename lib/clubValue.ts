@@ -1,5 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getPlayerValues } from "@/lib/playerValue";
+import {
+  effectiveGrade,
+  gradeOfDivision,
+  isFemaleGrade,
+  isMaleGrade,
+  isYouth,
+} from "@/lib/grades";
 
 /**
  * What a club is worth to the game, not what its first team did last Sunday.
@@ -62,7 +69,23 @@ const CEILING = 2500;
 /** The side a club can actually put out: thirteen plus a bench. */
 const MATCHDAY = 17;
 
-const GRADES = ["senior_men", "senior_women", "youth"] as const;
+const GRADES = [
+  "senior_men",
+  "senior_women",
+  "youth_boys",
+  "youth_girls",
+] as const;
+
+/**
+ * Breadth is measured in strands, not squads.
+ *
+ * A club is asked three questions: do you run men's rugby, do you run female
+ * rugby, do you run a youth setup. A girls youth side answers the second one
+ * — which is the whole point of splitting youth in two. Skolars entered
+ * thirteen youth girls' fixtures in 2025 and were still marked down for
+ * having no women's side; they field female rugby, and the model now sees it.
+ */
+const STRANDS = 3;
 
 async function all<T>(
   supabase: ReturnType<typeof createAdminClient>,
@@ -89,7 +112,7 @@ export async function getClubValues(): Promise<ClubValue[]> {
     await Promise.all([
       getPlayerValues(),
       all<any>(supabase, "teams", "team_id, name, team_type, is_public"),
-      all<any>(supabase, "players", "player_id, team_id, category"),
+      all<any>(supabase, "players", "player_id, team_id, category, gender"),
       all<any>(
         supabase,
         "fixtures",
@@ -105,23 +128,6 @@ export async function getClubValues(): Promise<ClubValue[]> {
 
   const compById = new Map(competitions.map((c) => [c.competition_id, c]));
   const resultBy = new Map(results.map((r) => [r.fixture_id, r]));
-
-  const gradeOf = (category: string | null | undefined) => {
-    const c = (category ?? "").toLowerCase().replace(/\s+/g, "_");
-    if (c === "senior_men" || c === "male" || c === "men") return "senior_men";
-    if (c === "senior_women" || c === "female" || c === "women")
-      return "senior_women";
-    if (c === "youth") return "youth";
-    return "unknown";
-  };
-
-  /** A competition's division, in the same words the squad uses. */
-  const gradeOfDivision = (division: string | null | undefined) => {
-    const d = (division ?? "men").toLowerCase();
-    if (d === "women") return "senior_women";
-    if (d === "youth") return "youth";
-    return "senior_men";
-  };
 
   const rows: ClubValue[] = [];
 
@@ -175,7 +181,15 @@ export async function getClubValues(): Promise<ClubValue[]> {
       if (ours > theirs) g.won += 1;
     }
 
-    const breadth = fielded.size / GRADES.length;
+    // Three strands rather than four squads: men's rugby, female rugby, and
+    // a youth setup. A girls side satisfies the female strand on its own, so
+    // running one instead of a senior women's team is not a penalty.
+    const strands = [
+      Array.from(fielded).some(isMaleGrade),
+      Array.from(fielded).some(isFemaleGrade),
+      Array.from(fielded).some(isYouth),
+    ].filter(Boolean).length;
+    const breadth = strands / STRANDS;
 
     // ── Squad quality: the side they could put out, per grade ──
     // A mean of the best seventeen rather than a sum of everybody, or the
@@ -183,7 +197,7 @@ export async function getClubValues(): Promise<ClubValue[]> {
     const gradeQuality: number[] = [];
     for (const grade of GRADES) {
       const inGrade = squad
-        .filter((p) => gradeOf(p.category) === grade)
+        .filter((p) => effectiveGrade(p.category, p.gender) === grade)
         .map((p) => values.get(p.player_id))
         .filter(Boolean)
         .map((v) => v!.scoreExTeam)

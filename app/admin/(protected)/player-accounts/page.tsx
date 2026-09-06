@@ -44,7 +44,7 @@ export default async function PlayerAccountsPage({
       supabase
         .from("players")
         .select(
-          "player_id, first_name, last_name, position, photo_url, playing_status, team_id, team:team_id(name)",
+          "player_id, first_name, last_name, position, photo_url, playing_status, team_id, category, gender, team:team_id(name)",
         )
         .order("last_name")
         .limit(1000),
@@ -73,7 +73,7 @@ export default async function PlayerAccountsPage({
   const matched = all.filter((p) => {
     if (showWithout && p.account) return false;
     if (team && p.team_id !== team) return false;
-    if (!isGrade(p.category, grade)) return false;
+    if (!isGrade(p.category, grade, p.gender)) return false;
     if (status === "active" && p.playing_status !== "active") return false;
     if (status === "inactive" && p.playing_status === "active") return false;
     if (!needle) return true;

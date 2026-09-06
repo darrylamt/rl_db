@@ -34,7 +34,7 @@ export default async function RegistrationsPage({
       supabase
         .from("player_registrations")
         .select(
-          "registration_id, season_year, notes, player:player_id(player_id, first_name, last_name, jersey_number, position, category), team:team_id(team_id, name)"
+          "registration_id, season_year, notes, player:player_id(player_id, first_name, last_name, jersey_number, position, category, gender), team:team_id(team_id, name)"
         )
         .eq("season_year", selectedYear)
         .order("season_year"),
@@ -54,7 +54,7 @@ export default async function RegistrationsPage({
     // only way to look at one of those squads on its own.
     const p = (reg.player as any);
     const person = Array.isArray(p) ? p[0] : p;
-    if (!isGrade(person?.category, selectedGrade)) continue;
+    if (!isGrade(person?.category, selectedGrade, person?.gender)) continue;
 
     const teamId = (reg.team as any)?.team_id ?? "__none__";
     const teamName = (reg.team as any)?.name ?? "Unassigned";

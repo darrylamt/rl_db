@@ -25,7 +25,7 @@ export default async function ClubSquadPage({
   let query = supabase
     .from("players")
     .select(
-      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status, approval_status, review_note, category"
+      "player_id, first_name, last_name, position, jersey_number, photo_url, date_of_birth, is_captain, playing_status, approval_status, review_note, category, gender"
     )
     .eq("team_id", teamId)
     .order("last_name");
@@ -42,12 +42,12 @@ export default async function ClubSquadPage({
   // otherwise every tab but the open one would read zero.
   const gradeCounts = GRADES.map((g) => ({
     ...g,
-    count: players.filter((p: any) => isGrade(p.category, g.value)).length,
+    count: players.filter((p: any) => isGrade(p.category, g.value, p.gender)).length,
   }));
   const allGrades = players.length;
 
   // A club's men, women and juniors are one list until this is chosen.
-  if (grade) players = players.filter((p: any) => isGrade(p.category, grade));
+  if (grade) players = players.filter((p: any) => isGrade(p.category, grade, p.gender));
 
   const PAGE_SIZE = 10;
   const matched = players.length;
@@ -212,7 +212,7 @@ export default async function ClubSquadPage({
                     )}
                   </span>
                   <span className="block text-xs text-slate-500">
-                    {[gradeLabel(p.category), p.position].filter(Boolean).join(" · ") || (
+                    {[gradeLabel(p.category, p.gender), p.position].filter(Boolean).join(" · ") || (
                       <span className="text-amber-700">position needed</span>
                     )}
                     {p.jersey_number != null && ` · #${p.jersey_number}`}

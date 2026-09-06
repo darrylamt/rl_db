@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { MatchCard } from "@/app/live/MatchCard";
 import { FIXTURE_SELECT } from "@/lib/matchStats";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
-import { GRADES, normaliseGrade } from "@/lib/grades";
+import { GRADES, effectiveGrade } from "@/lib/grades";
 import { formatOf, formatLabel, divisionLabel } from "@/lib/competitionFormat";
 import { Pagination } from "@/components/admin/Pagination";
 
@@ -65,7 +65,7 @@ export default async function PublicClubPage({
       // category arrives with supabase/public_players_add_category.sql; until
       // it is run the squad simply shows as one list rather than breaking.
       readWithOptionalColumns(
-        "player_id, first_name, last_name, jersey_number, position, is_captain, photo_url, category",
+        "player_id, first_name, last_name, jersey_number, position, is_captain, photo_url, category, gender",
         ["category"],
         (columns) =>
           supabase
@@ -155,10 +155,10 @@ export default async function PublicClubPage({
   const squadRows = (squad ?? []) as any[];
   const graded = GRADES.map((g) => ({
     label: g.label,
-    players: squadRows.filter((p) => normaliseGrade(p.category) === g.value),
+    players: squadRows.filter((p) => effectiveGrade(p.category, p.gender) === g.value),
   })).filter((g) => g.players.length > 0);
   const ungraded = squadRows.filter(
-    (p) => !GRADES.some((g) => normaliseGrade(p.category) === g.value)
+    (p) => !GRADES.some((g) => effectiveGrade(p.category, p.gender) === g.value)
   );
   const squadGroups = [
     ...graded,

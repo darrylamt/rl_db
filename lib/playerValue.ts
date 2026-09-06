@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
+import { effectiveGrade } from "@/lib/grades";
 
 /**
  * What a player is worth, worked out from what has actually been recorded.
@@ -21,8 +22,21 @@ import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 
 export type ValueGroup = "spine" | "outside" | "forward" | "utility";
 
-/** Men's, women's and youth are different competitions, not one ladder. */
-export type ValueGrade = "senior_men" | "senior_women" | "youth" | "unknown";
+/**
+ * Different competitions, not one ladder.
+ *
+ * Youth splits into boys and girls for the same reason men and women are
+ * apart: they do not play each other, so ranking one against the other is
+ * comparing scores from different games. A youth player with no gender
+ * recorded stays plain "youth" rather than being guessed into a cohort.
+ */
+export type ValueGrade =
+  | "senior_men"
+  | "senior_women"
+  | "youth_boys"
+  | "youth_girls"
+  | "youth"
+  | "unknown";
 
 export type Driver = { label: string; percentile: number; weight: number };
 
@@ -202,7 +216,11 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
   // The admin client on purpose: date of birth is not on the public view and
   // should not be. It is read here, used, and never returned.
   const [players, events, lineups, fixtures, results, requests] = await Promise.all([
-    all<any>(supabase, "players", "player_id, position, team_id, date_of_birth, category"),
+    all<any>(
+      supabase,
+      "players",
+      "player_id, position, team_id, date_of_birth, category, gender"
+    ),
     all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
     all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
     all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id"),
@@ -327,14 +345,10 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     age: number | null;
   };
 
-  const gradeOf = (category: string | null | undefined): ValueGrade => {
-    const c = (category ?? "").toLowerCase().replace(/\s+/g, "_");
-    if (c === "senior_men" || c === "male" || c === "men") return "senior_men";
-    if (c === "senior_women" || c === "female" || c === "women")
-      return "senior_women";
-    if (c === "youth") return "youth";
-    return "unknown";
-  };
+  const gradeOf = (
+    category: string | null | undefined,
+    gender: string | null | undefined
+  ): ValueGrade => effectiveGrade(category, gender) as ValueGrade;
 
   const rows: Row[] = players.map((p): Row => {
     const apps = played.get(p.player_id)?.size ?? 0;
@@ -342,7 +356,7 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     return {
       id: p.player_id as string,
       group: groupOf(p.position),
-      grade: gradeOf(p.category),
+      grade: gradeOf(p.category, p.gender),
       apps,
       pts,
       rate: apps > 0 ? pts / apps : 0,
