@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { MatchCard } from "@/app/live/MatchCard";
 import { FIXTURE_SELECT } from "@/lib/matchStats";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
-import { GRADES, effectiveGrade } from "@/lib/grades";
+import { GRADES, YOUTH_UNSPECIFIED, effectiveGrade } from "@/lib/grades";
 import { formatOf, formatLabel, divisionLabel } from "@/lib/competitionFormat";
 import { Pagination } from "@/components/admin/Pagination";
 
@@ -62,18 +62,23 @@ export default async function PublicClubPage({
         .eq("team_type", "club")
         .neq("is_public", false)
         .maybeSingle(),
-      // category arrives with supabase/public_players_add_category.sql; until
-      // it is run the squad simply shows as one list rather than breaking.
+      // Two columns arrive by migration, and they are dropped one at a time
+      // rather than together: gender first, then category. Dropping both at
+      // once — which is what one call with both listed as optional does —
+      // would take the grade grouping away over a missing gender, and losing
+      // the whole squad over it is exactly the bug this replaces.
       readWithOptionalColumns(
         "player_id, first_name, last_name, jersey_number, position, is_captain, photo_url, category, gender",
-        ["category"],
-        (columns) =>
-          supabase
-            .from("public_players")
-            .select(columns)
-            .eq("team_id", teamId)
-            .eq("playing_status", "active")
-            .order("jersey_number", { ascending: true, nullsFirst: false })
+        ["gender"],
+        (withoutGender) =>
+          readWithOptionalColumns(withoutGender, ["category"], (columns) =>
+            supabase
+              .from("public_players")
+              .select(columns)
+              .eq("team_id", teamId)
+              .eq("playing_status", "active")
+              .order("jersey_number", { ascending: true, nullsFirst: false })
+          )
       ),
       supabase
         .from("fixtures")
@@ -150,15 +155,21 @@ export default async function PublicClubPage({
     (a, b) => b.played - a.played || a.label.localeCompare(b.label)
   );
 
-  // Men, women and youth are different sides from the same club, so the squad
-  // reads as three lists rather than one of eighty names.
+  // Men, women, youth boys and youth girls are different sides from the same
+  // club, so the squad reads as several lists rather than one of eighty names.
+  //
+  // Plain "Youth" is kept as a group of its own for players whose gender is
+  // not known — which is every youth player until the view carries the
+  // column. Without it they would all be filed under "Other", which is a
+  // worse answer than the one the page could already give.
+  const GROUPS = [...GRADES, { value: YOUTH_UNSPECIFIED, label: "Youth" }];
   const squadRows = (squad ?? []) as any[];
-  const graded = GRADES.map((g) => ({
+  const graded = GROUPS.map((g) => ({
     label: g.label,
     players: squadRows.filter((p) => effectiveGrade(p.category, p.gender) === g.value),
   })).filter((g) => g.players.length > 0);
   const ungraded = squadRows.filter(
-    (p) => !GRADES.some((g) => effectiveGrade(p.category, p.gender) === g.value)
+    (p) => !GROUPS.some((g) => effectiveGrade(p.category, p.gender) === g.value)
   );
   const squadGroups = [
     ...graded,
