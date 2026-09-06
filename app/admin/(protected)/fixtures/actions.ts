@@ -29,6 +29,30 @@ function payload(fd: FormData) {
 // Added by integration_schema.sql; a deploy can land before the migration.
 const OPTIONAL_FIXTURE_COLUMNS = ["slug"] as const;
 
+/**
+ * Writes who was on the game.
+ *
+ * The three roles are rewritten together rather than merged: the form always
+ * posts all of them, so a blank field means "take this official off", and
+ * replacing the set is the only reading that lets you undo a mistake.
+ *
+ * A failure here does not fail the fixture. The match details are what the
+ * save was for, and losing them because an official could not be recorded
+ * would be the wrong trade — the fields simply come back empty to try again.
+ */
+async function saveOfficials(fixtureId: string, fd: FormData) {
+  const supabase = createAdminClient();
+  const roles = ["referee", "touch_judge_1", "touch_judge_2"] as const;
+
+  const rows = roles
+    .map((role) => ({ role, official_id: str(fd, role) }))
+    .filter((r) => r.official_id)
+    .map((r) => ({ fixture_id: fixtureId, role: r.role, official_id: r.official_id }));
+
+  await supabase.from("fixture_officials").delete().eq("fixture_id", fixtureId);
+  if (rows.length > 0) await supabase.from("fixture_officials").insert(rows);
+}
+
 function slugify(v: string | null) {
   if (!v) return null;
   return v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || null;
@@ -39,12 +63,25 @@ export async function createFixture(fd: FormData) {
   const p = payload(fd);
   if (!p.home_team_id || !p.away_team_id) throw new Error("Home and away teams are required");
   if (p.home_team_id === p.away_team_id) throw new Error("Home and away teams must be different");
+  // Held on an object rather than a bare local: the id is assigned inside a
+  // callback, and a plain `let` initialised to null narrows to never once the
+  // compiler has seen only that.
+  const created: { id: string | null } = { id: null };
   const { error } = await writeWithOptionalColumns(
     p,
     OPTIONAL_FIXTURE_COLUMNS,
-    (values) => supabase.from("fixtures").insert(values)
+    async (values) => {
+      const res = await supabase
+        .from("fixtures")
+        .insert(values)
+        .select("fixture_id")
+        .maybeSingle();
+      created.id = (res.data as any)?.fixture_id ?? null;
+      return { error: res.error };
+    }
   );
   if (error) throw new Error(error.message);
+  if (created.id) await saveOfficials(created.id, fd);
   revalidatePath("/admin/fixtures");
   revalidatePath("/admin/dashboard");
 }
@@ -60,9 +97,11 @@ export async function updateFixture(id: string, fd: FormData) {
     (values) => supabase.from("fixtures").update(values).eq("fixture_id", id)
   );
   if (error) throw new Error(error.message);
+  await saveOfficials(id, fd);
   revalidatePath("/admin/fixtures");
   revalidatePath(`/admin/fixtures/${id}`);
   revalidatePath("/admin/dashboard");
+  revalidatePath("/live");
 }
 
 export async function bulkCreateFixtures(fd: FormData) {

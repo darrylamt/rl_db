@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
+import { MatchOfficialsFields } from "@/components/admin/MatchOfficialsFields";
 import { createFixture } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +13,22 @@ export default async function NewFixturePage() {
   let teams: any[] = [];
   let comps: any[] = [];
   let venues: any[] = [];
+  let officials: any[] = [];
   try {
-    const [t, c, v] = await Promise.all([
+    const [t, c, v, o] = await Promise.all([
       supabase.from("teams").select("team_id, name").order("name"),
       supabase.from("competitions").select("competition_id, name, season").order("name"),
       supabase.from("venues").select("venue_id, name").order("name"),
+      supabase
+        .from("officials")
+        .select("official_id, first_name, last_name, role, status")
+        .neq("status", "inactive")
+        .order("last_name"),
     ]);
     teams = t.data ?? [];
     comps = c.data ?? [];
     venues = v.data ?? [];
+    officials = o.data ?? [];
   } catch {
     // data stays as empty arrays — form still renders
   }
@@ -81,6 +89,8 @@ export default async function NewFixturePage() {
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </Select>
       </Field>
+      <MatchOfficialsFields officials={officials} />
+
       <Field label="URL slug" hint="Public address on the website. Leave blank to keep the generated one.">
         <Input name="slug" placeholder="bulls-nungua-tigers-28-01-24" />
       </Field>

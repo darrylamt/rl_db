@@ -2,19 +2,44 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
+import { MatchOfficialsFields } from "@/components/admin/MatchOfficialsFields";
 import { updateFixture } from "../actions";
 
 const STATUSES = ["scheduled","live","completed","postponed","cancelled"];
 
 export default async function EditFixturePage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient();
-  const [{ data: f }, { data: teams }, { data: comps }, { data: venues }] = await Promise.all([
+  const [
+    { data: f },
+    { data: teams },
+    { data: comps },
+    { data: venues },
+    { data: officials },
+    { data: onTheGame },
+  ] = await Promise.all([
     supabase.from("fixtures").select("*").eq("fixture_id", params.id).maybeSingle(),
     supabase.from("teams").select("team_id, name").order("name"),
     supabase.from("competitions").select("competition_id, name, season").order("name"),
     supabase.from("venues").select("venue_id, name").order("name"),
+    supabase
+      .from("officials")
+      .select("official_id, first_name, last_name, role, status")
+      .order("last_name"),
+    supabase
+      .from("fixture_officials")
+      .select("role, official_id")
+      .eq("fixture_id", params.id),
   ]);
   if (!f) notFound();
+
+  // Retired officials stay on a match they already did, so the field can show
+  // them; they are simply not offered for a new appointment.
+  const alreadyOn = new Set((onTheGame ?? []).map((r: any) => r.official_id));
+  const available = (officials ?? []).filter(
+    (o: any) => o.status !== "inactive" || alreadyOn.has(o.official_id),
+  );
+  const current: Record<string, string> = {};
+  for (const r of (onTheGame ?? []) as any[]) current[r.role] = r.official_id;
   const bound = updateFixture.bind(null, params.id);
 
   return (
@@ -73,6 +98,8 @@ export default async function EditFixturePage({ params }: { params: { id: string
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </Select>
       </Field>
+      <MatchOfficialsFields officials={available as any} current={current} />
+
       <Field label="URL slug" hint="Public address on the website. Leave blank to keep the generated one.">
         <Input name="slug" placeholder="bulls-nungua-tigers-28-01-24" defaultValue={f.slug ?? ""} />
       </Field>
