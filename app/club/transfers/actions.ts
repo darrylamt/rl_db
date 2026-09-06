@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireClub, getAppUser } from "@/lib/auth";
 import { getTransferWindow } from "@/lib/transferWindow";
+import { writeWithOptionalColumns } from "@/lib/optionalColumns";
+import { getPlayerValue } from "@/lib/playerValue";
+import { formatLX, getBalance, priceFor } from "@/lib/lx";
 
 type Outcome = { error: string } | { note: string };
 
@@ -76,27 +79,60 @@ export async function requestPlayer(fd: FormData) {
     const fromTeam = (player as any).team_id ?? null;
     const free = !fromTeam;
 
-    const { error } = await supabase.from("transfer_requests").insert({
-      player_id: playerId,
-      from_team_id: fromTeam,
-      to_team_id: teamId,
-      kind,
-      loan_until: kind === "loan" ? loanUntil : null,
-      message,
-      requested_by: user?.userId ?? null,
-      // Nobody holds a free agent, so there is no club to agree — but the
-      // player still has to want to come.
-      status: free ? "with_player" : "with_club",
-      club_answered_at: free ? new Date().toISOString() : null,
-      club_note: free ? "No club to answer — the player is a free agent." : null,
-    });
+    // The price is settled here, at the moment of asking, and carried on the
+    // request. Values move as records are corrected, and a fee that changed
+    // between the enquiry and the signature would be unworkable. A free agent
+    // costs nothing — there is no club losing him to compensate.
+    let fee = 0;
+    let levy = 0;
+    if (!free) {
+      const valuation = await getPlayerValue(playerId);
+      if (valuation) {
+        ({ fee, levy } = priceFor(valuation.value, kind as "transfer" | "loan"));
+      }
+    }
+
+    const { error } = await writeWithOptionalColumns(
+      {
+        player_id: playerId,
+        from_team_id: fromTeam,
+        to_team_id: teamId,
+        kind,
+        loan_until: kind === "loan" ? loanUntil : null,
+        message,
+        requested_by: user?.userId ?? null,
+        // Nobody holds a free agent, so there is no club to agree — but the
+        // player still has to want to come.
+        status: free ? "with_player" : "with_club",
+        club_answered_at: free ? new Date().toISOString() : null,
+        club_note: free ? "No club to answer — the player is a free agent." : null,
+        fee,
+        levy,
+      },
+      ["fee", "levy"],
+      (values) => supabase.from("transfer_requests").insert(values),
+    );
     if (error) throw new Error(describe(error.message));
 
     const name = `${(player as any).first_name ?? ""} ${(player as any).last_name ?? ""}`.trim();
+
+    // Warned, not stopped. A club that goes ahead anyway ends up overdrawn,
+    // which the federation sees before it signs the move off.
+    let money = "";
+    if (fee + levy > 0) {
+      money = ` It will cost ${formatLX(fee + levy)} — ${formatLX(fee)} to them and ${formatLX(levy)} to the federation.`;
+      const balance = await getBalance(teamId);
+      if (balance !== null && balance < fee + levy) {
+        money += ` You have ${formatLX(balance)}, so this would leave you ${formatLX(fee + levy - balance)} overdrawn.`;
+      }
+    }
+
     outcome = {
-      note: free
-        ? `${name} has no club, so it goes straight to them to accept.`
-        : `Asked ${(player as any).team?.name ?? "their club"} about ${name}. They answer next.`,
+      note:
+        (free
+          ? `${name} has no club, so it goes straight to them to accept.`
+          : `Asked ${(player as any).team?.name ?? "their club"} about ${name}. They answer next.`) +
+        money,
     };
   } catch (e: any) {
     outcome = { error: describe(e.message ?? String(e)) };

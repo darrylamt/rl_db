@@ -3,6 +3,7 @@ import { expiringSoon, daysUntil, describeDays } from "@/lib/contracts";
 import { Avatar } from "@/components/Avatar";
 import { requireClub } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
+import { formatLX, getBalance } from "@/lib/lx";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,8 @@ export default async function ClubOverviewPage() {
         .eq("status", "active")
         .order("sort_order"),
     ]);
+
+  const balance = await getBalance(teamId);
 
   const squad = players ?? [];
   const today = new Date().toISOString().slice(0, 10);
@@ -162,6 +165,55 @@ export default async function ClubOverviewPage() {
         <section className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-900">
           Every player has a position, a photo and a date of birth. Nothing
           outstanding.
+        </section>
+      )}
+
+      {/* What the club has to spend. Its own card rather than a fourth
+          statistic: it is the only number here that anything can be done
+          with. */}
+      {balance !== null && (
+        <section
+          className={`rounded-lg p-4 flex flex-wrap items-center justify-between gap-3 ${
+            balance < 0
+              ? "bg-red-50 border border-red-300"
+              : "bg-navy-900 text-white"
+          }`}
+        >
+          <div>
+            <p
+              className={`text-xs uppercase tracking-wider ${
+                balance < 0 ? "text-red-700" : "text-white/60"
+              }`}
+            >
+              LeagueX budget
+            </p>
+            <p
+              className={`font-display text-3xl font-bold tabular-nums ${
+                balance < 0 ? "text-red-800" : ""
+              }`}
+            >
+              {formatLX(balance)}
+            </p>
+            <p
+              className={`text-xs mt-0.5 ${
+                balance < 0 ? "text-red-800" : "text-white/60"
+              }`}
+            >
+              {balance < 0
+                ? "Overdrawn. It comes out of next season's budget."
+                : "Yours to sign players with. Fees you receive are added to it."}
+            </p>
+          </div>
+          <Link
+            href="/club/transfers"
+            className={`text-sm font-medium px-3 py-2 rounded whitespace-nowrap ${
+              balance < 0
+                ? "border border-red-300 text-red-800 hover:bg-red-100"
+                : "bg-white/10 hover:bg-white/20"
+            }`}
+          >
+            Go to the market →
+          </Link>
         </section>
       )}
 

@@ -5,6 +5,8 @@ import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { TransferMarket } from "@/components/club/TransferMarket";
 import { getTransferWindow } from "@/lib/transferWindow";
 import { remaining, type Contract } from "@/lib/contracts";
+import { getPlayerValues } from "@/lib/playerValue";
+import { LEVY_RATE, LOAN_SHARE, formatLX, getBalance } from "@/lib/lx";
 import {
   requestPlayer,
   withdrawRequest,
@@ -37,7 +39,7 @@ const TONE: Record<string, string> = {
 };
 
 const SELECT =
-  "request_id, kind, loan_until, status, message, club_note, review_note, requested_at, player:player_id(player_id, first_name, last_name, photo_url, position), from_team:from_team_id(name), to_team:to_team_id(name)";
+  "request_id, kind, loan_until, fee, levy, status, message, club_note, review_note, requested_at, player:player_id(player_id, first_name, last_name, photo_url, position), from_team:from_team_id(name), to_team:to_team_id(name)";
 
 function name(r: any) {
   const p = Array.isArray(r.player) ? r.player[0] : r.player;
@@ -52,7 +54,19 @@ export default async function ClubTransfersPage({
   const { teamId } = await requireClub();
   const supabase = createAdminClient();
   const tab = searchParams?.tab ?? "market";
-  const market = await getTransferWindow();
+  const [market, balance, valuations] = await Promise.all([
+    getTransferWindow(),
+    getBalance(teamId),
+    getPlayerValues(),
+  ]);
+
+  // What each player would cost. Passed as the plain value; the market works
+  // the fee and the levy out from it, so a loan and a transfer can be priced
+  // as the club switches between them without another round trip.
+  const values: Record<string, number> = {};
+  for (const [playerId, v] of Array.from(valuations.entries())) {
+    values[playerId] = v.value;
+  }
 
   const [
     { data: teams },
@@ -86,16 +100,20 @@ export default async function ClubTransfersPage({
           .order("last_name")
           .limit(1000),
     ),
-    supabase
-      .from("transfer_requests")
-      .select(SELECT)
-      .eq("to_team_id", teamId)
-      .order("requested_at", { ascending: false }),
-    supabase
-      .from("transfer_requests")
-      .select(SELECT)
-      .eq("from_team_id", teamId)
-      .order("requested_at", { ascending: false }),
+    readWithOptionalColumns<any>(SELECT, ["fee", "levy"], (columns) =>
+      supabase
+        .from("transfer_requests")
+        .select(columns)
+        .eq("to_team_id", teamId)
+        .order("requested_at", { ascending: false }),
+    ),
+    readWithOptionalColumns<any>(SELECT, ["fee", "levy"], (columns) =>
+      supabase
+        .from("transfer_requests")
+        .select(columns)
+        .eq("from_team_id", teamId)
+        .order("requested_at", { ascending: false }),
+    ),
     // What each player is tied up for. A player with two years to run is a
     // different proposition from one out of contract in a month, and the
     // list is unreadable without it.
@@ -189,6 +207,23 @@ export default async function ClubTransfersPage({
               Federation: {r.review_note}
             </p>
           )}
+          {typeof r.fee === "number" && r.fee > 0 && (
+            <p className="text-xs mt-1.5 text-slate-600">
+              {mine ? "You pay" : "You receive"}{" "}
+              <span className="font-display tabular-nums text-navy-900">
+                {formatLX(mine ? r.fee + (r.levy ?? 0) : r.fee)}
+              </span>
+              {mine && (r.levy ?? 0) > 0 && (
+                <span className="text-slate-400">
+                  {" "}
+                  — {formatLX(r.fee)} to them, {formatLX(r.levy)} levy
+                </span>
+              )}
+              {r.status !== "approved" && (
+                <span className="text-slate-400"> · on sign-off</span>
+              )}
+            </p>
+          )}
         </div>
         <span
           className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
@@ -266,6 +301,44 @@ export default async function ClubTransfersPage({
         </p>
       </div>
 
+      {/* What you have to spend. Sits above the market rather than inside a
+          tab, because it is the thing that decides what is worth looking at. */}
+      {balance !== null && (
+        <div
+          className={`rounded-lg p-4 mb-4 flex flex-wrap items-center justify-between gap-3 ${
+            balance < 0
+              ? "bg-red-50 border border-red-300"
+              : "bg-navy-900 text-white"
+          }`}
+        >
+          <div>
+            <p
+              className={`text-xs uppercase tracking-wider ${
+                balance < 0 ? "text-red-700" : "text-white/60"
+              }`}
+            >
+              Your budget
+            </p>
+            <p
+              className={`font-display text-3xl font-bold tabular-nums ${
+                balance < 0 ? "text-red-800" : ""
+              }`}
+            >
+              {formatLX(balance)}
+            </p>
+          </div>
+          <p
+            className={`text-xs max-w-xs ${
+              balance < 0 ? "text-red-800" : "text-white/60"
+            }`}
+          >
+            {balance < 0
+              ? "You are overdrawn. It comes out of next season's budget, and the federation can see it."
+              : `Every fee carries a ${Math.round(LEVY_RATE * 100)}% levy to the federation on top. A loan costs ${Math.round(LOAN_SHARE * 100)}% of the player's value.`}
+          </p>
+        </div>
+      )}
+
       {searchParams?.error && (
         <div className="bg-red-50 border border-red-300 text-red-800 text-sm px-3 py-2.5 rounded mb-4">
           {searchParams.error}
@@ -311,6 +384,10 @@ export default async function ClubTransfersPage({
               players={(players ?? []) as any}
               openFor={openFor}
               contractLeft={contractLeft}
+              values={values}
+              balance={balance}
+              levyRate={LEVY_RATE}
+              loanShare={LOAN_SHARE}
               request={requestPlayer}
             />
           )}

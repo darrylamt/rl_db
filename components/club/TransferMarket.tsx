@@ -49,6 +49,10 @@ export function TransferMarket({
   players,
   openFor,
   contractLeft = {},
+  values = {},
+  balance = null,
+  levyRate = 0,
+  loanShare = 0.5,
   request,
 }: {
   teams: Team[];
@@ -57,6 +61,12 @@ export function TransferMarket({
   openFor: string[];
   /** player_id -> what is left to run, for those under contract. */
   contractLeft?: Record<string, string>;
+  /** player_id -> what the player is valued at, in LX. */
+  values?: Record<string, number>;
+  /** What this club has to spend. Null before the budgets migration is run. */
+  balance?: number | null;
+  levyRate?: number;
+  loanShare?: number;
   request: (fd: FormData) => Promise<void>;
 }) {
   const freeAgents = useMemo(
@@ -136,6 +146,24 @@ export function TransferMarket({
 
   const teamName = (id: string | null) =>
     id ? (teams.find((t) => t.team_id === id)?.name ?? "") : "no club";
+
+  /**
+   * What a player costs, worked out the same way the server does.
+   *
+   * A free agent is free: nobody is losing him, so there is nobody to
+   * compensate. Everyone else costs their value, half of it for a loan, and
+   * the federation's levy on top of whichever it is.
+   */
+  const priceOf = (p: Player, k: "transfer" | "loan" = "transfer") => {
+    if (!p.team_id) return { fee: 0, levy: 0, total: 0 };
+    const value = values[p.player_id];
+    if (value == null) return null;
+    const fee = Math.round(value * (k === "loan" ? loanShare : 1));
+    const levy = Math.round(fee * levyRate);
+    return { fee, levy, total: fee + levy };
+  };
+
+  const lx = (n: number) => `${Math.round(n).toLocaleString("en-GB")} LX`;
 
   return (
     <div>
@@ -253,6 +281,10 @@ export function TransferMarket({
           {visible.map((p) => {
             const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
             const already = open.has(p.player_id);
+            // The list quotes the asking price. What a loan would cost is
+            // worked out in the form, once they have said they want one.
+            const price = priceOf(p, "transfer");
+            const beyond = !!price && balance !== null && price.total > balance;
             return (
               <li key={p.player_id} className="px-3 py-2.5">
                 <div className="flex items-center gap-3">
@@ -295,6 +327,23 @@ export function TransferMarket({
                       )}
                     </p>
                   </div>
+
+                  {price && (
+                    <span className="text-right shrink-0">
+                      <span
+                        className={`block font-display tabular-nums text-sm ${
+                          beyond ? "text-red-700" : "text-navy-900"
+                        }`}
+                      >
+                        {price.total === 0 ? "Free" : lx(price.total)}
+                      </span>
+                      {beyond && (
+                        <span className="block text-[10px] text-red-600">
+                          beyond your budget
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {already ? (
                     <span className="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded shrink-0">
                       Asked
@@ -347,6 +396,59 @@ export function TransferMarket({
                         />
                       </label>
                     )}
+
+                    {/* The bill, before they send it. Warned, never blocked —
+                        a club that goes ahead anyway ends up overdrawn, and
+                        the federation sees that before signing it off. */}
+                    {(() => {
+                      const q = priceOf(p, kind);
+                      if (!q) return null;
+                      if (q.total === 0) {
+                        return (
+                          <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5">
+                            Free — nobody holds this player, so there is no
+                            club to pay.
+                          </p>
+                        );
+                      }
+                      const over = balance !== null && q.total > balance;
+                      return (
+                        <div
+                          className={`rounded border px-2.5 py-2 text-xs ${
+                            over
+                              ? "bg-red-50 border-red-300 text-red-800"
+                              : "bg-white border-slate-200 text-slate-600"
+                          }`}
+                        >
+                          <p className="flex justify-between gap-3">
+                            <span>
+                              {kind === "loan" ? "Loan fee" : "Fee"} to{" "}
+                              {teamName(p.team_id)}
+                            </span>
+                            <span className="tabular-nums">{lx(q.fee)}</span>
+                          </p>
+                          <p className="flex justify-between gap-3">
+                            <span>
+                              Federation levy (
+                              {Math.round(levyRate * 100)}%)
+                            </span>
+                            <span className="tabular-nums">{lx(q.levy)}</span>
+                          </p>
+                          <p className="flex justify-between gap-3 font-medium mt-1 pt-1 border-t border-current/20">
+                            <span>You pay</span>
+                            <span className="tabular-nums">{lx(q.total)}</span>
+                          </p>
+                          {over && (
+                            <p className="mt-1.5 leading-snug">
+                              You have {lx(balance ?? 0)}. Sending this would
+                              leave you {lx(q.total - (balance ?? 0))}{" "}
+                              overdrawn, which comes out of next
+                              season&rsquo;s budget. You can still send it.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <textarea
                       name="message"

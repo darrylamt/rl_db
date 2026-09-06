@@ -4,13 +4,15 @@ import { ListHeader } from "@/components/admin/ListHeader";
 import { TransferCard } from "@/components/admin/TransferCard";
 import { TransferWindowPanel } from "@/components/admin/TransferWindowPanel";
 import { getTransferWindow } from "@/lib/transferWindow";
+import { readWithOptionalColumns } from "@/lib/optionalColumns";
+import { getBooks } from "@/lib/lx";
 import { approveTransfer, declineTransfer } from "./actions";
 import { setTransferMode, addTransferWindow, removeTransferWindow } from "./window-actions";
 
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "request_id, kind, loan_until, status, message, club_note, review_note, requested_at, club_answered_at, reviewed_at, player:player_id(player_id, first_name, last_name, photo_url, position, team_id), from_team:from_team_id(team_id, name, logo_url), to_team:to_team_id(team_id, name, logo_url)";
+  "request_id, kind, loan_until, fee, levy, status, message, club_note, review_note, requested_at, club_answered_at, reviewed_at, player:player_id(player_id, first_name, last_name, photo_url, position, team_id), from_team:from_team_id(team_id, name, logo_url), to_team:to_team_id(team_id, name, logo_url)";
 
 export default async function TransferRequestsPage({
   searchParams,
@@ -20,13 +22,24 @@ export default async function TransferRequestsPage({
   const supabase = createAdminClient();
   const market = await getTransferWindow();
 
-  const { data, error } = await supabase
-    .from("transfer_requests")
-    .select(SELECT)
-    .order("requested_at", { ascending: false })
-    .limit(200);
+  const [{ data, error }, books] = await Promise.all([
+    readWithOptionalColumns<any>(SELECT, ["fee", "levy"], (columns) =>
+      supabase
+        .from("transfer_requests")
+        .select(columns)
+        .order("requested_at", { ascending: false })
+        .limit(200),
+    ),
+    getBooks(),
+  ]);
 
   const rows = (data ?? []) as any[];
+
+  // What the buying club holds, so the price on a card can be read against
+  // the money behind it. Null while the budgets migration is unrun, which
+  // takes the whole panel off rather than showing everyone as broke.
+  const balanceOf = (teamId: string | null | undefined) =>
+    books.notMigrated || !teamId ? null : (books.balances.get(teamId) ?? 0);
   const notMigrated = !!error && /transfer_requests/.test(error.message);
 
   const waiting = rows.filter((r) => r.status === "with_federation");
@@ -84,6 +97,7 @@ export default async function TransferRequestsPage({
                   <TransferCard
                     key={r.request_id}
                     request={r}
+                    buyerBalance={balanceOf(r.to_team?.team_id)}
                     approve={approveTransfer}
                     decline={declineTransfer}
                   />
@@ -106,6 +120,7 @@ export default async function TransferRequestsPage({
                   <TransferCard
                     key={r.request_id}
                     request={r}
+                    buyerBalance={balanceOf(r.to_team?.team_id)}
                     approve={approveTransfer}
                     decline={declineTransfer}
                     readOnly
@@ -125,6 +140,7 @@ export default async function TransferRequestsPage({
                   <TransferCard
                     key={r.request_id}
                     request={r}
+                    buyerBalance={balanceOf(r.to_team?.team_id)}
                     approve={approveTransfer}
                     decline={declineTransfer}
                     readOnly

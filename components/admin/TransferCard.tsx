@@ -36,11 +36,14 @@ export function TransferCard({
   approve,
   decline,
   readOnly,
+  buyerBalance = null,
 }: {
   request: any;
   approve: (requestId: string) => Promise<void>;
   decline: (requestId: string, fd: FormData) => Promise<void>;
   readOnly?: boolean;
+  /** What the buying club holds. Null before the budgets migration is run. */
+  buyerBalance?: number | null;
 }) {
   const [asking, setAsking] = useState(false);
   const r = request;
@@ -54,6 +57,15 @@ export function TransferCard({
     player?.team_id &&
     r.from_team?.team_id &&
     player.team_id !== r.from_team.team_id;
+
+  // The price agreed when the request was made, honoured at sign-off rather
+  // than recalculated. Absent on requests made before there was a currency.
+  const fee = typeof r.fee === "number" ? r.fee : null;
+  const levy = typeof r.levy === "number" ? r.levy : 0;
+  const total = fee === null ? null : fee + levy;
+  const cannotAfford =
+    total !== null && total > 0 && buyerBalance !== null && total > buyerBalance;
+  const lx = (n: number) => `${Math.round(n).toLocaleString("en-GB")} LX`;
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
@@ -90,6 +102,34 @@ export function TransferCard({
           <span className="truncate font-medium text-navy-900">{r.to_team?.name ?? "—"}</span>
         </span>
       </div>
+
+      {/* The bill. Signing off is what actually moves the LX, so it belongs
+          on the button's own card rather than only on the finance page. */}
+      {total !== null && total > 0 && (
+        <div
+          className={`mt-2 rounded border px-2.5 py-2 text-xs ${
+            cannotAfford
+              ? "bg-red-50 border-red-300 text-red-800"
+              : "bg-slate-50 border-slate-200 text-slate-600"
+          }`}
+        >
+          <p className="flex justify-between gap-3">
+            <span>Fee to {r.from_team?.name ?? "their club"}</span>
+            <span className="tabular-nums">{lx(fee ?? 0)}</span>
+          </p>
+          <p className="flex justify-between gap-3">
+            <span>Levy to the federation</span>
+            <span className="tabular-nums">{lx(levy)}</span>
+          </p>
+          {cannotAfford && (
+            <p className="mt-1.5 leading-snug">
+              {r.to_team?.name ?? "The buying club"} holds{" "}
+              {lx(buyerBalance ?? 0)}. Signing this off leaves them{" "}
+              {lx(total - (buyerBalance ?? 0))} overdrawn.
+            </p>
+          )}
+        </div>
+      )}
 
       {r.message && (
         <p className="text-xs text-slate-600 mt-2 italic break-words">“{r.message}”</p>

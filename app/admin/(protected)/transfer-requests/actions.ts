@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation, getAppUser } from "@/lib/auth";
+import { readWithOptionalColumns } from "@/lib/optionalColumns";
+import { getPlayerValue } from "@/lib/playerValue";
+import { currentSeason, formatLX, priceFor } from "@/lib/lx";
 
 type Outcome = { error: string } | { note: string };
 
@@ -14,6 +17,112 @@ function describe(message: string) {
     return "Run supabase/transfer_requests.sql first.";
   }
   return message;
+}
+
+/**
+ * Moves the LX, and writes it down.
+ *
+ * Four rows at most, and they sum to nothing: the buyer pays the fee, the
+ * seller receives exactly it, and the levy comes off the buyer on top and
+ * lands in the federation's account. Money only enters the system through an
+ * allocation and only leaves it through the levy or an expiry, which is what
+ * makes the totals on /admin/finance checkable by adding up a column.
+ *
+ * A free agent costs nothing. Nobody is losing a player, so there is nobody
+ * to compensate — and picking up an unattached player should always be
+ * cheaper than raiding a squad.
+ *
+ * Failing here does not undo the move. The registration is the thing that
+ * matters and it has already happened; a missing ledger row is a correction
+ * the federation can make by hand, and losing the transfer over it would not
+ * be.
+ */
+async function settleTheMoney(r: any, who: string): Promise<string> {
+  const supabase = createAdminClient();
+
+  // Nobody to pay.
+  if (!r.from_team_id) return "";
+
+  let fee: number | null = typeof r.fee === "number" ? r.fee : null;
+  let levy: number | null = typeof r.levy === "number" ? r.levy : null;
+  let pricedNow = false;
+
+  // A request made before the price was ever quoted — either the migration
+  // had not been run or it predates all of this. Priced at sign-off rather
+  // than waved through for nothing.
+  if (fee === null) {
+    const valuation = await getPlayerValue(r.player_id);
+    if (!valuation) return "";
+    const quote = priceFor(valuation.value, r.kind === "loan" ? "loan" : "transfer");
+    fee = quote.fee;
+    levy = quote.levy;
+    pricedNow = true;
+  }
+  if (levy === null) levy = 0;
+  if (fee <= 0 && levy <= 0) return "";
+
+  const season = currentSeason();
+  const what = r.kind === "loan" ? "Loan" : "Transfer";
+  const note = `${what} of ${who}${pricedNow ? " — priced at sign-off" : ""}.`;
+
+  const rows = [
+    {
+      team_id: r.to_team_id,
+      kind: "fee",
+      amount: -fee,
+      season,
+      player_id: r.player_id,
+      counterparty_team_id: r.from_team_id,
+      request_id: r.request_id,
+      note,
+    },
+    {
+      team_id: r.from_team_id,
+      kind: "fee",
+      amount: fee,
+      season,
+      player_id: r.player_id,
+      counterparty_team_id: r.to_team_id,
+      request_id: r.request_id,
+      note,
+    },
+  ];
+
+  if (levy > 0) {
+    rows.push(
+      {
+        team_id: r.to_team_id,
+        kind: "levy",
+        amount: -levy,
+        season,
+        player_id: r.player_id,
+        counterparty_team_id: null,
+        request_id: r.request_id,
+        note: `Levy on the ${what.toLowerCase()} of ${who}.`,
+      },
+      {
+        // The federation's own account.
+        team_id: null,
+        kind: "levy",
+        amount: levy,
+        season,
+        player_id: r.player_id,
+        counterparty_team_id: r.to_team_id,
+        request_id: r.request_id,
+        note: `Levy on the ${what.toLowerCase()} of ${who}.`,
+      }
+    );
+  }
+
+  const { error } = await supabase.from("lx_ledger").insert(rows);
+  if (error) {
+    // 42P01: supabase/club_budgets.sql has not been run. The move stands and
+    // nothing is said about money, because there is no money yet.
+    if ((error as any).code === "42P01") return "";
+    return " The move went through, but the LX did not — record it by hand on the finance page.";
+  }
+
+  return ` ${formatLX(fee)} to their old club, ${formatLX(levy)} to the federation.`;
 }
 
 /**
@@ -34,13 +143,16 @@ export async function approveTransfer(requestId: string) {
 
   let outcome: Outcome;
   try {
-    const { data: req } = await supabase
-      .from("transfer_requests")
-      .select(
-        "request_id, status, kind, loan_until, player_id, from_team_id, to_team_id, player:player_id(first_name, last_name, team_id), to_team:to_team_id(name)"
-      )
-      .eq("request_id", requestId)
-      .maybeSingle();
+    const { data: req } = await readWithOptionalColumns<any>(
+      "request_id, status, kind, loan_until, fee, levy, player_id, from_team_id, to_team_id, player:player_id(first_name, last_name, team_id), to_team:to_team_id(name)",
+      ["fee", "levy"],
+      (columns) =>
+        supabase
+          .from("transfer_requests")
+          .select(columns)
+          .eq("request_id", requestId)
+          .maybeSingle()
+    );
 
     if (!req) throw new Error("That request no longer exists.");
     const r = req as any;
@@ -93,6 +205,13 @@ export async function approveTransfer(requestId: string) {
           : "Transfer agreed between the clubs and signed off.",
     });
 
+    // ── And the money ──
+    // This is the only place LX changes hands. The fee was quoted when the
+    // request was made and is honoured here rather than recalculated: values
+    // move as records are corrected, and a price that changed between the
+    // handshake and the signature would be unworkable.
+    const paid = await settleTheMoney(r, who);
+
     const { error } = await supabase
       .from("transfer_requests")
       .update({
@@ -104,7 +223,7 @@ export async function approveTransfer(requestId: string) {
     if (error) throw new Error(error.message);
 
     outcome = {
-      note: `${who} is now at ${r.to_team?.name ?? "their new club"}.`,
+      note: `${who} is now at ${r.to_team?.name ?? "their new club"}.${paid}`,
     };
   } catch (e: any) {
     outcome = { error: describe(e.message ?? String(e)) };
@@ -113,6 +232,10 @@ export async function approveTransfer(requestId: string) {
   revalidatePath(PAGE);
   revalidatePath("/admin/players");
   revalidatePath("/admin/transfers");
+  // Both clubs' balances have just moved, and so has the federation's.
+  revalidatePath("/admin/finance");
+  revalidatePath("/club");
+  revalidatePath("/club/transfers");
   redirect(`${PAGE}?${new URLSearchParams(outcome as any)}`);
 }
 
