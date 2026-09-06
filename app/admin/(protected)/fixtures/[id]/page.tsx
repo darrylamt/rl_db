@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { MatchOfficialsFields } from "@/components/admin/MatchOfficialsFields";
+import { MatchCoachesFields } from "@/components/admin/MatchCoachesFields";
 import { updateFixture } from "../actions";
 
 const STATUSES = ["scheduled","live","completed","postponed","cancelled"];
@@ -16,6 +17,8 @@ export default async function EditFixturePage({ params }: { params: { id: string
     { data: venues },
     { data: officials },
     { data: onTheGame },
+    { data: coaches },
+    { data: sheets },
   ] = await Promise.all([
     supabase.from("fixtures").select("*").eq("fixture_id", params.id).maybeSingle(),
     supabase.from("teams").select("team_id, name").order("name"),
@@ -29,6 +32,17 @@ export default async function EditFixturePage({ params }: { params: { id: string
       .from("fixture_officials")
       .select("role, official_id")
       .eq("fixture_id", params.id),
+    // Both sides' options in one read; the fieldset narrows each list to the
+    // club it belongs to. Empty until supabase/coaches.sql has been run.
+    supabase
+      .from("coaches")
+      .select("coach_id, first_name, last_name, role, team_id, status")
+      .eq("status", "active")
+      .order("last_name"),
+    supabase
+      .from("team_sheets")
+      .select("team_id, head_coach_id, assistant_coach_id")
+      .eq("fixture_id", params.id),
   ]);
   if (!f) notFound();
 
@@ -40,6 +54,20 @@ export default async function EditFixturePage({ params }: { params: { id: string
   );
   const current: Record<string, string> = {};
   for (const r of (onTheGame ?? []) as any[]) current[r.role] = r.official_id;
+
+  // Whichever side each stored sheet belongs to, keyed the way the fields are
+  // named so the form can find them.
+  const dugouts: Record<string, string> = {};
+  for (const r of (sheets ?? []) as any[]) {
+    const key = r.team_id === f.home_team_id ? "home" : "away";
+    if (r.head_coach_id) dugouts[`${key}_head_coach_id`] = r.head_coach_id;
+    if (r.assistant_coach_id) {
+      dugouts[`${key}_assistant_coach_id`] = r.assistant_coach_id;
+    }
+  }
+
+  const nameOfTeam = (id: string | null) =>
+    (teams ?? []).find((t: any) => t.team_id === id)?.name ?? "";
   const bound = updateFixture.bind(null, params.id);
 
   return (
@@ -99,6 +127,15 @@ export default async function EditFixturePage({ params }: { params: { id: string
         </Select>
       </Field>
       <MatchOfficialsFields officials={available as any} current={current} />
+
+      <MatchCoachesFields
+        coaches={(coaches ?? []) as any}
+        sides={[
+          { key: "home", teamId: f.home_team_id ?? null, name: nameOfTeam(f.home_team_id) },
+          { key: "away", teamId: f.away_team_id ?? null, name: nameOfTeam(f.away_team_id) },
+        ]}
+        current={dugouts}
+      />
 
       <Field label="URL slug" hint="Public address on the website. Leave blank to keep the generated one.">
         <Input name="slug" placeholder="bulls-nungua-tigers-28-01-24" defaultValue={f.slug ?? ""} />

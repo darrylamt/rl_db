@@ -46,6 +46,9 @@ export function MatchOfficialsFields({
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Says the form carried these fields at all, so a save from a page
+              that rendered none does not read as "take everyone off". */}
+          <input type="hidden" name="officials_present" value="1" />
           {OFFICIAL_ROLES.map((r) => (
             <Field key={r.key} label={r.label}>
               <SearchableSelect

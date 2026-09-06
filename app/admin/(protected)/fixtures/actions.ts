@@ -42,6 +42,9 @@ const OPTIONAL_FIXTURE_COLUMNS = ["slug"] as const;
  */
 async function saveOfficials(fixtureId: string, fd: FormData) {
   const supabase = createAdminClient();
+  // The form said nothing about officials, which is not the same as saying
+  // there are none. Only a form that carried the fields may clear them.
+  if (!fd.get("officials_present")) return;
   const roles = ["referee", "touch_judge_1", "touch_judge_2"] as const;
 
   const rows = roles
@@ -51,6 +54,86 @@ async function saveOfficials(fixtureId: string, fd: FormData) {
 
   await supabase.from("fixture_officials").delete().eq("fixture_id", fixtureId);
   if (rows.length > 0) await supabase.from("fixture_officials").insert(rows);
+}
+
+/**
+ * Writes who was in charge of each side.
+ *
+ * Clubs set their own coach on a team sheet, but that only reaches matches
+ * still to come — an approved sheet is locked to the club, and every past
+ * match is approved. Two thirds of past sides have no sheet at all. This is
+ * the federation's way in, for a match of any age.
+ *
+ * Where a side has no sheet, one is created as a draft. Deliberately not
+ * approved: recording who coached a game is not signing off a side, and a
+ * future match must stay open for the club that has yet to name one. An
+ * existing sheet keeps whatever status it already had.
+ *
+ * A posted coach is checked against the club it is being set for, so a coach
+ * tied to one club cannot be recorded against another.
+ */
+async function saveCoaches(
+  fixtureId: string,
+  sides: { key: "home" | "away"; teamId: string | null }[],
+  fd: FormData
+) {
+  const supabase = createAdminClient();
+  // As above: a form with no coach pickers on it is silent, not empty.
+  if (!fd.get("coaches_present")) return;
+
+  for (const side of sides) {
+    if (!side.teamId) continue;
+
+    const head = str(fd, `${side.key}_head_coach_id`);
+    const assistant = str(fd, `${side.key}_assistant_coach_id`);
+
+    // Nothing asked for and nothing to undo: leave the sheet alone rather
+    // than creating an empty one for every match that is saved.
+    const { data: sheet } = await supabase
+      .from("team_sheets")
+      .select("sheet_id, head_coach_id, assistant_coach_id")
+      .eq("fixture_id", fixtureId)
+      .eq("team_id", side.teamId)
+      .maybeSingle();
+
+    const nothingSet = !head && !assistant;
+    const nothingStored =
+      !sheet ||
+      (!(sheet as any).head_coach_id && !(sheet as any).assistant_coach_id);
+    if (nothingSet && nothingStored) continue;
+
+    // Only coaches this club may actually be given.
+    const asked = [head, assistant].filter(Boolean) as string[];
+    const allowed = new Set<string>();
+    if (asked.length > 0) {
+      const { data: ok } = await supabase
+        .from("coaches")
+        .select("coach_id")
+        .in("coach_id", asked)
+        .or(`team_id.eq.${side.teamId},team_id.is.null`);
+      for (const c of (ok ?? []) as any[]) allowed.add(c.coach_id);
+    }
+
+    const values = {
+      head_coach_id: head && allowed.has(head) ? head : null,
+      assistant_coach_id:
+        assistant && allowed.has(assistant) ? assistant : null,
+    };
+
+    if (sheet) {
+      await supabase
+        .from("team_sheets")
+        .update(values)
+        .eq("sheet_id", (sheet as any).sheet_id);
+    } else {
+      await supabase.from("team_sheets").insert({
+        fixture_id: fixtureId,
+        team_id: side.teamId,
+        status: "draft",
+        ...values,
+      });
+    }
+  }
 }
 
 function slugify(v: string | null) {
@@ -98,7 +181,17 @@ export async function updateFixture(id: string, fd: FormData) {
   );
   if (error) throw new Error(error.message);
   await saveOfficials(id, fd);
+  await saveCoaches(
+    id,
+    [
+      { key: "home", teamId: p.home_team_id },
+      { key: "away", teamId: p.away_team_id },
+    ],
+    fd
+  );
   revalidatePath("/admin/fixtures");
+  revalidatePath("/admin/team-sheets");
+  revalidatePath("/club/team-sheets");
   revalidatePath(`/admin/fixtures/${id}`);
   revalidatePath("/admin/dashboard");
   revalidatePath("/live");
