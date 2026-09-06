@@ -6,10 +6,10 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation, getAppUser } from "@/lib/auth";
 import {
   carryOverCap,
-  currentSeason,
   formatLX,
   getClubBudgets,
 } from "@/lib/lx";
+import { getSeasonState, seasonForWriting } from "@/lib/seasons";
 
 type Outcome = { error: string } | { note: string };
 
@@ -21,6 +21,12 @@ function describe(message: string) {
   }
   if (/one_allocation_per_club_per_season/.test(message)) {
     return "That club has already had its budget for this season.";
+  }
+  if (/seasons/.test(message) && /does not exist|relation/i.test(message)) {
+    return "Run supabase/seasons.sql first.";
+  }
+  if (/a_season_ends_after_it_starts/.test(message)) {
+    return "A season cannot end before it starts.";
   }
   return message;
 }
@@ -49,10 +55,23 @@ export async function grantSeasonBudgets() {
   await requireFederation();
   const supabase = createAdminClient();
   const user = await getAppUser();
-  const season = currentSeason();
 
   let outcome: Outcome;
   try {
+    // Which season is being funded. While one is running it is that one;
+    // once it has ended the grant is for the season that follows, so the
+    // federation can fund a new season in November rather than waiting for
+    // the calendar to turn over.
+    const state = await getSeasonState();
+    const season =
+      state.ended && state.next ? state.next.season : state.season;
+
+    if (state.ended && !state.next) {
+      throw new Error(
+        `The ${state.season} season ended on ${state.row?.endsOn}. Add the next season's dates below before granting its budgets.`,
+      );
+    }
+
     const { budgets, books } = await getClubBudgets(season);
     if (books.notMigrated) throw new Error("Run supabase/club_budgets.sql first.");
 
@@ -136,13 +155,58 @@ export async function adjustBalance(fd: FormData) {
       team_id: teamId,
       kind: "adjustment",
       amount,
-      season: currentSeason(),
+      season: await seasonForWriting(),
       note,
       created_by: user?.userId ?? null,
     });
     if (error) throw new Error(error.message);
 
     outcome = { note: `Adjusted by ${amount > 0 ? "+" : "−"}${Math.abs(amount)} LX.` };
+  } catch (e: any) {
+    outcome = { error: describe(e.message ?? String(e)) };
+  }
+
+  revalidatePath(PAGE);
+  revalidatePath("/club");
+  back(outcome);
+}
+
+/**
+ * States when a season runs.
+ *
+ * The federation says it; nothing infers it. A season holds several
+ * tournaments that finish at different times, so there is no single
+ * competition end date to read — and a boundary taken from fixtures would
+ * move every time one was entered, which is no use to a thing that decides
+ * when money changes hands.
+ *
+ * Saving an existing season overwrites its dates rather than refusing, so
+ * correcting a date is the same gesture as setting one.
+ */
+export async function saveSeason(fd: FormData) {
+  await requireFederation();
+  const supabase = createAdminClient();
+
+  const season = ((fd.get("season") as string) ?? "").trim();
+  const startsOn = ((fd.get("starts_on") as string) ?? "").trim();
+  const endsOn = ((fd.get("ends_on") as string) ?? "").trim();
+  const note = ((fd.get("note") as string) ?? "").trim() || null;
+
+  let outcome: Outcome;
+  try {
+    if (!season) throw new Error("Give the season a name — the year will do.");
+    if (!startsOn || !endsOn) throw new Error("A season needs both dates.");
+    if (endsOn < startsOn) throw new Error("A season cannot end before it starts.");
+
+    const { error } = await supabase
+      .from("seasons")
+      .upsert(
+        { season, starts_on: startsOn, ends_on: endsOn, note },
+        { onConflict: "season" },
+      );
+    if (error) throw new Error(error.message);
+
+    outcome = { note: `The ${season} season runs ${startsOn} to ${endsOn}.` };
   } catch (e: any) {
     outcome = { error: describe(e.message ?? String(e)) };
   }

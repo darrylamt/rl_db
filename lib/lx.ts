@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getClubValues } from "@/lib/clubValue";
+import { seasonForWriting } from "@/lib/seasons";
 
 /**
  * LeagueX — the federation's currency, and the rules it moves by.
@@ -75,7 +76,14 @@ export function formatSigned(amount: number): string {
   return `${n < 0 ? "−" : "+"}${Math.abs(n).toLocaleString("en-GB")} LX`;
 }
 
-/** The season budgets are granted against. */
+/**
+ * The season budgets are granted against.
+ *
+ * The calendar year, and only as a last resort. The federation states when a
+ * season runs in the seasons table, and `seasonForWriting` is what callers
+ * should reach for — this stands in when that table is empty or missing, so a
+ * migration that has not been run cannot stop clubs trading.
+ */
 export function currentSeason(): string {
   return String(new Date().getFullYear());
 }
@@ -203,8 +211,9 @@ export type ClubBudget = {
  * youth setup, and should not be funded for one.
  */
 export async function getClubBudgets(
-  season = currentSeason()
+  season?: string
 ): Promise<{ budgets: ClubBudget[]; books: Books }> {
+  season = season ?? (await seasonForWriting());
   const [books, clubs] = await Promise.all([getBooks(), getClubValues()]);
 
   const grantedThisSeason = new Set(

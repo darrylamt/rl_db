@@ -9,12 +9,12 @@ import {
   PER_SEASON,
   SEASON_BONUS_CAP,
   carryOverCap,
-  currentSeason,
   formatLX,
   formatSigned,
   getClubBudgets,
 } from "@/lib/lx";
-import { grantSeasonBudgets, adjustBalance } from "./actions";
+import { getSeasonState } from "@/lib/seasons";
+import { grantSeasonBudgets, adjustBalance, saveSeason } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,10 @@ export default async function FinancePage({
 }: {
   searchParams?: { error?: string; note?: string };
 }) {
-  const season = currentSeason();
+  // Which season is being funded. While one is running it is that one; once
+  // it has ended the money on offer belongs to the season that follows.
+  const state = await getSeasonState();
+  const season = state.ended && state.next ? state.next.season : state.season;
   const { budgets, books } = await getClubBudgets(season);
 
   // Names for the ledger. Read separately rather than joined, so a club that
@@ -120,6 +123,111 @@ export default async function FinancePage({
                 value.
               </p>
             </div>
+          </section>
+
+          {/* When the season runs. Stated by the federation, because a season
+              holds several tournaments that finish at different times and a
+              boundary read off fixtures would move every time one was entered. */}
+          <section className="mb-8">
+            <h2 className="font-display text-lg text-navy-900 mb-1">Seasons</h2>
+            <p className="text-xs text-slate-500 mb-3 max-w-2xl">
+              Budgets are granted against these dates. Nothing happens on its
+              own &mdash; this decides which season the grant is for and when
+              it may be made, and the federation still presses the button.
+            </p>
+
+            {state.fallback ? (
+              <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2.5 rounded mb-3">
+                No seasons are on record, so the calendar year is standing in
+                and budgets roll over on 1 January. Run{" "}
+                <code className="font-mono">supabase/seasons.sql</code> and set
+                the real dates below.
+              </div>
+            ) : state.ended ? (
+              <div className="bg-sky-50 border border-sky-300 text-sky-900 text-sm px-3 py-2.5 rounded mb-3">
+                The {state.season} season ended on {state.row?.endsOn}.
+                {state.next
+                  ? ` The ${state.next.season} season runs from ${state.next.startsOn}, and its budgets can be granted now.`
+                  : " Add the next season below before its budgets can be granted."}
+              </div>
+            ) : state.running ? (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-3 py-2.5 rounded mb-3">
+                The {state.season} season is running &mdash; {state.row?.startsOn}{" "}
+                to {state.row?.endsOn}.
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-sm px-3 py-2.5 rounded mb-3">
+                The {state.season} season has not started yet. It runs{" "}
+                {state.row?.startsOn} to {state.row?.endsOn}.
+              </div>
+            )}
+
+            {state.every.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 mb-3">
+                {state.every.map((y) => (
+                  <div
+                    key={y.season}
+                    className="px-4 py-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm"
+                  >
+                    <span className="font-display text-navy-900 w-16 shrink-0">
+                      {y.season}
+                    </span>
+                    <span className="text-slate-600 tabular-nums shrink-0">
+                      {y.startsOn} &rarr; {y.endsOn}
+                    </span>
+                    {y.season === state.season && (
+                      <span className="text-[10px] uppercase tracking-wider bg-navy-900 text-white px-1.5 py-0.5 rounded shrink-0">
+                        {state.ended ? "Just ended" : "Current"}
+                      </span>
+                    )}
+                    {y.note && (
+                      <span className="text-xs text-slate-400 flex-1 min-w-0 truncate">
+                        {y.note}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form
+              action={saveSeason}
+              className="bg-white border border-slate-200 rounded-lg p-4 grid gap-3 sm:grid-cols-[7rem_1fr_1fr_auto] sm:items-end"
+            >
+              <label className="text-xs text-slate-600">
+                <span className="block mb-1">Season</span>
+                <input
+                  name="season"
+                  required
+                  placeholder="2027"
+                  className="w-full px-2 py-2 rounded border border-slate-300 text-sm"
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                <span className="block mb-1">Starts on</span>
+                <input
+                  name="starts_on"
+                  type="date"
+                  required
+                  className="w-full px-2 py-2 rounded border border-slate-300 text-sm"
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                <span className="block mb-1">Ends on</span>
+                <input
+                  name="ends_on"
+                  type="date"
+                  required
+                  className="w-full px-2 py-2 rounded border border-slate-300 text-sm"
+                />
+              </label>
+              <button className="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded h-fit">
+                Save season
+              </button>
+              <p className="text-[11px] text-slate-400 sm:col-span-4">
+                Saving a season that already exists corrects its dates.
+              </p>
+            </form>
           </section>
 
           {overdrawn.length > 0 && (

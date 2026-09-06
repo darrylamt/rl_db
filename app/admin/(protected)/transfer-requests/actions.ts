@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation, getAppUser } from "@/lib/auth";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { getPlayerValue } from "@/lib/playerValue";
-import { currentSeason, formatLX, priceFor } from "@/lib/lx";
+import { formatLX, priceFor } from "@/lib/lx";
+import { seasonForWriting } from "@/lib/seasons";
 
 type Outcome = { error: string } | { note: string };
 
@@ -61,7 +62,7 @@ async function settleTheMoney(r: any, who: string): Promise<string> {
   if (levy === null) levy = 0;
   if (fee <= 0 && levy <= 0) return "";
 
-  const season = currentSeason();
+  const season = await seasonForWriting();
   const what = r.kind === "loan" ? "Loan" : "Transfer";
   const note = `${what} of ${who}${pricedNow ? " — priced at sign-off" : ""}.`;
 
