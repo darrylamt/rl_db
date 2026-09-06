@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { roleLabel } from "@/lib/officiating";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
@@ -71,6 +72,7 @@ export default async function MatchCentrePage({
     { data: lineup },
     { data: ratings },
     { data: officials },
+    { data: benches },
   ] = await Promise.all([
     supabase
       .from("fixtures")
@@ -108,7 +110,15 @@ export default async function MatchCentrePage({
       .eq("fixture_id", fixtureId),
     supabase
       .from("fixture_officials")
-      .select("role, official:official_id(first_name, last_name)")
+      .select("role, official:official_id(official_id, first_name, last_name)")
+      .eq("fixture_id", fixtureId),
+    // Who was in charge of each side. Comes back empty until
+    // supabase/coaches.sql has been run, which simply hides the section.
+    supabase
+      .from("team_sheets")
+      .select(
+        "team_id, head:head_coach_id(coach_id, first_name, last_name), assistant:assistant_coach_id(coach_id, first_name, last_name)"
+      )
       .eq("fixture_id", fixtureId),
   ]);
 
@@ -511,6 +521,52 @@ export default async function MatchCentrePage({
         ]}
       />
 
+      {/* Who was in charge */}
+      {(() => {
+        const dugouts = ((benches ?? []) as any[])
+          .map((b) => {
+            const people = [
+              { person: one<any>(b.head), what: "Head coach" },
+              { person: one<any>(b.assistant), what: "Assistant" },
+            ].filter((x) => x.person);
+            const side = b.team_id === homeId ? home : away;
+            return { name: side?.name ?? "", people };
+          })
+          .filter((d) => d.people.length > 0);
+
+        if (dugouts.length === 0) return null;
+        return (
+          <section className="mb-6">
+            <h2 className="font-display text-xl mb-3">Coaches</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {dugouts.map((d, i) => (
+                <div
+                  key={i}
+                  className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3"
+                >
+                  <p className="text-xs uppercase tracking-wider text-slate-500 mb-1">
+                    {d.name}
+                  </p>
+                  {d.people.map((x, j) => (
+                    <p key={j} className="text-sm text-slate-300">
+                      <Link
+                        href={`/live/coach/${x.person.coach_id}`}
+                        className="hover:text-white hover:underline"
+                      >
+                        {`${x.person.first_name ?? ""} ${x.person.last_name ?? ""}`.trim()}
+                      </Link>
+                      <span className="text-slate-500 text-xs ml-1.5">
+                        {x.what}
+                      </span>
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       {/* Officials */}
       {(officials ?? []).length > 0 && (
         <section className="mb-6">
@@ -518,13 +574,24 @@ export default async function MatchCentrePage({
           <div className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm">
             {((officials ?? []) as any[]).map((o, i) => {
               const off = one<any>(o.official);
+              const name = off
+                ? `${off.first_name ?? ""} ${off.last_name ?? ""}`.trim()
+                : "";
+              const role = roleLabel(o.role);
               return (
                 <span key={i} className="text-slate-300">
-                  {off ? `${off.first_name} ${off.last_name}` : "—"}
-                  {o.role && (
-                    <span className="text-slate-500 text-xs ml-1.5">
-                      {o.role}
-                    </span>
+                  {off?.official_id ? (
+                    <Link
+                      href={`/live/official/${off.official_id}`}
+                      className="hover:text-white hover:underline"
+                    >
+                      {name || "—"}
+                    </Link>
+                  ) : (
+                    name || "—"
+                  )}
+                  {role && (
+                    <span className="text-slate-500 text-xs ml-1.5">{role}</span>
                   )}
                 </span>
               );
