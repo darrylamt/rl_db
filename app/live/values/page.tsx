@@ -152,6 +152,7 @@ export default async function ValuesPage({
                     </span>
                     <span className="font-display text-xl text-ghanaYellow-500 tabular-nums shrink-0">
                       {c.value}
+                      <span className="text-xs ml-1 text-ghanaYellow-500/70">LX</span>
                     </span>
                   </div>
 
@@ -282,6 +283,7 @@ export default async function ValuesPage({
                     <span className="text-right shrink-0">
                       <span className="block font-display text-xl text-ghanaYellow-500 tabular-nums leading-none">
                         {r.v.value}
+                        <span className="text-xs ml-1 text-ghanaYellow-500/70">LX</span>
                       </span>
                       <span
                         className={`block text-[10px] mt-0.5 ${

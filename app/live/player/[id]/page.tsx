@@ -552,6 +552,9 @@ export default async function PublicPlayerPage({
                 </p>
                 <p className="font-display text-4xl md:text-5xl text-ghanaYellow-500 tabular-nums leading-none mt-1">
                   {valuation.value}
+                  <span className="text-lg md:text-xl ml-1.5 text-ghanaYellow-500/70">
+                    LX
+                  </span>
                 </p>
               </div>
               <div className="text-right">
