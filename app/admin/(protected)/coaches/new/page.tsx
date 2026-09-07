@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createCoach } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -93,9 +94,7 @@ export default async function NewCoachPage() {
         </Field>
       </div>
 
-      <Field label="Photo URL">
-        <Input name="photo_url" placeholder="https://..." />
-      </Field>
+      <PhotoUpload name="photo" label="Photo" shape="round" />
     </FormShell>
   );
 }

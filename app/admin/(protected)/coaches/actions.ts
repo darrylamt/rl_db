@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { requireFederation } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { resolveImageUrl } from "@/lib/upload";
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -20,7 +21,6 @@ function payload(fd: FormData) {
     qualification: str(fd, "qualification"),
     region: str(fd, "region"),
     nationality: str(fd, "nationality"),
-    photo_url: str(fd, "photo_url"),
     phone: str(fd, "phone"),
     email: str(fd, "email"),
     status: str(fd, "status") ?? "active",
@@ -34,7 +34,15 @@ export async function createCoach(fd: FormData) {
   if (!p.first_name || !p.last_name) {
     throw new Error("First and last name are required");
   }
-  const { error } = await supabase.from("coaches").insert(p);
+  // A new coach has no photo to keep, so anything absent stays null.
+  const photo_url = await resolveImageUrl(
+    fd,
+    "photo",
+    "player-photos",
+    "coaches",
+    null
+  );
+  const { error } = await supabase.from("coaches").insert({ ...p, photo_url });
   if (error) throw new Error(error.message);
   revalidatePath("/admin/coaches");
 }
@@ -46,7 +54,28 @@ export async function updateCoach(id: string, fd: FormData) {
   if (!p.first_name || !p.last_name) {
     throw new Error("First and last name are required");
   }
-  const { error } = await supabase.from("coaches").update(p).eq("coach_id", id);
+
+  // An empty file input is not a request to remove the photo. Reading what is
+  // already stored and handing it back is what stops a save that did not
+  // touch the picture from wiping it — the bug that ate club photos before.
+  const { data: existing } = await supabase
+    .from("coaches")
+    .select("photo_url")
+    .eq("coach_id", id)
+    .maybeSingle();
+
+  const photo_url = await resolveImageUrl(
+    fd,
+    "photo",
+    "player-photos",
+    "coaches",
+    (existing as any)?.photo_url
+  );
+
+  const { error } = await supabase
+    .from("coaches")
+    .update({ ...p, photo_url })
+    .eq("coach_id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/coaches");
   revalidatePath(`/admin/coaches/${id}`);

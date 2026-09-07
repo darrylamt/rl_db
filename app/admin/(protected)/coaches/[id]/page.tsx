@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { SearchableSelect } from "@/components/admin/SearchableSelect";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { updateCoach } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -119,9 +120,7 @@ export default async function EditCoachPage({
         </Field>
       </div>
 
-      <Field label="Photo URL">
-        <Input name="photo_url" defaultValue={c.photo_url ?? ""} />
-      </Field>
+      <PhotoUpload name="photo" currentUrl={c.photo_url} label="Photo" shape="round" />
     </FormShell>
   );
 }
