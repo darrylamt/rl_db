@@ -31,9 +31,23 @@ export function formatLabel(key: string | null | undefined): string | null {
   return FORMATS.find((f) => f.key === key)?.label ?? null;
 }
 
+/**
+ * Youth is two divisions, and "youth" on its own is the third.
+ *
+ * Splitting youth into boys and girls left this list behind: competitions
+ * started carrying youth_boys and youth_girls while the filters still only
+ * knew "youth", so divisionsIn matched nothing and the Youth chip quietly
+ * disappeared from every comparison.
+ *
+ * Plain "youth" stays last for anything nobody has classified yet — a
+ * competition entered before the split, or one the federation has not said
+ * either way about.
+ */
 export const DIVISIONS: FormatOption[] = [
   { key: "men", label: "Men" },
   { key: "women", label: "Women" },
+  { key: "youth_boys", label: "Youth Boys" },
+  { key: "youth_girls", label: "Youth Girls" },
   { key: "youth", label: "Youth" },
 ];
 
