@@ -18,10 +18,18 @@ export const metadata: Metadata = {
     "What every club and player is worth, worked out from the recorded record.",
 };
 
+/**
+ * Four ladders, not three.
+ *
+ * This still said "youth" after youth was split into boys and girls, and
+ * since every youth player carries a gender none of them matched it any
+ * more — the tab was there and 264 players were behind it, unreachable.
+ */
 const GRADES: { key: ValueGrade; label: string }[] = [
   { key: "senior_men", label: "Men" },
   { key: "senior_women", label: "Women" },
-  { key: "youth", label: "Youth" },
+  { key: "youth_boys", label: "Youth Boys" },
+  { key: "youth_girls", label: "Youth Girls" },
 ];
 
 const GROUPS: { key: ValueGroup | "all"; label: string }[] = [
@@ -37,7 +45,13 @@ const PAGE_SIZE = 25;
 export default async function ValuesPage({
   searchParams,
 }: {
-  searchParams?: { view?: string; grade?: string; group?: string; page?: string };
+  searchParams?: {
+    view?: string;
+    grade?: string;
+    group?: string;
+    page?: string;
+    q?: string;
+  };
 }) {
   const supabase = createPublicClient();
   const view = searchParams?.view === "clubs" ? "clubs" : "players";
@@ -59,6 +73,7 @@ export default async function ValuesPage({
   const group = (GROUPS.find((g) => g.key === searchParams?.group)?.key ??
     "all") as ValueGroup | "all";
   const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const q = (searchParams?.q ?? "").trim();
 
   const withValue = ((players ?? []) as any[])
     .map((p) => ({ ...p, v: values.get(p.player_id) }))
@@ -69,9 +84,20 @@ export default async function ValuesPage({
   // imported rather than a statement that they have stopped playing — and
   // filtering on it hid all 336 of them.
   const inGrade = withValue.filter((r) => r.v.grade === grade);
-  const rows = inGrade
-    .filter((r) => group === "all" || r.v.group === group)
-    .sort((a, b) => b.v.value - a.v.value);
+
+  // A name search looks across every ladder. Somebody typing a name is asking
+  // where that player is, not where they are within the grade tab that
+  // happened to be open — and five hundred players is too many to find
+  // anybody by paging through the one you guessed right.
+  const needle = q.toLowerCase();
+  const rows = (q
+    ? withValue.filter((r) =>
+        `${r.first_name ?? ""} ${r.last_name ?? ""}`
+          .toLowerCase()
+          .includes(needle)
+      )
+    : inGrade.filter((r) => group === "all" || r.v.group === group)
+  ).sort((a, b) => b.v.value - a.v.value);
 
   const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const offset = (page - 1) * PAGE_SIZE;
@@ -82,8 +108,8 @@ export default async function ValuesPage({
     const gr = "group" in next ? next.group : group;
     if (g !== "senior_men") p.set("grade", g);
     if (gr && gr !== "all") p.set("group", gr);
-    const q = p.toString();
-    return q ? `/live/values?${q}` : "/live/values";
+    const built = p.toString();
+    return built ? `/live/values?${built}` : "/live/values";
   };
 
   return (
@@ -187,6 +213,37 @@ export default async function ValuesPage({
       <>
       {/* The women's game has nine recorded matches to the men's two hundred,
           so these are separate ladders rather than one. */}
+      {/* A plain GET form: no JavaScript needed, and the result is a URL
+          somebody can send to somebody else. */}
+      <form action="/live/values" className="flex gap-2 mb-4">
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Search every player by name"
+          aria-label="Search players by name"
+          className="flex-1 min-w-0 bg-neutral-900 border border-white/10 rounded-full px-4 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:border-white/30"
+        />
+        <button className="px-4 py-2 rounded-full bg-white text-black text-sm font-medium shrink-0">
+          Search
+        </button>
+        {q && (
+          <Link
+            href="/live/values"
+            className="px-4 py-2 rounded-full border border-white/15 text-slate-300 text-sm shrink-0 hover:border-white/40"
+          >
+            Clear
+          </Link>
+        )}
+      </form>
+
+      {q ? (
+        <p className="text-sm text-slate-400 mb-4">
+          {rows.length === 0
+            ? `Nobody matches “${q}”.`
+            : `${rows.length} player${rows.length === 1 ? "" : "s"} matching “${q}”, across every grade.`}
+        </p>
+      ) : (
       <div className="flex bg-neutral-900 border border-white/10 rounded-full p-1 mb-3 max-w-sm">
         {GRADES.map((g) => {
           const on = grade === g.key;
@@ -213,7 +270,9 @@ export default async function ValuesPage({
           );
         })}
       </div>
+      )}
 
+      {!q && (
       <div className="flex gap-1.5 flex-wrap mb-6">
         {GROUPS.filter(
           (g) =>
@@ -236,10 +295,11 @@ export default async function ValuesPage({
           );
         })}
       </div>
+      )}
 
       {rows.length === 0 ? (
         <p className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-10 text-center text-slate-400 text-sm">
-          Nobody to value here yet.
+          {q ? "Try part of a name, or clear the search." : "Nobody to value here yet."}
         </p>
       ) : (
         <>
@@ -274,8 +334,18 @@ export default async function ValuesPage({
                           <Avatar src={t.logo_url} name={t.name} size={14} contain />
                         )}
                         <span className="text-[11px] text-slate-500 truncate">
-                          {[t?.name, r.position].filter(Boolean).join(" · ") ||
-                            "No club"}
+                          {/* The grade only earns its place while searching:
+                              a search crosses all four ladders, so without it
+                              a men's row and a youth row look identical. */}
+                          {[
+                            t?.name,
+                            r.position,
+                            q
+                              ? GRADES.find((g) => g.key === r.v.grade)?.label
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "No club"}
                         </span>
                       </span>
                     </span>

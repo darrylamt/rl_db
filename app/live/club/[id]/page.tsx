@@ -7,7 +7,15 @@ import { MatchCard } from "@/app/live/MatchCard";
 import { FIXTURE_SELECT } from "@/lib/matchStats";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { GRADES, YOUTH_UNSPECIFIED, effectiveGrade } from "@/lib/grades";
-import { formatOf, formatLabel, divisionLabel } from "@/lib/competitionFormat";
+import {
+  formatOf,
+  formatLabel,
+  divisionLabel,
+  formatsIn,
+  divisionsIn,
+  seasonsIn,
+  inSeasonRange,
+} from "@/lib/competitionFormat";
 import { Pagination } from "@/components/admin/Pagination";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +45,7 @@ const TABS = [
   { key: "fixtures", label: "Fixtures" },
   { key: "results", label: "Results" },
   { key: "record", label: "Record" },
+  { key: "h2h", label: "Head to head" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -45,7 +54,15 @@ export default async function PublicClubPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { tab?: string; page?: string };
+  searchParams?: {
+    tab?: string;
+    page?: string;
+    vs?: string;
+    division?: string;
+    format?: string;
+    from?: string;
+    to?: string;
+  };
 }) {
   const supabase = createPublicClient();
   const teamId = params.id;
@@ -109,6 +126,106 @@ export default async function PublicClubPage({
 
   const tab: TabKey =
     (TABS.find((t) => t.key === searchParams?.tab)?.key as TabKey) ?? "squad";
+
+  /**
+   * Who this club has played, and how it has gone against each of them.
+   *
+   * Counted from the same completed fixtures the Record tab uses, so the two
+   * cannot disagree. Only matches with a score against them count — a fixture
+   * nobody recorded is not a draw.
+   */
+  const played = all.filter((f) => {
+    const r = one<any>(f.result);
+    return !!r && r.home_score != null && r.away_score != null;
+  });
+
+  const oppFilter = {
+    division: searchParams?.division ?? "",
+    format: searchParams?.format ?? "",
+    from: searchParams?.from ?? "",
+    to: searchParams?.to ?? "",
+  };
+
+  type Side = { played: number; won: number; drawn: number; lost: number; for: number; against: number };
+  const blank = (): Side => ({ played: 0, won: 0, drawn: 0, lost: 0, for: 0, against: 0 });
+
+  // Every opponent, with how many completed matches there have been. Built
+  // before the filters so the list of who you can pick does not shrink to
+  // nothing the moment a filter is set.
+  const opponents = new Map<string, { id: string; name: string; logo: string | null; n: number }>();
+  for (const f of played) {
+    const home = one<any>(f.home);
+    const away = one<any>(f.away);
+    const isHome = home?.team_id === teamId;
+    const opp = isHome ? away : home;
+    if (!opp?.team_id || opp.team_id === teamId) continue;
+    const cur = opponents.get(opp.team_id);
+    if (cur) cur.n += 1;
+    else opponents.set(opp.team_id, { id: opp.team_id, name: opp.name, logo: opp.logo_url ?? null, n: 1 });
+  }
+  const opponentList = Array.from(opponents.values()).sort(
+    (a, b) => b.n - a.n || a.name.localeCompare(b.name)
+  );
+
+  const vsId = searchParams?.vs && opponents.has(searchParams.vs) ? searchParams.vs : "";
+  const vsTeam = vsId ? opponents.get(vsId)! : null;
+
+  // The meetings themselves, once an opponent is chosen and the filters are
+  // applied. Kept as rows so the tally and the list are the same matches.
+  const meetings = vsId
+    ? played.filter((f) => {
+        const home = one<any>(f.home);
+        const away = one<any>(f.away);
+        const isHome = home?.team_id === teamId;
+        const opp = isHome ? away : home;
+        if (opp?.team_id !== vsId) return false;
+        const comp = one<any>(f.competition);
+        if (oppFilter.format && formatOf(comp?.name) !== oppFilter.format) return false;
+        if (oppFilter.division && (comp?.division ?? "men") !== oppFilter.division) return false;
+        if (!inSeasonRange(comp?.season, oppFilter.from, oppFilter.to)) return false;
+        return true;
+      })
+    : [];
+
+  const us = blank();
+  const them = blank();
+  for (const f of meetings) {
+    const r = one<any>(f.result);
+    const home = one<any>(f.home);
+    const isHome = home?.team_id === teamId;
+    const ours = isHome ? r.home_score : r.away_score;
+    const theirs = isHome ? r.away_score : r.home_score;
+    us.played += 1; them.played += 1;
+    us.for += ours; us.against += theirs;
+    them.for += theirs; them.against += ours;
+    if (ours > theirs) { us.won += 1; them.lost += 1; }
+    else if (ours < theirs) { us.lost += 1; them.won += 1; }
+    else { us.drawn += 1; them.drawn += 1; }
+  }
+
+  // Only offer a filter that leads somewhere: the competitions these two have
+  // actually met in, not every competition on record.
+  const metIn = (vsId ? played.filter((f) => {
+    const home = one<any>(f.home);
+    const away = one<any>(f.away);
+    const isHome = home?.team_id === teamId;
+    return (isHome ? away : home)?.team_id === vsId;
+  }) : []).map((f) => {
+    const c = one<any>(f.competition);
+    return { name: c?.name ?? null, division: c?.division ?? null, season: c?.season ?? null };
+  });
+  const h2hFormats = formatsIn(metIn);
+  const h2hDivisions = divisionsIn(metIn);
+  const h2hSeasons = seasonsIn(metIn);
+
+  /** A link that keeps the tab and the other filters where they are. */
+  const h2hHref = (next: Record<string, string>) => {
+    const sp = new URLSearchParams();
+    sp.set("tab", "h2h");
+    const merged = { vs: vsId, ...oppFilter, ...next };
+    for (const [k, v] of Object.entries(merged)) if (v) sp.set(k, v);
+    return `/live/club/${teamId}?${sp.toString()}`;
+  };
 
   const PAGE_SIZE = 10;
   const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
@@ -279,6 +396,228 @@ export default async function PublicClubPage({
             <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
               Nothing played yet.
             </p>
+          )}
+        </section>
+      )}
+
+      {tab === "h2h" && (
+        <section className="mb-8">
+          <p className="text-[11px] text-slate-500 mb-3">
+            Every completed meeting. A fixture with no score recorded against
+            it is not counted as a draw.
+          </p>
+
+          {opponentList.length === 0 ? (
+            <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+              No completed matches yet, so there is nobody to compare against.
+            </p>
+          ) : (
+            <>
+              <div className="flex gap-1.5 flex-wrap mb-5">
+                {opponentList.map((o) => (
+                  <Link
+                    key={o.id}
+                    href={
+                      o.id === vsId
+                        ? `/live/club/${teamId}?tab=h2h`
+                        : h2hHref({ vs: o.id, division: "", format: "", from: "", to: "" })
+                    }
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border transition ${
+                      o.id === vsId
+                        ? "bg-white text-black border-white font-semibold"
+                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Avatar src={o.logo} name={o.name} size={16} contain />
+                    <span>{o.name}</span>
+                    <span className={o.id === vsId ? "text-black/50" : "text-slate-500"}>
+                      {o.n}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {!vsTeam ? (
+                <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+                  Pick a club above to see the head to head.
+                </p>
+              ) : (
+                <>
+                  {(h2hDivisions.length > 1 ||
+                    h2hFormats.length > 1 ||
+                    h2hSeasons.length > 1) && (
+                    <div className="flex gap-1.5 flex-wrap mb-4">
+                      {h2hDivisions.length > 1 &&
+                        h2hDivisions.map((d) => (
+                          <Link
+                            key={d.key}
+                            href={h2hHref({
+                              division: oppFilter.division === d.key ? "" : d.key,
+                            })}
+                            className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                              oppFilter.division === d.key
+                                ? "bg-ghanaYellow-500 text-black border-ghanaYellow-500 font-semibold"
+                                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                            }`}
+                          >
+                            {d.label}
+                          </Link>
+                        ))}
+                      {h2hFormats.length > 1 &&
+                        h2hFormats.map((f) => (
+                          <Link
+                            key={f.key}
+                            href={h2hHref({
+                              format: oppFilter.format === f.key ? "" : f.key,
+                            })}
+                            className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                              oppFilter.format === f.key
+                                ? "bg-ghanaYellow-500 text-black border-ghanaYellow-500 font-semibold"
+                                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                            }`}
+                          >
+                            {f.label}
+                          </Link>
+                        ))}
+                      {h2hSeasons.length > 1 &&
+                        h2hSeasons.map((y) => {
+                          const only = oppFilter.from === y && oppFilter.to === y;
+                          return (
+                            <Link
+                              key={y}
+                              href={h2hHref({ from: only ? "" : y, to: only ? "" : y })}
+                              className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                                only
+                                  ? "bg-white text-black border-white font-semibold"
+                                  : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
+                              }`}
+                            >
+                              {y}
+                            </Link>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {meetings.length === 0 ? (
+                    <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-8 text-center text-slate-500 text-sm">
+                      No meetings match those filters.
+                    </p>
+                  ) : (
+                    <>
+                      {/* The record, both ways round. */}
+                      <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 mb-4">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <Avatar
+                              src={(team as any).logo_url}
+                              name={(team as any).name}
+                              size={28}
+                              contain
+                            />
+                            <span className="text-sm font-medium truncate">
+                              {(team as any).name}
+                            </span>
+                          </span>
+                          <span className="font-display text-2xl tabular-nums shrink-0">
+                            <span className="text-emerald-400">{us.won}</span>
+                            <span className="text-slate-600"> &ndash; </span>
+                            <span className="text-slate-400">{us.drawn}</span>
+                            <span className="text-slate-600"> &ndash; </span>
+                            <span className="text-red-400">{them.won}</span>
+                          </span>
+                          <span className="flex items-center gap-2 min-w-0 justify-end">
+                            <span className="text-sm font-medium truncate">
+                              {vsTeam.name}
+                            </span>
+                            <Avatar src={vsTeam.logo} name={vsTeam.name} size={28} contain />
+                          </span>
+                        </div>
+
+                        <dl className="grid grid-cols-3 gap-3 text-center">
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wider text-slate-500">
+                              Met
+                            </dt>
+                            <dd className="font-display text-xl tabular-nums mt-0.5">
+                              {us.played}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wider text-slate-500">
+                              Points
+                            </dt>
+                            <dd className="font-display text-xl tabular-nums mt-0.5">
+                              {us.for}
+                            </dd>
+                            <dd className="text-[10px] text-slate-500">
+                              {them.for} against
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wider text-slate-500">
+                              Win rate
+                            </dt>
+                            <dd className="font-display text-xl tabular-nums mt-0.5">
+                              {us.played > 0
+                                ? `${Math.round((us.won / us.played) * 100)}%`
+                                : "—"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+
+                      <div className="space-y-2">
+                        {meetings.map((f) => {
+                          const r = one<any>(f.result);
+                          const home = one<any>(f.home);
+                          const away = one<any>(f.away);
+                          const comp = one<any>(f.competition);
+                          const isHome = home?.team_id === teamId;
+                          const ours = isHome ? r.home_score : r.away_score;
+                          const theirs = isHome ? r.away_score : r.home_score;
+                          const outcome =
+                            ours > theirs ? "W" : ours < theirs ? "L" : "D";
+                          return (
+                            <Link
+                              key={f.fixture_id}
+                              href={`/live/${f.fixture_id}`}
+                              className="flex items-center gap-3 bg-neutral-900 border border-white/10 rounded-xl px-3 py-2.5 hover:border-white/25 transition"
+                            >
+                              <span
+                                className={`w-6 h-6 rounded grid place-items-center text-[11px] font-bold shrink-0 ${
+                                  outcome === "W"
+                                    ? "bg-emerald-500/15 text-emerald-400"
+                                    : outcome === "L"
+                                      ? "bg-red-500/15 text-red-400"
+                                      : "bg-white/10 text-slate-400"
+                                }`}
+                              >
+                                {outcome}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm truncate">
+                                  {home?.name} <span className="text-slate-500">v</span>{" "}
+                                  {away?.name}
+                                </span>
+                                <span className="block text-[11px] text-slate-500 truncate">
+                                  {[f.scheduled_date, comp?.name, comp?.season]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </span>
+                              </span>
+                              <span className="font-display tabular-nums shrink-0">
+                                {r.home_score}&ndash;{r.away_score}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </>
           )}
         </section>
       )}
