@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { remaining, type Contract } from "@/lib/contracts";
 import { Avatar } from "@/components/Avatar";
+import { SearchableSelect } from "@/components/admin/SearchableSelect";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
@@ -385,23 +386,23 @@ export default async function PublicPlayerPage({
           <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1">
             Compare with
           </span>
-          <select
+          {/* Five hundred names in a dropdown is a scroll, not a choice.
+              The same control the admin uses, in the dark. */}
+          <SearchableSelect
             name="vs"
+            tone="dark"
             defaultValue={vsId}
-            className="w-full px-3 py-1.5 rounded border border-white/15 bg-neutral-950 text-sm text-white focus:outline-none focus:border-white/40"
-          >
-            <option value="">— nobody —</option>
-            {((allPlayers ?? []) as any[])
+            emptyLabel="— nobody —"
+            placeholder="Type a name…"
+            options={((allPlayers ?? []) as any[])
               .filter((o) => o.player_id !== playerId)
-              .map((o) => (
-                <option key={o.player_id} value={o.player_id}>
-                  {o.first_name} {o.last_name}
-                  {o.team_id && teamName.get(o.team_id)
-                    ? ` · ${teamName.get(o.team_id)}`
-                    : ""}
-                </option>
-              ))}
-          </select>
+              .map((o) => ({
+                value: o.player_id,
+                label: `${o.first_name ?? ""} ${o.last_name ?? ""}`.trim(),
+                hint:
+                  (o.team_id ? teamName.get(o.team_id) : null) ?? undefined,
+              }))}
+          />
         </label>
 
         {scopeDivisions.length > 0 && (

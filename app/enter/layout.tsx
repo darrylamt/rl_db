@@ -47,6 +47,9 @@ export default async function EnterLayout({
             <Link href="/enter/fixture" className="text-slate-300 hover:text-ghanaYellow-500">
               Fixture
             </Link>
+            <Link href="/enter/archive" className="text-slate-300 hover:text-ghanaYellow-500">
+              Past
+            </Link>
             <form action="/admin/logout" method="post">
               <button className="text-slate-500 hover:text-white border-l border-white/10 pl-3">
                 Sign out
