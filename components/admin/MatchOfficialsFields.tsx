@@ -62,8 +62,12 @@ export function MatchOfficialsFields({
         </div>
       )}
       <p className="text-[11px] text-slate-400 mt-1.5">
-        Can be filled in for any match, however old. Clearing a field takes
-        that official off the game.
+        Anybody on the officials register can take any of these three on any
+        given match &mdash; the role on their record is what they are
+        qualified for, not what they must be today. All three appear publicly
+        as match officials, under the role they filled.
+        {" "}Can be set for a match of any age; clearing a field takes that
+        official off the game.
       </p>
     </div>
   );

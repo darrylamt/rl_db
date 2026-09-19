@@ -649,6 +649,7 @@ export default async function PublicClubPage({
               </div>
               {recent.length > PAGE_SIZE && (
                 <Pagination
+                  tone="dark"
                   page={page}
                   pageSize={PAGE_SIZE}
                   total={recent.length}

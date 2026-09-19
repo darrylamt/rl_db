@@ -571,31 +571,60 @@ export default async function MatchCentrePage({
       {(officials ?? []).length > 0 && (
         <section className="mb-6">
           <h2 className="font-display text-xl mb-3">Match Officials</h2>
-          <div className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm">
-            {((officials ?? []) as any[]).map((o, i) => {
-              const off = one<any>(o.official);
-              const name = off
-                ? `${off.first_name ?? ""} ${off.last_name ?? ""}`.trim()
-                : "";
-              const role = roleLabel(o.role);
-              return (
-                <span key={i} className="text-slate-300">
-                  {off?.official_id ? (
-                    <Link
-                      href={`/live/official/${off.official_id}`}
-                      className="hover:text-white hover:underline"
-                    >
-                      {name || "—"}
-                    </Link>
-                  ) : (
-                    name || "—"
-                  )}
-                  {role && (
-                    <span className="text-slate-500 text-xs ml-1.5">{role}</span>
-                  )}
-                </span>
+          <div className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm">
+            {/* Everyone on the game is a match official; the role is a
+                subheading under it rather than a label trailing each name,
+                because two touch judges reading as one run-on line was the
+                thing that made this unreadable on a phone. */}
+            {(() => {
+              const ORDER = ["referee", "touch_judge_1", "touch_judge_2"];
+              const byRole = new Map<string, string[]>();
+              const idOf = new Map<string, string>();
+
+              for (const o of (officials ?? []) as any[]) {
+                const off = one<any>(o.official);
+                const who = off
+                  ? `${off.first_name ?? ""} ${off.last_name ?? ""}`.trim()
+                  : "";
+                if (!who) continue;
+                const label = roleLabel(o.role) || "Official";
+                if (!byRole.has(label)) byRole.set(label, []);
+                byRole.get(label)!.push(who);
+                if (off?.official_id) idOf.set(who, off.official_id);
+              }
+
+              const groups = Array.from(byRole.entries()).sort(
+                (a, b) =>
+                  ORDER.findIndex((r) => roleLabel(r) === a[0]) -
+                  ORDER.findIndex((r) => roleLabel(r) === b[0])
               );
-            })}
+
+              return groups.map(([label, names]) => (
+                <div key={label} className="min-w-[8rem]">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                    {label}
+                    {names.length > 1 ? "s" : ""}
+                  </p>
+                  {names.map((who) => {
+                    const id = idOf.get(who);
+                    return (
+                      <p key={who} className="text-slate-200 leading-snug">
+                        {id ? (
+                          <Link
+                            href={`/live/official/${id}`}
+                            className="hover:text-ghanaYellow-500 hover:underline"
+                          >
+                            {who}
+                          </Link>
+                        ) : (
+                          who
+                        )}
+                      </p>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
         </section>
       )}

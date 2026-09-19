@@ -374,7 +374,7 @@ export default async function ValuesPage({
           </ol>
 
           {rows.length > PAGE_SIZE && (
-            <Pagination page={page} pageSize={PAGE_SIZE} total={rows.length} />
+            <Pagination tone="dark" page={page} pageSize={PAGE_SIZE} total={rows.length} />
           )}
         </>
       )}
