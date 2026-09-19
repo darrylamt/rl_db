@@ -123,7 +123,13 @@ export async function getOfficialRecord(officialId: string): Promise<Record_> {
     .eq("official_id", officialId);
 
   const rows = (data ?? []) as any[];
-  const roleBy = new Map(rows.map((r) => [r.fixture_id, r.role]));
+  // Through roleLabel, not raw. The stored values are "referee" and
+  // "touch_judge_2"; showing those put the column name on the page and left
+  // the counts at nought, because they were compared against "Referee" and
+  // "Touch judge" and never matched.
+  const roleBy = new Map(
+    rows.map((r) => [r.fixture_id, roleLabel(r.role)])
+  );
   const lines = await linesFor(
     rows.map((r) => r.fixture_id),
     (id) => roleBy.get(id) ?? null,

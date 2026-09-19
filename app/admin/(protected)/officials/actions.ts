@@ -14,6 +14,10 @@ function payload(fd: FormData) {
     first_name: str(fd, "first_name"),
     last_name: str(fd, "last_name"),
     role: str(fd, "role"),
+    // Set by hand, never worked out from matches done: passing a course
+    // happens off the field and only the federation knows when it did.
+    level: str(fd, "level"),
+    level_gained: str(fd, "level_gained"),
     region: str(fd, "region"),
     nationality: str(fd, "nationality"),
     date_of_birth: str(fd, "date_of_birth"),

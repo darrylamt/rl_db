@@ -1,6 +1,14 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { createOfficial } from "../actions";
 
+const LEVELS = [
+  "Level 1",
+  "Level 2",
+  "Level 3",
+  "National",
+  "International",
+];
+
 const ROLES = ["Referee","Touch judge","Video referee","Match commissioner","Timekeeper","Other"];
 const STATUSES = ["active","inactive","retired"];
 
@@ -26,6 +34,17 @@ export default function NewOfficialPage() {
           <Select name="status" defaultValue="active">
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </Select>
+        </Field>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Level" hint="Set by hand as they pass courses.">
+          <Select name="level" defaultValue="">
+            <option value="">— not set —</option>
+            {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+          </Select>
+        </Field>
+        <Field label="Level gained">
+          <Input name="level_gained" type="date" />
         </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
