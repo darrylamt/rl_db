@@ -3,6 +3,25 @@ import { Avatar } from "@/components/Avatar";
 import type { Record_ } from "@/lib/officiating";
 
 /**
+ * The letters in the chip when there is no result to show.
+ *
+ * Built from the role itself rather than a list of the ones an official can
+ * hold. The first version tested for "Referee" and fell through to TJ for
+ * everything else, which put TJ against a coach's name on any match without
+ * a score — including fixtures that have not been played.
+ */
+function initialsOf(role: string | null): string {
+  if (!role) return "·";
+  const words = role.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "·";
+  if (words.length === 1) return words[0].slice(0, 1).toUpperCase();
+  return words
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
+
+/**
  * A referee's or a coach's page.
  *
  * Built light by mistake the first time and dropped into /live, which is a
@@ -37,9 +56,13 @@ export function PersonRecord({
   const { matches, won, lost, drawn, decided, lines } = record;
   const rate = decided > 0 ? Math.round((won / decided) * 100) : null;
 
+  // A coach's tiles count played matches, not appointments. Listing a
+  // fixture that has not kicked off yet is right — they are named for it —
+  // but counting it made "Matches 9" sit above a won, drawn and lost that
+  // added up to eight.
   const stats = showOutcomes
     ? [
-        { label: "Matches", value: matches },
+        { label: "Played", value: decided },
         { label: "Won", value: won },
         { label: "Drawn", value: drawn },
         { label: "Lost", value: lost },
@@ -143,8 +166,11 @@ export function PersonRecord({
                           : "D"}
                     </span>
                   ) : (
-                    <span className="w-6 h-6 rounded grid place-items-center text-[10px] font-bold shrink-0 bg-white/5 text-slate-500">
-                      {l.role === "Referee" ? "R" : l.role ? "TJ" : "·"}
+                    <span
+                      className="w-6 h-6 rounded grid place-items-center text-[10px] font-bold shrink-0 bg-white/5 text-slate-500"
+                      title={l.role ?? undefined}
+                    >
+                      {initialsOf(l.role)}
                     </span>
                   )}
 
@@ -159,7 +185,9 @@ export function PersonRecord({
                     </span>
                   ) : (
                     <span className="text-[11px] text-slate-500 shrink-0">
-                      no result
+                      {l.date && l.date > new Date().toISOString().slice(0, 10)
+                        ? "to come"
+                        : "no result"}
                     </span>
                   )}
                 </div>
