@@ -3,6 +3,7 @@ import { Avatar } from "@/components/Avatar";
 import { LiveClock } from "@/components/LiveClock";
 import { fmtShortDate, fmtTime } from "@/lib/matchStats";
 import { formatOf } from "@/lib/competitionFormat";
+import { PredictionResult } from "@/components/live/PredictionResult";
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (Array.isArray(v)) return v[0] ?? null;
@@ -108,9 +109,12 @@ export function StatusPill({ status }: { status: string | null | undefined }) {
 export function MatchCard({
   fixture,
   liveScore,
+  predictions,
 }: {
   fixture: any;
   liveScore?: { home: number; away: number };
+  /** Votes cast on this match, if anybody called it. */
+  predictions?: { home: number; away: number };
 }) {
   const home = one<any>(fixture.home);
   const away = one<any>(fixture.away);
@@ -188,6 +192,25 @@ export function MatchCard({
         </span>
         {venue?.name && <span className="truncate">· {venue.name}</span>}
       </div>
+
+      {/* The call stays on the card after kick-off. A prediction is only
+          interesting once there is something to measure it against. */}
+      {predictions && (
+        <PredictionResult
+          fixtureId={fixture.fixture_id}
+          homeName={home?.name ?? "Home"}
+          awayName={away?.name ?? "Away"}
+          counts={predictions}
+          // A recorded result only. A live match has a running score but
+          // nothing settled, so it shows the split without a verdict.
+          result={
+            result && result.home_score != null && result.away_score != null
+              ? { home: result.home_score, away: result.away_score }
+              : null
+          }
+          compact
+        />
+      )}
     </Link>
   );
 }

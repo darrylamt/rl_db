@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { roleLabel } from "@/lib/officiating";
+import { getPredictionCounts } from "@/lib/predictions";
+import { PredictionResult } from "@/components/live/PredictionResult";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createPublicClient } from "@/lib/supabase/server";
@@ -123,6 +125,10 @@ export default async function MatchCentrePage({
   ]);
 
   if (!fixture) notFound();
+
+  // What the crowd called. Read here rather than on the card so the match
+  // page carries it too — this is where somebody lands to see how it went.
+  const calls = await getPredictionCounts(fixtureId);
 
   const f: any = fixture;
   const home = one<any>(f.home);
@@ -354,6 +360,28 @@ export default async function MatchCentrePage({
           )}
         </div>
       </div>
+
+      {/* The prediction, read-only. Voting lives on the home page and shuts
+          at kick-off; this is the record of what was called, which only gets
+          interesting once there is a score to hold it against. */}
+      {calls.home + calls.away > 0 && (
+        <section className="mb-6 bg-neutral-900 border border-white/10 rounded-lg px-4 py-3">
+          <PredictionResult
+            fixtureId={fixtureId}
+            homeName={home?.name ?? "Home"}
+            awayName={away?.name ?? "Away"}
+            counts={calls}
+            // Only a recorded result counts as decided. A live match has
+            // a running score but no verdict to pass yet, so it shows the
+            // split and what you picked and stops there.
+            result={
+              result?.home_score != null && result?.away_score != null
+                ? { home: result.home_score, away: result.away_score }
+                : null
+            }
+          />
+        </section>
+      )}
 
       {result?.video_url && (
         <a

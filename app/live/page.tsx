@@ -241,9 +241,23 @@ export default async function LiveHubPage({
       return at == null || at > Date.now();
     })
     .slice(0, 5);
-  const pollCounts = await getPredictionCountsFor(
-    pollFixtures.map((f) => f.fixture_id)
+  // Counts for every match on the page, not only the ones still open. A
+  // prediction is worth seeing most once the game it was about is under way
+  // or finished, and the voting card drops a match the moment it kicks off.
+  const shownIds = Array.from(
+    new Set(
+      [...live, ...todaysMatches, ...results, ...upcoming, ...pollFixtures].map(
+        (f: any) => f.fixture_id
+      )
+    )
   );
+  const pollCounts = await getPredictionCountsFor(shownIds);
+
+  /** Only pass a bar down when somebody actually called the match. */
+  const callsFor = (fixtureId: string) => {
+    const c = pollCounts[fixtureId];
+    return c && c.home + c.away > 0 ? c : undefined;
+  };
   const withColour = (t: any) =>
     t ? { ...t, brandColor: brandColour.get(t.team_id) ?? null } : t;
 
@@ -343,12 +357,14 @@ export default async function LiveHubPage({
               key={f.fixture_id}
               fixture={f}
               liveScore={scoreFor.get(f.fixture_id)}
+              predictions={callsFor(f.fixture_id)}
             />
           ))}
           {todaysMatches.map((f: any) => (
             <MatchCard
               key={f.fixture_id}
               fixture={f}
+              predictions={callsFor(f.fixture_id)}
               liveScore={scoreFor.get(f.fixture_id)}
             />
           ))}
@@ -370,7 +386,11 @@ export default async function LiveHubPage({
                 </h3>
                 <div className="space-y-2">
                   {matches.map((f: any) => (
-                    <MatchCard key={f.fixture_id} fixture={f} />
+                    <MatchCard
+                      key={f.fixture_id}
+                      fixture={f}
+                      predictions={callsFor(f.fixture_id)}
+                    />
                   ))}
                 </div>
               </div>
@@ -386,7 +406,13 @@ export default async function LiveHubPage({
       {tab === "upcoming" && (
         <div className="space-y-2">
           {upcoming.length > 0 ? (
-            upcoming.map((f: any) => <MatchCard key={f.fixture_id} fixture={f} />)
+            upcoming.map((f: any) => (
+              <MatchCard
+                key={f.fixture_id}
+                fixture={f}
+                predictions={callsFor(f.fixture_id)}
+              />
+            ))
           ) : (
             <p className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-10 text-center text-slate-400 text-sm">
               Nothing scheduled yet.
