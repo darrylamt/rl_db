@@ -263,6 +263,15 @@ export default async function ArchivePage({
                         {events > 0 ? "Edit stats" : "Add stats"}
                       </Link>
                     </div>
+
+                    {/* The rest of the record: who played, who coached, who
+                        was on the whistle. */}
+                    <Link
+                      href={`/enter/match/${f.fixture_id}`}
+                      className="mt-2 block text-center text-sm border border-white/10 rounded px-3 py-2 text-slate-300 hover:bg-white/5"
+                    >
+                      Team sheets, coaches &amp; officials
+                    </Link>
                   </li>
                 );
               })}

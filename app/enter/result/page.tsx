@@ -103,6 +103,57 @@ export default function EnterResultPage() {
     [fixtures, fixtureId]
   );
 
+  /**
+   * What is already recorded against this match.
+   *
+   * The form only ever wrote: pick a match that already has a result and
+   * every box was blank, so there was nothing to correct and saving put
+   * zeroes over tries, conversions and attendance that were already right.
+   * Filling in a single wrong score meant retyping the rest from memory.
+   *
+   * Loaded whenever the match changes, and cleared when there is nothing on
+   * record so a fresh match does not inherit the last one's numbers.
+   */
+  const [existing, setExisting] = useState<"none" | "loading" | "found">(
+    "none"
+  );
+  useEffect(() => {
+    if (!fixtureId) {
+      setExisting("none");
+      return;
+    }
+    let live = true;
+    setExisting("loading");
+    (async () => {
+      const { data } = await supabase
+        .from("match_results")
+        .select(
+          "home_score, away_score, home_tries, away_tries, home_conversions, away_conversions, home_penalties, away_penalties, home_drop_goals, away_drop_goals, attendance, recorded_by"
+        )
+        .eq("fixture_id", fixtureId)
+        .maybeSingle();
+      if (!live) return;
+
+      const str = (v: any) => (v === null || v === undefined ? "" : String(v));
+      setHomeScore(str(data?.home_score));
+      setAwayScore(str(data?.away_score));
+      setHomeTries(str(data?.home_tries));
+      setAwayTries(str(data?.away_tries));
+      setHomeConv(str(data?.home_conversions));
+      setAwayConv(str(data?.away_conversions));
+      setHomePen(str(data?.home_penalties));
+      setAwayPen(str(data?.away_penalties));
+      setHomeDg(str(data?.home_drop_goals));
+      setAwayDg(str(data?.away_drop_goals));
+      setAttendance(str(data?.attendance));
+      setRecordedBy(str(data?.recorded_by));
+      setExisting(data ? "found" : "none");
+    })();
+    return () => {
+      live = false;
+    };
+  }, [supabase, fixtureId]);
+
   function intOrNull(s: string) {
     if (s.trim() === "") return null;
     const n = parseInt(s, 10);
@@ -202,7 +253,23 @@ export default function EnterResultPage() {
             {selectedFixture.home_team?.name}{" "}
             <span className="text-navy-400">vs</span>{" "}
             {selectedFixture.away_team?.name}
+            {existing === "found" && (
+              <span className="block text-xs text-ghanaYellow-500 mt-1">
+                This match already has a result. The boxes below hold what is
+                on record — change what is wrong and leave the rest.
+              </span>
+            )}
           </div>
+        )}
+
+        {/* Everything a recorder can set for this match that is not a score. */}
+        {fixtureId && (
+          <a
+            href={`/enter/match/${fixtureId}`}
+            className="block text-center text-sm font-medium border border-white/15 rounded px-3 py-2.5 hover:bg-white/5"
+          >
+            Team sheets, coaches and officials &rarr;
+          </a>
         )}
 
         <div className="pt-2">
