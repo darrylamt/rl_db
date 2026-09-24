@@ -5,6 +5,9 @@ import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { effectiveGrade, gradeOfDivision, isYouth } from "@/lib/grades";
 import { LineupPicker } from "./LineupPicker";
 import { saveOfficials, saveCoaches, saveLineup } from "./actions";
+import { MatchSheets } from "@/components/admin/MatchSheets";
+import { listMatchDocuments } from "@/lib/matchDocuments";
+import { getAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,7 @@ export default async function MatchRecordPage({
 }) {
   const supabase = createAdminClient();
   const fixtureId = params.fixtureId;
+  const [matchSheets, me] = await Promise.all([listMatchDocuments(fixtureId), getAppUser()]);
 
   const { data: fixture } = await supabase
     .from("fixtures")
@@ -177,6 +181,15 @@ export default async function MatchRecordPage({
           {searchParams.note}
         </div>
       )}
+
+      {/* ── Match sheets: the photos behind the result ── */}
+      <MatchSheets
+        fixtureId={fixtureId}
+        documents={matchSheets.documents}
+        ready={matchSheets.ready}
+        canRemove={me?.role === "federation"}
+        tone="dark"
+      />
 
       {/* ── Officials ── */}
       <section className="mb-6 bg-neutral-950 border border-white/10 rounded-lg p-4">

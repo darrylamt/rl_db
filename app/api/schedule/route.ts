@@ -181,6 +181,29 @@ export async function GET(req: Request) {
     ),
   ]);
 
+  // ── 2c. Match sheets: photos of the team sheets and scoring record ───────
+  // Public, as they always were on the website. Read apart from the rest so
+  // that, until supabase/match_sheets.sql has run, the schedule still loads.
+  const sheetsByFixture = new Map<string, { kind: string; url: string }[]>();
+  try {
+    const docs = await fetchAllRows((from, to) =>
+      supabase
+        .from("fixture_documents")
+        .select("fixture_id, kind, url")
+        .in("fixture_id", fixtureIds)
+        .order("created_at", { ascending: true })
+        .order("document_id", { ascending: true })
+        .range(from, to)
+    );
+    for (const d of docs as any[]) {
+      const list = sheetsByFixture.get(d.fixture_id) ?? [];
+      list.push({ kind: d.kind, url: d.url });
+      sheetsByFixture.set(d.fixture_id, list);
+    }
+  } catch {
+    // No table yet: no sheets, rather than no schedule.
+  }
+
   const ROLE_WORDS: Record<string, string> = {
     referee: "Referee",
     touch_judge_1: "Touch judge",
@@ -360,6 +383,10 @@ export async function GET(req: Request) {
       competition_id: (f.competition as any)?.competition_id ?? null,
       season: (f.competition as any)?.season ?? null,
       highlights: result?.video_url ?? null,
+      // Every sheet on the match; match_sheet is the first, under the name
+      // the website's schedule used before it read this API.
+      match_sheets: sheetsByFixture.get(f.fixture_id) ?? [],
+      match_sheet: sheetsByFixture.get(f.fixture_id)?.[0]?.url ?? null,
       // Referee first, then the touch judges, each with an id to link to.
       officials: (officialsByFixture.get(f.fixture_id) ?? [])
         .sort((a, b) => a.order - b.order)

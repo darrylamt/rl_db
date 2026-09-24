@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ResultTabs } from "./ResultTabs";
+import { MatchSheets } from "@/components/admin/MatchSheets";
+import { listMatchDocuments } from "@/lib/matchDocuments";
+import { getAppUser } from "@/lib/auth";
 import { upsertResult, addEvent, deleteEvent, saveRatings, deleteRating, swapHomeAway } from "../actions";
 
 export default async function EditResultPage({ params }: { params: { id: string } }) {
@@ -64,12 +67,21 @@ export default async function EditResultPage({ params }: { params: { id: string 
       .order("last_name"),
   ]);
 
+  const [sheets, me] = await Promise.all([listMatchDocuments(params.id), getAppUser()]);
+
   const boundUpsert     = upsertResult.bind(null, params.id);
   const boundAddEvent   = addEvent.bind(null, params.id);
   const boundSaveRatings = saveRatings.bind(null, params.id);
   const boundSwap        = swapHomeAway.bind(null, params.id);
 
   return (
+    <>
+    <MatchSheets
+      fixtureId={params.id}
+      documents={sheets.documents}
+      ready={sheets.ready}
+      canRemove={me?.role === "federation"}
+    />
     <ResultTabs
       fixtureId={params.id}
       fixture={f}
@@ -86,5 +98,6 @@ export default async function EditResultPage({ params }: { params: { id: string 
       deleteRating={deleteRating}
       swapHomeAway={boundSwap}
     />
+    </>
   );
 }
