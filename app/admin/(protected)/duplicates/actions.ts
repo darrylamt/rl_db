@@ -9,6 +9,88 @@ import { PLAYER_REFERENCES } from "@/lib/duplicates";
 
 const PAGE = "/admin/duplicates";
 
+/** Details a player record carries that a merge must not throw away. */
+const CARRIED = [
+  "date_of_birth",
+  "position",
+  "secondary_positions",
+  "email",
+  "phone",
+  "photo_url",
+  "jersey_number",
+  "nationality",
+  "height_cm",
+  "weight_kg",
+  "gender",
+] as const;
+
+const blank = (v: unknown) =>
+  v === null ||
+  v === undefined ||
+  v === "" ||
+  (Array.isArray(v) && v.length === 0);
+
+const isYouthCategory = (c: unknown) =>
+  typeof c === "string" && c.toLowerCase().includes("youth");
+
+/**
+ * What the survivor should take from the record being dropped.
+ *
+ * Blanks are filled. Two things can genuinely disagree, and each has an
+ * obvious answer:
+ *
+ *   grade  senior beats youth. The usual reason one person holds two records
+ *          is that they came up from the youth side, and nobody moves back.
+ *   club   a club beats a national side or a President's XIII. Those are
+ *          selections, not where somebody is registered — and a record with
+ *          no club at all takes whichever club the other one has.
+ *
+ * Anything else that differs is left as the survivor has it: the federation
+ * chose that record, and second-guessing a deliberate choice is worse than
+ * leaving one field for them to correct.
+ */
+async function reconcile(
+  supabase: ReturnType<typeof createAdminClient>,
+  keepId: string,
+  dropId: string
+): Promise<Record<string, unknown>> {
+  const cols = ["player_id", "team_id", "category", ...CARRIED].join(", ");
+  const { data } = await supabase
+    .from("players")
+    .select(cols)
+    .in("player_id", [keepId, dropId]);
+  const keep = (data ?? []).find((p: any) => p.player_id === keepId) as any;
+  const drop = (data ?? []).find((p: any) => p.player_id === dropId) as any;
+  if (!keep || !drop) return {};
+
+  const patch: Record<string, unknown> = {};
+
+  for (const field of CARRIED) {
+    if (blank(keep[field]) && !blank(drop[field])) patch[field] = drop[field];
+  }
+
+  if (isYouthCategory(keep.category) && !blank(drop.category) && !isYouthCategory(drop.category)) {
+    patch.category = drop.category;
+  } else if (blank(keep.category) && !blank(drop.category)) {
+    patch.category = drop.category;
+  }
+
+  if (blank(keep.team_id) && !blank(drop.team_id)) {
+    patch.team_id = drop.team_id;
+  } else if (!blank(keep.team_id) && !blank(drop.team_id) && keep.team_id !== drop.team_id) {
+    const { data: sides } = await supabase
+      .from("teams")
+      .select("team_id, team_type")
+      .in("team_id", [keep.team_id, drop.team_id]);
+    const typeOf = new Map((sides ?? []).map((t: any) => [t.team_id, t.team_type]));
+    const keepIsClub = typeOf.get(keep.team_id) === "club";
+    const dropIsClub = typeOf.get(drop.team_id) === "club";
+    if (!keepIsClub && dropIsClub) patch.team_id = drop.team_id;
+  }
+
+  return patch;
+}
+
 /**
  * Folds one player record into another.
  *
@@ -62,6 +144,30 @@ export async function mergePlayers(keepId: string, dropId: string) {
         throw new Error(`${table}: ${error.message}`);
       }
       if ((count ?? 0) > 0) moved.push(`${count} from ${table.replace(/_/g, " ")}`);
+    }
+
+    // ── The player row itself ──
+    // Moving the child rows is not the whole of a merge. The first version
+    // stopped there and deleted the dropped record with everything on it:
+    // Shadrack Aidoo's club, date of birth, position, email, phone and photo
+    // all went, and his login ended up pointing at a clubless youth record.
+    // Whatever the survivor lacks is taken from the record about to go.
+    const patch = await reconcile(supabase, keepId, dropId);
+    if (Object.keys(patch).length > 0) {
+      // Contact details may be unique, and the dropped row still holds them
+      // until it is deleted — so it lets go of them first.
+      const released: Record<string, null> = {};
+      if ("email" in patch) released.email = null;
+      if ("phone" in patch) released.phone = null;
+      if (Object.keys(released).length > 0) {
+        await supabase.from("players").update(released).eq("player_id", dropId);
+      }
+      const { error: kept } = await supabase
+        .from("players")
+        .update(patch)
+        .eq("player_id", keepId);
+      if (kept) throw new Error(`Could not carry details across: ${kept.message}`);
+      moved.push(`${Object.keys(patch).length} detail${Object.keys(patch).length === 1 ? "" : "s"} (${Object.keys(patch).join(", ")})`);
     }
 
     const { error: gone } = await supabase
