@@ -1,4 +1,4 @@
-import { createPublicClient } from "@/lib/supabase/server";
+import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
 import { ok, fail, preflight } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -147,6 +147,81 @@ export async function GET(req: Request) {
     ),
   ]);
 
+  // ── 2b. Who officiated, and who coached each side ────────────────────────
+  // Officials are public, so the public client reads them.
+  //
+  // Coaches are read with the service key, because they live on team_sheets
+  // and the public key only sees approved sheets. A coach set on an old match
+  // through the recorder's backfill creates a draft sheet, and read publicly
+  // every one of those would vanish. So: any sheet for a match already
+  // played, and only approved ones for a match still to come — a club's
+  // unpublished draft for next week stays its own. Names and ids only; the
+  // register's phone numbers and emails never enter this query.
+  const today = new Date().toISOString().slice(0, 10);
+  const admin = createAdminClient();
+
+  const [appointments, sheets] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase
+        .from("fixture_officials")
+        .select("fixture_id, role, official:official_id(official_id, first_name, last_name)")
+        .in("fixture_id", fixtureIds)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows((from, to) =>
+      admin
+        .from("team_sheets")
+        .select(
+          "fixture_id, team_id, status, head:head_coach_id(coach_id, first_name, last_name), assistant:assistant_coach_id(coach_id, first_name, last_name)"
+        )
+        .in("fixture_id", fixtureIds)
+        .order("sheet_id", { ascending: true })
+        .range(from, to)
+    ),
+  ]);
+
+  const ROLE_WORDS: Record<string, string> = {
+    referee: "Referee",
+    touch_judge_1: "Touch judge",
+    touch_judge_2: "Touch judge",
+  };
+  const ROLE_ORDER = ["referee", "touch_judge_1", "touch_judge_2"];
+
+  const officialsByFixture = new Map<string, any[]>();
+  for (const a of (appointments ?? []) as any[]) {
+    const o = Array.isArray(a.official) ? a.official[0] : a.official;
+    if (!o) continue;
+    const list = officialsByFixture.get(a.fixture_id) ?? [];
+    list.push({
+      official_id: o.official_id,
+      name: `${o.first_name ?? ""} ${o.last_name ?? ""}`.trim(),
+      role: ROLE_WORDS[a.role] ?? a.role,
+      order: ROLE_ORDER.indexOf(a.role),
+    });
+    officialsByFixture.set(a.fixture_id, list);
+  }
+
+  const dateOf = new Map(fixtures.map((f: any) => [f.fixture_id, f.scheduled_date]));
+  const coachesByFixtureTeam = new Map<string, any[]>();
+  for (const s of (sheets ?? []) as any[]) {
+    const date = dateOf.get(s.fixture_id);
+    const past = !!date && date <= today;
+    if (!past && s.status !== "approved") continue;
+
+    const people = [
+      { p: Array.isArray(s.head) ? s.head[0] : s.head, role: "Head coach" },
+      { p: Array.isArray(s.assistant) ? s.assistant[0] : s.assistant, role: "Assistant coach" },
+    ]
+      .filter((x) => x.p)
+      .map((x) => ({
+        coach_id: x.p.coach_id,
+        name: `${x.p.first_name ?? ""} ${x.p.last_name ?? ""}`.trim(),
+        role: x.role,
+      }));
+    if (people.length) coachesByFixtureTeam.set(`${s.fixture_id}|${s.team_id}`, people);
+  }
+
   // ── 3. Index by fixture_id for O(1) lookups ───────────────────────────────
   type ResultRow = (typeof results)[number];
   type EventRow = (typeof events)[number];
@@ -249,6 +324,9 @@ export async function GET(req: Request) {
         roster,
         squad,
         activities,
+        // Who was in charge of this side, with ids so a page can link to
+        // their profile.
+        coaches: coachesByFixtureTeam.get(`${f.fixture_id}|${teamId}`) ?? [],
       };
     }
 
@@ -282,6 +360,10 @@ export async function GET(req: Request) {
       competition_id: (f.competition as any)?.competition_id ?? null,
       season: (f.competition as any)?.season ?? null,
       highlights: result?.video_url ?? null,
+      // Referee first, then the touch judges, each with an id to link to.
+      officials: (officialsByFixture.get(f.fixture_id) ?? [])
+        .sort((a, b) => a.order - b.order)
+        .map(({ order, ...o }) => o),
       home_team: buildTeamSection(homeId, homeTeam),
       away_team: buildTeamSection(awayId, awayTeam),
     };
