@@ -26,6 +26,19 @@ async function fetchAllRows<T>(
 }
 
 // Per-player counters rather than things that happen at a minute mark.
+/**
+ * What each scoring event is worth, for a running score before a result
+ * exists. Rugby league: try four, conversion and penalty goal two, drop goal
+ * one. Everything else a recorder logs — tackles, sets, cards — scores
+ * nothing and is left out.
+ */
+const SCORE_POINTS: Record<string, number> = {
+  try: 4,
+  conversion: 2,
+  penalty_goal: 2,
+  drop_goal: 1,
+};
+
 const TALLY_EVENTS = new Set([
   "completed_set",
   "tackle",
@@ -169,6 +182,25 @@ export async function GET(req: Request) {
     const fixtureEvents = eventsByFixture.get(f.fixture_id) ?? [];
     const fixtureLineup = lineupsByFixture.get(f.fixture_id) ?? [];
 
+    // The score before there is a result. A result is written at full time,
+    // so a match in progress has none, and this used to send null for the
+    // whole of it — the website polled every twenty seconds and got the same
+    // null back each time, which is why a live score never moved. Until the
+    // result exists the score is what the scoring events add up to, the same
+    // rule the federation's own live page has always used.
+    const runningScore = (teamId: string): number | null => {
+      let pts = 0;
+      let any = false;
+      for (const e of fixtureEvents) {
+        if (e.team_id !== teamId) continue;
+        const p = SCORE_POINTS[e.event_type as string];
+        if (p === undefined) continue;
+        pts += p;
+        any = true;
+      }
+      return any ? pts : null;
+    };
+
     function buildTeamSection(teamId: string, team: any) {
       const activities = fixtureEvents
         .filter((e) => e.team_id === teamId)
@@ -205,7 +237,15 @@ export async function GET(req: Request) {
         name: team?.name ?? "",
         logo: team?.logo_url ?? null,
         slug: team?.slug ?? null,
-        score: result ? (teamId === homeId ? result.home_score : result.away_score) : null,
+        // A recorded result wins; before one exists, the running total.
+        score: result
+          ? teamId === homeId
+            ? result.home_score
+            : result.away_score
+          : f.status === "live"
+            ? // Under way and nobody has scored yet: nil-all, not blank.
+              runningScore(teamId) ?? 0
+            : runningScore(teamId),
         roster,
         squad,
         activities,
