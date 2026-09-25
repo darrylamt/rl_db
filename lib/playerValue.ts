@@ -210,7 +210,17 @@ async function all<T>(
   return out;
 }
 
-export async function getPlayerValues(): Promise<Map<string, Valuation>> {
+/** Everything a valuation is worked out from, read once. */
+type ValueInputs = {
+  players: any[];
+  events: any[];
+  lineups: any[];
+  fixtures: any[];
+  results: any[];
+  requests: any[];
+};
+
+async function loadValueInputs(): Promise<ValueInputs> {
   const supabase = createAdminClient();
 
   // The admin client on purpose: date of birth is not on the public view and
@@ -223,10 +233,108 @@ export async function getPlayerValues(): Promise<Map<string, Valuation>> {
     ),
     all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
     all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
-    all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id"),
+    all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id, scheduled_date"),
     all<any>(supabase, "match_results", "fixture_id, home_score, away_score"),
-    all<any>(supabase, "transfer_requests", "player_id, to_team_id"),
+    all<any>(supabase, "transfer_requests", "player_id, to_team_id, requested_at"),
   ]);
+  return { players, events, lineups, fixtures, results, requests };
+}
+
+/**
+ * The record as it stood before a date: only matches played before it, and
+ * only the clubs that had asked after a player by then.
+ *
+ * A match with no date counts on both sides of any line. Nobody knows when
+ * it was, and leaving it out of "then" alone would show every player in it
+ * as having grown by it.
+ */
+function before(input: ValueInputs, asOf: string): ValueInputs {
+  const kept = new Set(
+    input.fixtures
+      .filter((f) => !f.scheduled_date || f.scheduled_date < asOf)
+      .map((f) => f.fixture_id)
+  );
+  return {
+    players: input.players,
+    fixtures: input.fixtures.filter((f) => kept.has(f.fixture_id)),
+    events: input.events.filter((e) => !e.fixture_id || kept.has(e.fixture_id)),
+    lineups: input.lineups.filter((l) => kept.has(l.fixture_id)),
+    results: input.results.filter((r) => kept.has(r.fixture_id)),
+    requests: input.requests.filter(
+      (q) => !q.requested_at || String(q.requested_at).slice(0, 10) < asOf
+    ),
+  };
+}
+
+/**
+ * Every player's value.
+ *
+ * With `asOf` (a YYYY-MM-DD date), what the record said before that day —
+ * the same sums over less of the record, so the two can be compared to see
+ * who has risen and who has fallen.
+ */
+export async function getPlayerValues(
+  opts: { asOf?: string } = {}
+): Promise<Map<string, Valuation>> {
+  const input = await loadValueInputs();
+  return computeValues(opts.asOf ? before(input, opts.asOf) : input);
+}
+
+export type MovementPeriod = "matchday" | "30d" | "season";
+
+export type ValueMovement = {
+  now: Map<string, Valuation>;
+  then: Map<string, Valuation>;
+  /** The day "then" stops before, or null when there is nothing to compare. */
+  asOf: string | null;
+};
+
+/**
+ * Every value now and as it stood at the start of a period, from one read of
+ * the record, so the page can say who rose, who fell, and by how much.
+ *
+ * "matchday" is the last date anything was played and has a result: the
+ * change is what that round did. "season" starts where the federation says
+ * the season started, passed in because it lives in the seasons table.
+ */
+export async function getValueMovement(
+  period: MovementPeriod,
+  seasonStart?: string | null
+): Promise<ValueMovement> {
+  const input = await loadValueInputs();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let asOf: string | null = null;
+  if (period === "matchday") {
+    const withResult = new Set(
+      input.results
+        .filter((r) => r.home_score != null && r.away_score != null)
+        .map((r) => r.fixture_id)
+    );
+    asOf =
+      input.fixtures
+        .filter((f) => f.scheduled_date && f.scheduled_date <= today && withResult.has(f.fixture_id))
+        .map((f) => f.scheduled_date as string)
+        .sort()
+        .pop() ?? null;
+  } else if (period === "30d") {
+    asOf = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  } else {
+    asOf = seasonStart ?? null;
+  }
+
+  const now = computeValues(input);
+  return { now, then: asOf ? computeValues(before(input, asOf)) : now, asOf };
+}
+
+function computeValues({
+  players,
+  events,
+  lineups,
+  fixtures,
+  results,
+  requests,
+}: ValueInputs): Map<string, Valuation> {
 
   // ── What each player has actually done ──
   const points = new Map<string, number>();

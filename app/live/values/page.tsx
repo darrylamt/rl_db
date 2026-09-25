@@ -4,11 +4,13 @@ import { createPublicClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { Pagination } from "@/components/admin/Pagination";
 import {
-  getPlayerValues,
+  getValueMovement,
+  type MovementPeriod,
   type ValueGroup,
   type ValueGrade,
 } from "@/lib/playerValue";
 import { getClubValues } from "@/lib/clubValue";
+import { getSeasonState } from "@/lib/seasons";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +42,28 @@ const GROUPS: { key: ValueGroup | "all"; label: string }[] = [
   { key: "utility", label: "Unlisted" },
 ];
 
+/** What each value is compared against, to show who has risen and fallen. */
+const PERIODS: { key: MovementPeriod; label: string }[] = [
+  { key: "matchday", label: "Last matchday" },
+  { key: "30d", label: "30 days" },
+  { key: "season", label: "This season" },
+];
+
+const SORTS = [
+  { key: "value", label: "Highest value" },
+  { key: "rising", label: "Biggest risers" },
+  { key: "falling", label: "Biggest fallers" },
+] as const;
+type SortKey = (typeof SORTS)[number]["key"];
+
 const PAGE_SIZE = 25;
+
+const shortDate = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
 export default async function ValuesPage({
   searchParams,
@@ -51,14 +74,23 @@ export default async function ValuesPage({
     group?: string;
     page?: string;
     q?: string;
+    since?: string;
+    sort?: string;
   };
 }) {
   const supabase = createPublicClient();
   const view = searchParams?.view === "clubs" ? "clubs" : "players";
+  const since = (PERIODS.find((p) => p.key === searchParams?.since)?.key ??
+    "matchday") as MovementPeriod;
+  const sort = (SORTS.find((s) => s.key === searchParams?.sort)?.key ??
+    "value") as SortKey;
 
-  const [values, clubValues, { data: players }, { data: teams }] = await Promise.all([
-    getPlayerValues(),
-    getClubValues(),
+  // Each of these reads the whole record, so only the tab being looked at
+  // is worked out.
+  const season = view === "players" && since === "season" ? await getSeasonState() : null;
+  const [movement, clubValues, { data: players }, { data: teams }] = await Promise.all([
+    view === "players" ? getValueMovement(since, season?.row?.startsOn) : null,
+    view === "clubs" ? getClubValues() : Promise.resolve([]),
     supabase
       .from("public_players")
       .select("player_id, first_name, last_name, position, photo_url, team_id")
@@ -75,8 +107,22 @@ export default async function ValuesPage({
   const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
   const q = (searchParams?.q ?? "").trim();
 
+  const values = movement?.now ?? new Map();
+  const then = movement?.then ?? new Map();
+
+  // The change is the value now less the value the record gave the same
+  // player at the start of the period. Null when there was nothing to
+  // compare with, so "no change" and "no comparison" read differently.
   const withValue = ((players ?? []) as any[])
-    .map((p) => ({ ...p, v: values.get(p.player_id) }))
+    .map((p) => {
+      const v = values.get(p.player_id);
+      const was = then.get(p.player_id);
+      return {
+        ...p,
+        v,
+        change: v && was && movement?.asOf ? v.value - was.value : null,
+      };
+    })
     .filter((r) => r.v);
 
   // Deliberately not filtered on playing_status. Every women's and youth
@@ -97,17 +143,32 @@ export default async function ValuesPage({
           .includes(needle)
       )
     : inGrade.filter((r) => group === "all" || r.v.group === group)
-  ).sort((a, b) => b.v.value - a.v.value);
+  ).sort((a, b) =>
+    sort === "rising"
+      ? (b.change ?? 0) - (a.change ?? 0) || b.v.value - a.v.value
+      : sort === "falling"
+      ? (a.change ?? 0) - (b.change ?? 0) || b.v.value - a.v.value
+      : b.v.value - a.v.value
+  );
 
   const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const offset = (page - 1) * PAGE_SIZE;
 
-  const href = (next: { grade?: ValueGrade; group?: string }) => {
+  const href = (next: {
+    grade?: ValueGrade;
+    group?: string;
+    since?: MovementPeriod;
+    sort?: SortKey;
+  }) => {
     const p = new URLSearchParams();
     const g = next.grade ?? grade;
     const gr = "group" in next ? next.group : group;
+    const si = next.since ?? since;
+    const so = next.sort ?? sort;
     if (g !== "senior_men") p.set("grade", g);
     if (gr && gr !== "all") p.set("group", gr);
+    if (si !== "matchday") p.set("since", si);
+    if (so !== "value") p.set("sort", so);
     const built = p.toString();
     return built ? `/live/values?${built}` : "/live/values";
   };
@@ -297,6 +358,51 @@ export default async function ValuesPage({
       </div>
       )}
 
+      {/* Rise and fall: against what, and in what order. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-5 text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-slate-500 mr-1">Change since</span>
+          {PERIODS.map((p) => (
+            <Link
+              key={p.key}
+              href={href({ since: p.key })}
+              className={`px-2.5 py-1 rounded-full border transition ${
+                since === p.key
+                  ? "bg-white text-black border-white font-medium"
+                  : "border-white/10 text-slate-300 hover:border-white/30"
+              }`}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </div>
+        {!q && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-500 mr-1">Sort</span>
+            {SORTS.map((o) => (
+              <Link
+                key={o.key}
+                href={href({ sort: o.key })}
+                className={`px-2.5 py-1 rounded-full border transition ${
+                  sort === o.key
+                    ? "bg-white text-black border-white font-medium"
+                    : "border-white/10 text-slate-300 hover:border-white/30"
+                }`}
+              >
+                {o.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500 -mt-3 mb-5">
+        {movement?.asOf
+          ? `Compared with each player's value before ${shortDate(movement.asOf)}.`
+          : since === "season"
+          ? "No season start date is set, so there is nothing to compare with yet."
+          : "Nothing has been played yet to compare with."}
+      </p>
+
       {rows.length === 0 ? (
         <p className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-10 text-center text-slate-400 text-sm">
           {q ? "Try part of a name, or clear the search." : "Nobody to value here yet."}
@@ -355,6 +461,25 @@ export default async function ValuesPage({
                         {r.v.value}
                         <span className="text-xs ml-1 text-ghanaYellow-500/70">LX</span>
                       </span>
+                      {r.change != null && (
+                        <span
+                          className={`block text-[11px] font-medium tabular-nums mt-1 ${
+                            r.change > 0
+                              ? "text-emerald-400"
+                              : r.change < 0
+                              ? "text-red-400"
+                              : "text-slate-500"
+                          }`}
+                          title={
+                            r.change === 0
+                              ? "No change"
+                              : `${r.change > 0 ? "Up" : "Down"} ${Math.abs(r.change)} LX`
+                          }
+                        >
+                          {r.change > 0 ? "▲" : r.change < 0 ? "▼" : "–"}
+                          {r.change !== 0 && ` ${Math.abs(r.change)} LX`}
+                        </span>
+                      )}
                       <span
                         className={`block text-[10px] mt-0.5 ${
                           r.v.confidence === "good"
