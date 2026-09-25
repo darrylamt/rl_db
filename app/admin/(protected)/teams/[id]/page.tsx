@@ -60,6 +60,9 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
           <Input name="coach_name" defaultValue={team.coach_name ?? ""} />
         </Field>
       </div>
+      <Field label="Manager photo" hint="Shown on the club's page on the website.">
+        <PhotoUpload name="manager_photo" currentUrl={team.manager_photo_url} label="Manager photo" />
+      </Field>
       <Field label="Founded year">
         <Input name="founded_year" type="number" min={1800} max={2100} defaultValue={team.founded_year ?? ""} />
       </Field>

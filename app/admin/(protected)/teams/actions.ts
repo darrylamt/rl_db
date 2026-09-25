@@ -81,9 +81,11 @@ export async function createTeam(fd: FormData) {
 
 export async function updateTeam(id: string, fd: FormData) {
   const supabase = createAdminClient();
+  // "*" rather than named columns: naming manager_photo_url before its
+  // migration has run would fail the read, and the logo would be lost with it.
   const { data: existing } = await supabase
     .from("teams")
-    .select("logo_url")
+    .select("*")
     .eq("team_id", id)
     .maybeSingle();
   const payload = payloadFromForm(fd);
@@ -95,8 +97,44 @@ export async function updateTeam(id: string, fd: FormData) {
     (values) => supabase.from("teams").update(values).eq("team_id", id)
   );
   if (error) throw new Error(error.message);
+  await saveManagerPhoto(supabase, id, fd, existing);
   revalidatePath("/admin/teams");
   revalidatePath(`/admin/teams/${id}`);
+}
+
+/**
+ * The manager's photo, written on its own.
+ *
+ * Kept out of the main save because a missing column there drops every
+ * optional column together, and one migration not yet run should not cost a
+ * club its division or colour. Before team_manager_photo.sql the upload is
+ * simply not kept; the error names the file to run.
+ */
+async function saveManagerPhoto(
+  supabase: ReturnType<typeof createAdminClient>,
+  teamId: string,
+  fd: FormData,
+  existing: any
+) {
+  const file = fd.get("manager_photo") as File | null;
+  if (!file || file.size === 0) return;
+  const url = await resolveImageUrl(
+    fd,
+    "manager_photo",
+    "player-photos",
+    "managers",
+    existing?.manager_photo_url
+  );
+  const { error } = await supabase
+    .from("teams")
+    .update({ manager_photo_url: url })
+    .eq("team_id", teamId);
+  if (error?.code === "42703" || error?.code === "PGRST204") {
+    throw new Error(
+      "Saved, except the manager photo: run supabase/team_manager_photo.sql, then upload it again."
+    );
+  }
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteTeam(id: string) {
