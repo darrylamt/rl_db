@@ -88,7 +88,7 @@ export function PersonRecord({
           <p className="text-[10px] uppercase tracking-widest text-ghanaYellow-500">
             {eyebrow}
           </p>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold break-words leading-tight">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold break-words leading-tight">
             {name}
           </h1>
           {meta.filter(Boolean).length > 0 && (

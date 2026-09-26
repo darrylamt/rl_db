@@ -308,7 +308,7 @@ export default async function PublicClubPage({
       <div className="flex items-center gap-4 mb-6">
         <Avatar src={team.logo_url} name={team.name} size={64} contain />
         <div className="min-w-0">
-          <h1 className="font-display text-2xl md:text-4xl leading-tight truncate">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight break-words">
             {team.name}
           </h1>
           <p className="text-slate-400 text-sm mt-1">

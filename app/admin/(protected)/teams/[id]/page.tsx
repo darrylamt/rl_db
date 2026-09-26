@@ -74,6 +74,9 @@ export default async function EditTeamPage({ params }: { params: { id: string } 
           <Input name="legal_name" defaultValue={team.legal_name ?? ""} />
         </Field>
       </div>
+      <Field label="Club email" hint="Shown on the club's page on the website, so only an address the club wants public.">
+        <Input name="email" type="email" placeholder="info@club.com" defaultValue={team.email ?? ""} />
+      </Field>
       <Field label="Instagram">
         <Input name="instagram_url" type="url" placeholder="https://instagram.com/…" defaultValue={team.instagram_url ?? ""} />
       </Field>

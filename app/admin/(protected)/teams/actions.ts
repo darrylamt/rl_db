@@ -98,6 +98,7 @@ export async function updateTeam(id: string, fd: FormData) {
   );
   if (error) throw new Error(error.message);
   await saveManagerPhoto(supabase, id, fd, existing);
+  await saveEmail(supabase, id, fd);
   revalidatePath("/admin/teams");
   revalidatePath(`/admin/teams/${id}`);
 }
@@ -133,6 +134,31 @@ async function saveManagerPhoto(
     throw new Error(
       "Saved, except the manager photo: run supabase/team_manager_photo.sql, then upload it again."
     );
+  }
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * The club's public contact email, written on its own for the same reason
+ * as the manager photo: before team_email.sql has run, everything else on
+ * the form still saves.
+ */
+async function saveEmail(
+  supabase: ReturnType<typeof createAdminClient>,
+  teamId: string,
+  fd: FormData
+) {
+  if (!fd.has("email")) return;
+  const email = str(fd, "email");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error(`"${email}" doesn't look like an email address.`);
+  }
+  const { error } = await supabase
+    .from("teams")
+    .update({ email: email?.toLowerCase() ?? null })
+    .eq("team_id", teamId);
+  if (error?.code === "42703" || error?.code === "PGRST204") {
+    throw new Error("Saved, except the email: run supabase/team_email.sql, then save again.");
   }
   if (error) throw new Error(error.message);
 }

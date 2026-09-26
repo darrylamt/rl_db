@@ -315,7 +315,7 @@ export default async function PublicPlayerPage({
 
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7 flex items-end justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="font-display text-3xl md:text-5xl leading-[0.95] text-white drop-shadow">
+              <h1 className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight break-words text-white drop-shadow">
                 {p.first_name}
                 <br />
                 {p.last_name}
