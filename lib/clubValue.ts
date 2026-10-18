@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { wholeTable } from "@/lib/wholeTable";
 import { getPlayerValues } from "@/lib/playerValue";
 import {
   effectiveGrade,
@@ -87,39 +87,19 @@ const GRADES = [
  */
 const STRANDS = 3;
 
-async function all<T>(
-  supabase: ReturnType<typeof createAdminClient>,
-  table: string,
-  columns: string
-): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .range(from, from + 999);
-    if (error || !data) break;
-    out.push(...(data as T[]));
-    if (data.length < 1000) break;
-  }
-  return out;
-}
 
 export async function getClubValues(): Promise<ClubValue[]> {
-  const supabase = createAdminClient();
-
+  // Whole tables, through the five-minute cache (lib/wholeTable).
   const [values, teams, players, fixtures, competitions, results] =
     await Promise.all([
       getPlayerValues(),
-      all<any>(supabase, "teams", "team_id, name, team_type, is_public"),
-      all<any>(supabase, "players", "player_id, team_id, category, gender"),
-      all<any>(
-        supabase,
-        "fixtures",
+      wholeTable("admin", "teams", "team_id, name, team_type, is_public"),
+      wholeTable("admin", "players", "player_id, team_id, category, gender"),
+      wholeTable("admin", "fixtures",
         "fixture_id, competition_id, home_team_id, away_team_id"
       ),
-      all<any>(supabase, "competitions", "competition_id, season, division"),
-      all<any>(supabase, "match_results", "fixture_id, home_score, away_score"),
+      wholeTable("admin", "competitions", "competition_id, season, division"),
+      wholeTable("admin", "match_results", "fixture_id, home_score, away_score"),
     ]);
 
   const clubs = teams.filter(

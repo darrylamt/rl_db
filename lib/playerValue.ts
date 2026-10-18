@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { wholeTable } from "@/lib/wholeTable";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 import { effectiveGrade } from "@/lib/grades";
 
@@ -192,23 +192,6 @@ function confidenceOf(appearances: number): Valuation["confidence"] {
   return "good";
 }
 
-async function all<T>(
-  supabase: ReturnType<typeof createAdminClient>,
-  table: string,
-  columns: string
-): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .range(from, from + 999);
-    if (error || !data) break;
-    out.push(...(data as T[]));
-    if (data.length < 1000) break;
-  }
-  return out;
-}
 
 /** Everything a valuation is worked out from, read once. */
 type ValueInputs = {
@@ -221,21 +204,18 @@ type ValueInputs = {
 };
 
 async function loadValueInputs(): Promise<ValueInputs> {
-  const supabase = createAdminClient();
-
-  // The admin client on purpose: date of birth is not on the public view and
-  // should not be. It is read here, used, and never returned.
+  // Through the five-minute cache (lib/wholeTable). The admin client on
+  // purpose: date of birth is not on the public view and should not be. It
+  // is read here, used, and never returned.
   const [players, events, lineups, fixtures, results, requests] = await Promise.all([
-    all<any>(
-      supabase,
-      "players",
+    wholeTable("admin", "players",
       "player_id, position, team_id, date_of_birth, category, gender"
     ),
-    all<any>(supabase, "match_events", "player_id, fixture_id, event_type, team_id"),
-    all<any>(supabase, "match_lineups", "player_id, fixture_id, team_id"),
-    all<any>(supabase, "fixtures", "fixture_id, home_team_id, away_team_id, scheduled_date"),
-    all<any>(supabase, "match_results", "fixture_id, home_score, away_score"),
-    all<any>(supabase, "transfer_requests", "player_id, to_team_id, requested_at"),
+    wholeTable("admin", "match_events", "player_id, fixture_id, event_type, team_id"),
+    wholeTable("admin", "match_lineups", "player_id, fixture_id, team_id"),
+    wholeTable("admin", "fixtures", "fixture_id, home_team_id, away_team_id, scheduled_date"),
+    wholeTable("admin", "match_results", "fixture_id, home_score, away_score"),
+    wholeTable("admin", "transfer_requests", "player_id, to_team_id, requested_at"),
   ]);
   return { players, events, lineups, fixtures, results, requests };
 }

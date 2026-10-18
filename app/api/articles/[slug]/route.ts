@@ -40,6 +40,6 @@ export async function GET(
       date: data.published_at,
       blocks: stored && stored.length ? stored : htmlToBlocks(data.content),
     },
-    { cache: "short" }
+    { cache: "public" }
   );
 }

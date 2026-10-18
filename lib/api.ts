@@ -13,11 +13,14 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// Public list routes are cached for 60 s at the CDN / browser; stale
-// responses are served for up to 30 s more while a revalidation happens.
-const PUBLIC_CACHE = "public, s-maxage=60, stale-while-revalidate=30";
+// Public routes are cached at the CDN for five minutes, then served stale for
+// up to ten more while one request refreshes them. Every miss is a full read
+// from Supabase, whose free plan meters what leaves the database, and the
+// data behind these (clubs, players, sponsors, articles, tables) changes a few
+// times a week. At 60 s the same rows went out a thousand times a day.
+const PUBLIC_CACHE = "public, s-maxage=300, stale-while-revalidate=600";
 
-// Shorter TTL for data that changes often (live match events, results).
+// Only for something live: a match in progress, where ten seconds matters.
 const SHORT_CACHE = "public, s-maxage=10, stale-while-revalidate=5";
 
 export function ok<T>(

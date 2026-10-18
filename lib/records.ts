@@ -1,4 +1,4 @@
-import { createPublicClient } from "@/lib/supabase/server";
+import { wholeTable } from "@/lib/wholeTable";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 import { formatOf, formatsIn, divisionsIn } from "@/lib/competitionFormat";
 
@@ -91,23 +91,10 @@ export async function getRecords(
   format?: string | null,
   division?: string | null,
 ): Promise<RecordsData> {
-  const supabase = createPublicClient();
-
-  // Paged, because PostgREST stops at 1000 without a word and these are the
-  // tables most likely to pass it.
-  const all = async <T,>(table: string, columns: string): Promise<T[]> => {
-    const out: T[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase
-        .from(table)
-        .select(columns)
-        .range(from, from + 999);
-      if (error || !data) break;
-      out.push(...(data as T[]));
-      if (data.length < 1000) break;
-    }
-    return out;
-  };
+  // Through the five-minute cache (lib/wholeTable), with the public client's
+  // permissions, as before.
+  const all = <T,>(table: string, columns: string) =>
+    wholeTable<T>("public", table, columns);
 
   const [competitions, fixtures, events, lineups, players, teams, results] =
     await Promise.all([

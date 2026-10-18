@@ -36,5 +36,5 @@ export async function GET(req: Request) {
 
   const { data, error } = await q;
   if (error) return fail(error.message, 500);
-  return ok({ items: data ?? [], total: data?.length ?? 0 }, { cache: "short" });
+  return ok({ items: data ?? [], total: data?.length ?? 0 }, { cache: "public" });
 }

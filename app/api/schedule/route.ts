@@ -396,5 +396,11 @@ export async function GET(req: Request) {
     };
   });
 
-  return ok(schedule, { cache: "short" });
+  // Ten seconds while a match is on, so the website's live score keeps up;
+  // five minutes otherwise. This is the site's biggest response (most of a
+  // megabyte, built from five tables), and on the ten-second cache it was
+  // rebuilt from the database up to six times a minute, all week, for
+  // matches that finished days before.
+  const anyLive = schedule.some((f: any) => f.live);
+  return ok(schedule, { cache: anyLive ? "short" : "public" });
 }

@@ -40,5 +40,5 @@ export async function GET(req: Request) {
     date: a.published_at,
   }));
 
-  return ok({ items, total: count ?? 0 }, { cache: "short" });
+  return ok({ items, total: count ?? 0 }, { cache: "public" });
 }
