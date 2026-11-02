@@ -2,8 +2,27 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PersonRecord } from "@/components/live/PersonRecord";
 import { getCoachRecord } from "@/lib/officiating";
+import { liveShare, titledCard } from "@/lib/liveShare";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+/** Shared, a coach's page shows the federation's card with their name. */
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const { data } = await createAdminClient()
+    .from("coaches")
+    .select("first_name, last_name")
+    .eq("coach_id", params.id)
+    .maybeSingle();
+  const name = data ? `${(data as any).first_name ?? ""} ${(data as any).last_name ?? ""}`.trim() : "Coach";
+  return liveShare({
+    title: `${name} — RLFG Live`,
+    description: `${name}, coach: every match on record with the Rugby League Federation Ghana.`,
+    image: titledCard(name, "Coach · Rugby League Federation Ghana"),
+    path: `/live/coach/${params.id}`,
+  });
+}
+
 
 export default async function CoachPage({
   params,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Anton, Lato, Bebas_Neue } from "next/font/google";
 import "./globals.css";
+import { appOrigin } from "@/lib/liveShare";
 
 // RLFG brand: Poppins for body, Anton for display headings.
 const poppins = Poppins({
@@ -32,6 +33,8 @@ const bebasNeue = Bebas_Neue({
 });
 
 export const metadata: Metadata = {
+  // Shared links need absolute addresses for their preview images.
+  metadataBase: appOrigin(),
   title: "RLFG — Rugby League Federation Ghana",
   description: "Official management platform for the Rugby League Federation Ghana",
   icons: {

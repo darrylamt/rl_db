@@ -3,14 +3,17 @@ import type { Metadata } from "next";
 import { getRecords, type RecordBoard } from "@/lib/records";
 import { Avatar } from "@/components/Avatar";
 import { formatLabel, divisionLabel } from "@/lib/competitionFormat";
+import { liveShare, titledCard } from "@/lib/liveShare";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = liveShare({
   title: "Records — RLFG Live",
   description:
     "All-time and season records for Rugby League Federation Ghana — tries, points, tackles, appearances and club records.",
-};
+  image: titledCard("Records", "The record book"),
+  path: "/live/records",
+});
 
 function Chevron() {
   return (

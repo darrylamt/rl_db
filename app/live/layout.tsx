@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { liveShare } from "@/lib/liveShare";
 
 // Public match centre. Nothing here links to /admin or /enter — this is the
 // address that gets handed to fans.
-export const metadata: Metadata = {
+export const metadata: Metadata = liveShare({
   title: "Live Scores — Rugby League Federation Ghana",
-  description:
-    "Live scores, results and match stats from the Rugby League Federation Ghana.",
-};
+  path: "/live",
+});
 
 export default function LiveLayout({
   children,

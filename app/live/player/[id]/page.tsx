@@ -15,6 +15,8 @@ import {
 import { fetchLineupAppearances } from "@/lib/appearances";
 import { cleanSecondaryPositions } from "@/lib/positions";
 import { getPlayerValue } from "@/lib/playerValue";
+import { liveShare } from "@/lib/liveShare";
+import { ShareButton } from "@/components/live/ShareButton";
 import {
   formatOf,
   formatLabel,
@@ -60,8 +62,13 @@ export async function generateMetadata({
     .select("first_name, last_name")
     .eq("player_id", params.id)
     .maybeSingle();
-  if (!data) return { title: "Player — RLFG Live" };
-  return { title: `${data.first_name} ${data.last_name} — RLFG Live` };
+  if (!data) return liveShare({ title: "Player — RLFG Live" });
+  return liveShare({
+    title: `${data.first_name} ${data.last_name} — RLFG Live`,
+    description: `${data.first_name} ${data.last_name}'s record with the Rugby League Federation Ghana: matches, points and tries.`,
+    image: `/api/og/player/${params.id}`,
+    path: `/live/player/${params.id}`,
+  });
 }
 
 export default async function PublicPlayerPage({
@@ -272,12 +279,15 @@ export default async function PublicPlayerPage({
 
   return (
     <>
-      <Link
-        href="/live"
-        className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs mb-4"
-      >
-        ← All matches
-      </Link>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Link
+          href="/live"
+          className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs"
+        >
+          ← All matches
+        </Link>
+        <ShareButton />
+      </div>
 
       {/* Identity */}
       <div className="relative rounded-3xl overflow-hidden mb-4 bg-gradient-to-b from-violet-900 via-purple-900 to-violet-950 border border-white/10">

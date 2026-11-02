@@ -12,6 +12,8 @@ import { TeamSwitch } from "@/components/live/TeamSwitch";
 import { EventIcon } from "@/components/live/EventIcon";
 import { rateMatch } from "@/lib/matchRating";
 import { TeamBadge, StatusPill } from "../MatchCard";
+import { liveShare } from "@/lib/liveShare";
+import { ShareButton } from "@/components/live/ShareButton";
 import {
   TEAM_STAT_ROWS,
   byMatchTime,
@@ -50,13 +52,20 @@ export async function generateMetadata({
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("fixtures")
-    .select("home:home_team_id(name), away:away_team_id(name)")
+    .select("scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name), result:match_results(home_score, away_score)")
     .eq("fixture_id", params.id)
     .maybeSingle();
-  if (!data) return { title: "Match — RLFG Live" };
+  if (!data) return liveShare({ title: "Match — RLFG Live" });
   const home = one<any>((data as any).home)?.name ?? "TBC";
   const away = one<any>((data as any).away)?.name ?? "TBC";
-  return { title: `${home} v ${away} — RLFG Live` };
+  const r = one<any>((data as any).result);
+  const scored = r?.home_score != null && r?.away_score != null;
+  return liveShare({
+    title: scored ? `${home} ${r.home_score}–${r.away_score} ${away} — RLFG Live` : `${home} v ${away} — RLFG Live`,
+    description: [one<any>((data as any).competition)?.name, (data as any).scheduled_date].filter(Boolean).join(" · ") || undefined,
+    image: `/api/og/match/${params.id}`,
+    path: `/live/${params.id}`,
+  });
 }
 
 export default async function MatchCentrePage({
@@ -298,12 +307,15 @@ export default async function MatchCentrePage({
         ]}
       />
 
-      <Link
-        href="/live"
-        className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs mb-4"
-      >
-        ← All matches
-      </Link>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Link
+          href="/live"
+          className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs"
+        >
+          ← All matches
+        </Link>
+        <ShareButton />
+      </div>
 
       {/* Scoreboard */}
       <div className="bg-neutral-900 border border-white/10 rounded-lg overflow-hidden mb-6">

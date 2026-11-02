@@ -11,14 +11,17 @@ import {
 } from "@/lib/playerValue";
 import { getClubValues } from "@/lib/clubValue";
 import { getSeasonState } from "@/lib/seasons";
+import { liveShare, titledCard } from "@/lib/liveShare";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = liveShare({
   title: "Values — RLFG Live",
   description:
     "What every club and player is worth, worked out from the recorded record.",
-};
+  image: titledCard("Values", "Player and club values"),
+  path: "/live/values",
+});
 
 /**
  * Four ladders, not three.

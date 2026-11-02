@@ -3,8 +3,27 @@ import { createPublicClient } from "@/lib/supabase/server";
 import { PersonRecord } from "@/components/live/PersonRecord";
 import { readWithOptionalColumns } from "@/lib/optionalColumns";
 import { getOfficialRecord } from "@/lib/officiating";
+import { liveShare, titledCard } from "@/lib/liveShare";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+/** Shared, a match official's page shows the federation's card with their name. */
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const { data } = await createPublicClient()
+    .from("public_officials")
+    .select("first_name, last_name")
+    .eq("official_id", params.id)
+    .maybeSingle();
+  const name = data ? `${(data as any).first_name ?? ""} ${(data as any).last_name ?? ""}`.trim() : "Match official";
+  return liveShare({
+    title: `${name} — RLFG Live`,
+    description: `${name}, match official: every match on record with the Rugby League Federation Ghana.`,
+    image: titledCard(name, "Match official · Rugby League Federation Ghana"),
+    path: `/live/official/${params.id}`,
+  });
+}
+
 
 export default async function OfficialPage({
   params,

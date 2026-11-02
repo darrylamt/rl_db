@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import type { Record_ } from "@/lib/officiating";
+import { ShareButton } from "@/components/live/ShareButton";
 
 /**
  * The letters in the chip when there is no result to show.
@@ -84,7 +85,7 @@ export function PersonRecord({
     <div>
       <header className="flex items-center gap-4 mb-6">
         <Avatar src={photoUrl} name={name} size={64} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-widest text-ghanaYellow-500">
             {eyebrow}
           </p>
@@ -97,6 +98,7 @@ export function PersonRecord({
             </p>
           )}
         </div>
+        <ShareButton className="shrink-0 self-start" />
       </header>
 
       {/* Three across on a phone rather than two-and-an-orphan. */}

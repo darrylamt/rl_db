@@ -3,6 +3,13 @@ import { Avatar } from "@/components/Avatar";
 import { createPublicClient } from "@/lib/supabase/server";
 import { getSeasonState } from "@/lib/seasons";
 import { divisionLabel } from "@/lib/competitionFormat";
+import { liveShare, titledCard } from "@/lib/liveShare";
+
+export const metadata = liveShare({
+  title: "Table — RLFG Live",
+  image: titledCard("Table", "Current season standings"),
+  path: "/live/standings",
+});
 
 export const dynamic = "force-dynamic";
 

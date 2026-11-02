@@ -17,6 +17,8 @@ import {
   inSeasonRange,
 } from "@/lib/competitionFormat";
 import { Pagination } from "@/components/admin/Pagination";
+import { liveShare } from "@/lib/liveShare";
+import { ShareButton } from "@/components/live/ShareButton";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +38,13 @@ export async function generateMetadata({
     .select("name")
     .eq("team_id", params.id)
     .maybeSingle();
-  if (!data) return { title: "Club — RLFG Live" };
-  return { title: `${data.name} — RLFG Live` };
+  if (!data) return liveShare({ title: "Club — RLFG Live" });
+  return liveShare({
+    title: `${data.name} — RLFG Live`,
+    description: `${data.name}: squad, fixtures, results, record and head to head.`,
+    image: `/api/og/club/${params.id}`,
+    path: `/live/club/${params.id}`,
+  });
 }
 
 const TABS = [
@@ -297,12 +304,15 @@ export default async function PublicClubPage({
 
   return (
     <>
-      <Link
-        href="/live"
-        className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs mb-4"
-      >
-        ← Live scores
-      </Link>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Link
+          href="/live"
+          className="inline-block text-slate-400 hover:text-ghanaYellow-500 text-xs"
+        >
+          ← Live scores
+        </Link>
+        <ShareButton />
+      </div>
 
       {/* Identity */}
       <div className="flex items-center gap-4 mb-6">
