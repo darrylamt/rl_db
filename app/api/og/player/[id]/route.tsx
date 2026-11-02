@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return render(
     <Frame logo={logo} eyebrow={p.suspension ? "Player · Suspended" : p.is_captain ? "Player · Captain" : "Player"}>
       <div style={{ display: "flex", alignItems: "center", gap: 56, width: "100%" }}>
-        <Badge src={photo} name={name} size={340} square />
+        <Badge src={photo} name={name} size={340} square fill />
         <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", fontFamily: "Anton", fontSize: name.length > 22 ? 64 : 80, lineHeight: 1.05, textTransform: "uppercase" }}>
             {name}

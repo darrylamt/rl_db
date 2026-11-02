@@ -81,7 +81,8 @@ export async function federationLogo(origin: string) {
 }
 
 /** A round picture, or initials on dark when there is none. */
-export function Badge({ src, name, size, square = false }: { src: string | null; name: string; size: number; square?: boolean }) {
+/** `fill`: photos fill the frame; crests (the default for square) sit inside it. */
+export function Badge({ src, name, size, square = false, fill = !square }: { src: string | null; name: string; size: number; square?: boolean; fill?: boolean }) {
   return (
     <div
       style={{
@@ -92,7 +93,7 @@ export function Badge({ src, name, size, square = false }: { src: string | null;
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-        <img src={src} width={size} height={size} style={{ objectFit: square ? "contain" : "cover", width: size, height: size }} />
+        <img src={src} width={size} height={size} style={{ objectFit: fill ? "cover" : "contain", objectPosition: "top", width: size, height: size }} />
       ) : (
         <div style={{ display: "flex", fontFamily: "Anton", fontSize: size * 0.38, color: "rgba(255,255,255,0.35)" }}>{initialsOf(name)}</div>
       )}
