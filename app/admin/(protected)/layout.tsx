@@ -65,6 +65,7 @@ const navSections = [
     title: "Public site",
     items: [
       { href: "/admin/articles", label: "Articles" },
+      { href: "/admin/events", label: "Events" },
       { href: "/admin/documents", label: "Documents" },
       { href: "/admin/people", label: "Board & Committee" },
       { href: "/admin/partners", label: "Partners" },

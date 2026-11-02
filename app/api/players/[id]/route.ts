@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/server";
 import { ok, fail, preflight } from "@/lib/api";
 import { fetchLineupAppearances } from "@/lib/appearances";
+import { currentSuspensions } from "@/lib/suspensions";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,8 @@ export async function GET(
   // other column and having to remember this file each time one is added.
   const { date_of_birth, age, ...publicPlayer } = player as any;
 
+  const suspension = (await currentSuspensions(supabase, [id])).get(id) ?? null;
+
   const c = ((contracts ?? []) as any[])[0] ?? null;
   const contractTeam = c ? (Array.isArray(c.team) ? c.team[0] : c.team) : null;
   const ratingValues = ((ratings ?? []) as any[])
@@ -88,6 +91,8 @@ export async function GET(
 
   return ok({
     ...publicPlayer,
+    // Serving a ban today: until when (never why).
+    suspension,
     contract: c
       ? { club: contractTeam?.name ?? null, club_slug: contractTeam?.slug ?? null, starts_on: c.starts_on, ends_on: c.ends_on }
       : null,

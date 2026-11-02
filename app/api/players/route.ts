@@ -1,5 +1,6 @@
 import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
 import { ok, fail, preflight, requireAdmin, readJson, parsePagination } from "@/lib/api";
+import { currentSuspensions } from "@/lib/suspensions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,14 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await q;
   if (error) return fail(error.message, 500);
-  return ok({ items: data ?? [], total: count ?? 0 });
+
+  // Who is serving a ban today, so the website can mark them. The end date
+  // only; the reason stays in the admin.
+  const ids = (data ?? []).map((p: any) => p.player_id);
+  const banned = await currentSuspensions(supabase, ids);
+  const items = (data ?? []).map((p: any) => ({ ...p, suspension: banned.get(p.player_id) ?? null }));
+
+  return ok({ items, total: count ?? 0 });
 }
 
 export async function POST(req: Request) {
