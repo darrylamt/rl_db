@@ -17,7 +17,14 @@ export async function GET(
   const supabase = createPublicClient();
   const { id } = params;
 
-  const [{ data: player, error: playerError }, { data: events }, lineups] =
+  const today = new Date().toISOString().slice(0, 10);
+  const [
+    { data: player, error: playerError },
+    { data: events },
+    lineups,
+    { data: contracts },
+    { data: ratings },
+  ] =
     await Promise.all([
       supabase
         .from("public_players")
@@ -35,6 +42,22 @@ export async function GET(
 
       // Squad selections — a player appears in a match even with no events
       fetchLineupAppearances(supabase, id),
+
+      // The contract running now, as /live shows it: whose, and until when.
+      // Only accepted contracts are readable without an account, and the
+      // terms are left out on purpose.
+      supabase
+        .from("contracts")
+        .select("starts_on, ends_on, team:team_id(name, slug)")
+        .eq("player_id", id)
+        .eq("status", "accepted")
+        .lte("starts_on", today)
+        .gte("ends_on", today)
+        .order("ends_on", { ascending: false })
+        .limit(1),
+
+      // Match ratings out of ten, for the average.
+      supabase.from("match_player_ratings").select("rating").eq("player_id", id),
     ]);
 
   if (playerError) return fail(playerError.message, 500);
@@ -57,8 +80,23 @@ export async function GET(
   // other column and having to remember this file each time one is added.
   const { date_of_birth, age, ...publicPlayer } = player as any;
 
+  const c = ((contracts ?? []) as any[])[0] ?? null;
+  const contractTeam = c ? (Array.isArray(c.team) ? c.team[0] : c.team) : null;
+  const ratingValues = ((ratings ?? []) as any[])
+    .map((r) => Number(r.rating))
+    .filter((n) => Number.isFinite(n));
+
   return ok({
     ...publicPlayer,
+    contract: c
+      ? { club: contractTeam?.name ?? null, club_slug: contractTeam?.slug ?? null, starts_on: c.starts_on, ends_on: c.ends_on }
+      : null,
+    match_rating: ratingValues.length
+      ? {
+          average: Math.round((ratingValues.reduce((s, n) => s + n, 0) / ratingValues.length) * 10) / 10,
+          matches: ratingValues.length,
+        }
+      : null,
     stats: {
       matches_played: matchesPlayed,
       ...stats,

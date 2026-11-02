@@ -41,6 +41,7 @@ export async function GET(
     { data: events },
     { data: lineup },
     { data: officials },
+    { data: ratings },
   ] = await Promise.all([
     // Result (may be null if not yet played)
     supabase
@@ -78,6 +79,13 @@ export async function GET(
         "role, official:official_id(official_id, first_name, last_name)"
       )
       .eq("fixture_id", fixtureId),
+
+    // Player ratings for the match, out of ten. The score only; the
+    // coaching notes stay in the admin.
+    supabase
+      .from("match_player_ratings")
+      .select("player_id, team_id, rating")
+      .eq("fixture_id", fixtureId),
   ]);
 
   return ok(
@@ -87,6 +95,7 @@ export async function GET(
       events: events ?? [],
       lineup: lineup ?? [],
       officials: officials ?? [],
+      ratings: ratings ?? [],
     },
     { cache: "short" }
   );
