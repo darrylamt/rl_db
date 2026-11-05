@@ -1,4 +1,5 @@
 import { createPublicClient, createAdminClient } from "@/lib/supabase/server";
+import { isPlayoffRound } from "@/lib/leagueTable";
 import { ok, fail, preflight } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
        home_team:home_team_id(team_id, name, logo_url, slug),
        away_team:away_team_id(team_id, name, logo_url, slug),
        venue:venue_id(name),
-       competition:competition_id(competition_id, name, season, type)`
+       competition:competition_id(competition_id, name, season, type, division)`
     )
     .order("scheduled_date", { ascending: true })
     .order("scheduled_time", { ascending: true });
@@ -378,9 +379,13 @@ export async function GET(req: Request) {
         ? `${f.scheduled_date}T${f.scheduled_time ?? "00:00:00"}`
         : null,
       round: f.round ?? null,
+      // A playoff, semi or final: kept out of league tables (lib/leagueTable).
+      knockout: isPlayoffRound(f.round),
       venue: (f.venue as any)?.name ?? null,
       competition: (f.competition as any)?.name ?? null,
       competition_id: (f.competition as any)?.competition_id ?? null,
+      // men | women | youth | youth_boys | youth_girls, for filtering by grade.
+      division: (f.competition as any)?.division ?? null,
       season: (f.competition as any)?.season ?? null,
       highlights: result?.video_url ?? null,
       // Every sheet on the match; match_sheet is the first, under the name
