@@ -1,4 +1,5 @@
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createOfficial } from "../actions";
 
 const LEVELS = [
@@ -66,8 +67,8 @@ export default function NewOfficialPage() {
           <Input name="email" type="email" />
         </Field>
       </div>
-      <Field label="Photo URL">
-        <Input name="photo_url" placeholder="https://..." />
+      <Field label="Photo">
+        <PhotoUpload name="photo" label="Photo" shape="round" />
       </Field>
     </FormShell>
   );

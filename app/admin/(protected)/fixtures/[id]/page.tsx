@@ -117,7 +117,7 @@ export default async function EditFixturePage({ params }: { params: { id: string
         <Field label="Time">
           <Input name="scheduled_time" type="time" defaultValue={f.scheduled_time?.slice(0,5) ?? ""} />
         </Field>
-        <Field label="Round">
+        <Field label="Round" hint="Call a knockout match Playoff, Semi-final or Final and it stays out of the league table.">
           <Input name="round" defaultValue={f.round ?? ""} />
         </Field>
       </div>

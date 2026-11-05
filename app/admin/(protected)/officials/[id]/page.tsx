@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { updateOfficial } from "../actions";
@@ -73,8 +74,8 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
           <Input name="email" type="email" defaultValue={o.email ?? ""} />
         </Field>
       </div>
-      <Field label="Photo URL">
-        <Input name="photo_url" defaultValue={o.photo_url ?? ""} />
+      <Field label="Photo">
+        <PhotoUpload name="photo" currentUrl={o.photo_url} label="Photo" shape="round" />
       </Field>
     </FormShell>
   );

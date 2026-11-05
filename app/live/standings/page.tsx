@@ -4,6 +4,7 @@ import { createPublicClient } from "@/lib/supabase/server";
 import { getSeasonState } from "@/lib/seasons";
 import { divisionLabel } from "@/lib/competitionFormat";
 import { liveShare, titledCard } from "@/lib/liveShare";
+import { getLeagueTables } from "@/lib/leagueTable";
 
 export const metadata = liveShare({
   title: "Table — RLFG Live",
@@ -48,17 +49,19 @@ export default async function StandingsPage({
 }) {
   const supabase = createPublicClient();
 
-  const [{ data: comps }, { data: table }, seasonState] = await Promise.all([
+  // The league phase only: playoffs and finals are shown under each table,
+  // not counted in it (lib/leagueTable).
+  const [{ data: comps }, league, seasonState] = await Promise.all([
     supabase
       .from("competitions")
       .select("competition_id, name, season, division")
       .order("name"),
-    supabase.from("standings").select("*"),
+    getLeagueTables(supabase),
     getSeasonState(),
   ]);
 
   const competitions = (comps ?? []) as any[];
-  const rows = (table ?? []) as Row[];
+  const rows = league.rows as Row[];
 
   // Newest first, so the season selector opens on what people are asking about.
   const seasons = Array.from(
@@ -92,8 +95,9 @@ export default async function StandingsPage({
             b.points_for - a.points_for ||
             a.team_name.localeCompare(b.team_name)
         ),
+      playoffs: league.playoffs.filter((m) => m.competition_id === c.competition_id),
     }))
-    .filter((g) => g.rows.length > 0);
+    .filter((g) => g.rows.length > 0 || g.playoffs.length > 0);
 
   return (
     <div>
@@ -242,6 +246,39 @@ export default async function StandingsPage({
                   </tbody>
                 </table>
               </div>
+
+              {/* The knockout matches, kept out of the table above. */}
+              {g.playoffs.length > 0 && (
+                <div className="border-t border-white/10">
+                  <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-widest text-ghanaYellow-500">
+                    Playoffs
+                  </p>
+                  <div className="divide-y divide-white/5">
+                    {g.playoffs.map((m) => {
+                      const done = m.home_score != null && m.away_score != null;
+                      return (
+                        <Link
+                          key={m.fixture_id}
+                          href={`/live/${m.fixture_id}`}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-white/5"
+                        >
+                          <span className="w-20 shrink-0 text-[11px] uppercase tracking-wider text-slate-500 truncate">
+                            {m.round ?? "Playoff"}
+                          </span>
+                          <span className="flex-1 min-w-0 truncate">
+                            <span className={done && m.home_score! > m.away_score! ? "font-semibold" : ""}>{m.home?.name}</span>
+                            <span className="text-slate-500"> v </span>
+                            <span className={done && m.away_score! > m.home_score! ? "font-semibold" : ""}>{m.away?.name}</span>
+                          </span>
+                          <span className="font-display tabular-nums shrink-0">
+                            {done ? `${m.home_score}–${m.away_score}` : (m.scheduled_date ?? "TBC")}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </section>
           ))}
         </div>
@@ -249,7 +286,8 @@ export default async function StandingsPage({
 
       <p className="text-xs text-slate-500 mt-5">
         Built from results as they are recorded. A match without a score
-        against it is not counted.
+        against it is not counted, and playoffs and finals are listed under
+        the table rather than counted in it.
       </p>
     </div>
   );

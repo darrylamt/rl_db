@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { resolveImageUrl } from "@/lib/upload";
 
 function str(fd: FormData, k: string) {
   const v = fd.get(k);
@@ -21,7 +22,6 @@ function payload(fd: FormData) {
     region: str(fd, "region"),
     nationality: str(fd, "nationality"),
     date_of_birth: str(fd, "date_of_birth"),
-    photo_url: str(fd, "photo_url"),
     phone: str(fd, "phone"),
     email: str(fd, "email"),
     status: str(fd, "status") ?? "active",
@@ -32,7 +32,9 @@ export async function createOfficial(fd: FormData) {
   const supabase = createAdminClient();
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
-  const { error } = await supabase.from("officials").insert(p);
+  // Uploaded and framed on the form, as a coach's or a player's photo is.
+  const photo_url = await resolveImageUrl(fd, "photo", "player-photos", "officials", null);
+  const { error } = await supabase.from("officials").insert({ ...p, photo_url });
   if (error) throw new Error(error.message);
   revalidatePath("/admin/officials");
   revalidatePath("/admin/dashboard");
@@ -42,7 +44,10 @@ export async function updateOfficial(id: string, fd: FormData) {
   const supabase = createAdminClient();
   const p = payload(fd);
   if (!p.first_name || !p.last_name) throw new Error("First and last name are required");
-  const { error } = await supabase.from("officials").update(p).eq("official_id", id);
+  // A save that didn't touch the photo keeps the one already stored.
+  const { data: existing } = await supabase.from("officials").select("photo_url").eq("official_id", id).maybeSingle();
+  const photo_url = await resolveImageUrl(fd, "photo", "player-photos", "officials", existing?.photo_url);
+  const { error } = await supabase.from("officials").update({ ...p, photo_url }).eq("official_id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/officials");
   revalidatePath(`/admin/officials/${id}`);

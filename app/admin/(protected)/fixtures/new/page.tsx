@@ -80,7 +80,7 @@ export default async function NewFixturePage() {
         <Field label="Time">
           <Input name="scheduled_time" type="time" />
         </Field>
-        <Field label="Round">
+        <Field label="Round" hint="Call a knockout match Playoff, Semi-final or Final and it stays out of the league table.">
           <Input name="round" placeholder="R1 / QF / Final" />
         </Field>
       </div>
