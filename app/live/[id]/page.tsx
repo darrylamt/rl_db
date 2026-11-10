@@ -10,7 +10,7 @@ import { LiveClock } from "@/components/LiveClock";
 import { MatchTabs } from "@/components/live/MatchTabs";
 import { TeamSwitch } from "@/components/live/TeamSwitch";
 import { EventIcon } from "@/components/live/EventIcon";
-import { rateMatch } from "@/lib/matchRating";
+import { matchRatings } from "@/lib/matchRating";
 import { TeamBadge, StatusPill } from "../MatchCard";
 import { liveShare } from "@/lib/liveShare";
 import { ShareButton } from "@/components/live/ShareButton";
@@ -172,45 +172,21 @@ export default async function MatchCentrePage({
   const awayScore = result?.away_score ?? pointsFrom(awayEvents);
   const hasScore = !!result || allEvents.length > 0;
 
-  const ratingByPlayer = new Map<string, number>();
-
   // Worked out from what each player did. Ratings used to be a number
   // somebody typed in, so almost nobody had one; every event is already
-  // recorded against a player, so the match can rate itself.
-  const eventsByPlayer = new Map<string, any[]>();
-  for (const e of allEvents) {
-    const p = one<any>(e.player);
-    if (!p?.player_id) continue;
-    const list = eventsByPlayer.get(p.player_id) ?? [];
-    list.push(e);
-    eventsByPlayer.set(p.player_id, list);
-  }
-
+  // recorded against a player, so the match can rate itself. One entered by
+  // hand still wins. The public API and the player page use the same helper,
+  // so a player has the same number everywhere.
   const positionOf = new Map<string, string | null>();
   for (const l of (lineup ?? []) as any[]) {
     const p = one<any>(l.player);
     if (p?.player_id) positionOf.set(p.player_id, l.position ?? null);
   }
-
-  const autoRating = new Map<string, number>();
-  Array.from(eventsByPlayer).forEach(([playerId, list]) => {
-    const { rating, confidence } = rateMatch(list, positionOf.get(playerId));
-    // A player with almost nothing on record sat on the baseline anyway;
-    // showing 6.0 for them would read as a judgement rather than a gap.
-    if (confidence !== "none") autoRating.set(playerId, rating);
-  });
-
-  for (const [playerId, rating] of Array.from(autoRating)) {
-    ratingByPlayer.set(playerId, rating);
-  }
-
-  // A rating entered by hand outranks the calculation — somebody watched the
-  // match and the events only know what was typed in.
-  for (const r of (ratings ?? []) as any[]) {
-    if (r.player_id != null && r.rating != null) {
-      ratingByPlayer.set(r.player_id, Number(r.rating));
-    }
-  }
+  const ratingByPlayer = matchRatings(
+    allEvents.map((e) => ({ player_id: one<any>(e.player)?.player_id, event_type: e.event_type })),
+    positionOf,
+    (ratings ?? []) as any[]
+  );
 
   // Per-player event tallies for the line-up lists.
   const statsByPlayer = new Map<string, StatMap>();

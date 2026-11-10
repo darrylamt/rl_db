@@ -40,10 +40,10 @@ export function hasKickedOff(fixture: any): boolean {
 export async function fetchLineupAppearances(
   supabase: SupabaseClient,
   playerId: string
-): Promise<{ lineup_id: string; is_starter: boolean; fixture: any }[]> {
+): Promise<{ lineup_id: string; is_starter: boolean; position: string | null; fixture: any }[]> {
   const { data } = await supabase
     .from("match_lineups")
-    .select(`lineup_id, is_starter, ${APPEARANCE_FIXTURE_EMBED}`)
+    .select(`lineup_id, is_starter, position, ${APPEARANCE_FIXTURE_EMBED}`)
     .eq("player_id", playerId);
 
   return (data ?? [])

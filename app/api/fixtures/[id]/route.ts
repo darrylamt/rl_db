@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/server";
 import { ok, fail, preflight } from "@/lib/api";
+import { matchRatings } from "@/lib/matchRating";
 
 export const dynamic = "force-dynamic";
 
@@ -80,13 +81,44 @@ export async function GET(
       )
       .eq("fixture_id", fixtureId),
 
-    // Player ratings for the match, out of ten. The score only; the
-    // coaching notes stay in the admin.
+    // Ratings entered by hand, out of ten. The score only; the coaching
+    // notes stay in the admin.
     supabase
       .from("match_player_ratings")
       .select("player_id, team_id, rating")
       .eq("fixture_id", fixtureId),
   ]);
+
+  // Every player's rating, as the /live match page gives it: worked out from
+  // what each did, unless somebody entered one by hand. Hand-entered ones
+  // alone left almost every match without any.
+  const one = (v: any) => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+  const lineupRows = (lineup ?? []) as any[];
+  const eventRows = (events ?? []) as any[];
+  const storedRows = (ratings ?? []) as any[];
+  const positionOf = new Map<string, string | null>();
+  const teamOf = new Map<string, string>();
+  const nameOf = new Map<string, string>();
+  const note = (p: any, teamId: string | null | undefined) => {
+    if (!p?.player_id) return;
+    if (teamId && !teamOf.has(p.player_id)) teamOf.set(p.player_id, teamId);
+    if (!nameOf.has(p.player_id)) {
+      nameOf.set(p.player_id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim());
+    }
+  };
+  for (const r of storedRows) if (r.player_id && r.team_id) teamOf.set(r.player_id, r.team_id);
+  for (const l of lineupRows) {
+    const p = one(l.player);
+    if (p?.player_id) positionOf.set(p.player_id, l.position ?? null);
+    note(p, one(l.team)?.team_id);
+  }
+  for (const e of eventRows) note(one(e.player), one(e.team)?.team_id);
+
+  const rated = matchRatings(
+    eventRows.map((e) => ({ player_id: one(e.player)?.player_id, event_type: e.event_type })),
+    positionOf,
+    storedRows
+  );
 
   return ok(
     {
@@ -95,7 +127,12 @@ export async function GET(
       events: events ?? [],
       lineup: lineup ?? [],
       officials: officials ?? [],
-      ratings: ratings ?? [],
+      ratings: Array.from(rated.entries()).map(([player_id, rating]) => ({
+        player_id,
+        team_id: teamOf.get(player_id) ?? null,
+        name: nameOf.get(player_id) || null,
+        rating,
+      })),
     },
     { cache: "short" }
   );

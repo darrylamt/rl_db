@@ -206,3 +206,48 @@ export function ratingLabel(rating: number): string {
   if (rating >= 5) return "Quiet";
   return "Poor";
 }
+
+/**
+ * Every rated player in one match, as the match page shows them.
+ *
+ * Worked out from each player's events, and a rating somebody entered by hand
+ * wins, since they watched the match and the events only know what was typed
+ * in. A player with nothing on record gets no rating rather than the 6.0
+ * baseline, which would read as a judgement rather than a gap.
+ *
+ * Kept in one place so the /live match page, the /live player page and the
+ * public API all give a player the same number for the same match.
+ */
+export function matchRatings(
+  events: { player_id?: string | null; event_type?: string | null }[],
+  positionOf: Map<string, string | null | undefined>,
+  stored: { player_id?: string | null; rating?: number | string | null }[]
+): Map<string, number> {
+  const byPlayer = new Map<string, RatedEvent[]>();
+  for (const e of events) {
+    if (!e.player_id) continue;
+    const list = byPlayer.get(e.player_id) ?? [];
+    list.push(e);
+    byPlayer.set(e.player_id, list);
+  }
+
+  const out = new Map<string, number>();
+  Array.from(byPlayer).forEach(([playerId, list]) => {
+    const { rating, confidence } = rateMatch(list, positionOf.get(playerId));
+    if (confidence !== "none") out.set(playerId, rating);
+  });
+  for (const r of stored) {
+    const n = Number(r.rating);
+    if (r.player_id && r.rating != null && Number.isFinite(n)) out.set(r.player_id, n);
+  }
+  return out;
+}
+
+/** An average to one decimal, or null when there is nothing to average. */
+export function averageRating(values: number[]): { average: number; matches: number } | null {
+  if (!values.length) return null;
+  return {
+    average: Math.round((values.reduce((s, n) => s + n, 0) / values.length) * 10) / 10,
+    matches: values.length,
+  };
+}

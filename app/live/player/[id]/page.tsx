@@ -13,6 +13,7 @@ import {
   hasAttributes,
 } from "@/lib/attributes";
 import { fetchLineupAppearances } from "@/lib/appearances";
+import { averageRating, matchRatings } from "@/lib/matchRating";
 import { cleanSecondaryPositions } from "@/lib/positions";
 import { getPlayerValue } from "@/lib/playerValue";
 import { liveShare } from "@/lib/liveShare";
@@ -115,7 +116,7 @@ export default async function PublicPlayerPage({
     fetchLineupAppearances(supabase, playerId),
     supabase
       .from("match_player_ratings")
-      .select("rating")
+      .select("fixture_id, rating")
       .eq("player_id", playerId),
     supabase.from("teams").select("team_id, name, logo_url"),
     supabase
@@ -236,12 +237,31 @@ export default async function PublicPlayerPage({
   });
   const matchesPlayed = perMatch.size;
 
-  const ratingValues = ((ratings ?? []) as any[])
-    .map((r) => Number(r.rating))
-    .filter((n) => Number.isFinite(n));
-  const avgRating = ratingValues.length
-    ? Math.round((ratingValues.reduce((s, r) => s + r, 0) / ratingValues.length) * 10) / 10
-    : null;
+  // A rating for each match, as the match page gives it: worked out from their
+  // events unless one was entered by hand. Only hand-entered ones counted
+  // before, so most players had no average at all.
+  const positionIn = new Map<string, string | null>(
+    lineups
+      .filter((l) => l.fixture?.fixture_id)
+      .map((l) => [l.fixture.fixture_id, l.position ?? null])
+  );
+  const storedIn = new Map<string, any>(
+    ((ratings ?? []) as any[]).filter((r) => r.fixture_id).map((r) => [r.fixture_id, r.rating])
+  );
+  const ratingIn = new Map<string, number>();
+  for (const m of matchRows) {
+    const fid = m.fixture.fixture_id;
+    const mine = allEvents
+      .filter((e) => one<any>(e.fixture)?.fixture_id === fid)
+      .map((e) => ({ player_id: playerId, event_type: e.event_type }));
+    const r = matchRatings(
+      mine,
+      new Map([[playerId, positionIn.get(fid)]]),
+      storedIn.has(fid) ? [{ player_id: playerId, rating: storedIn.get(fid) }] : []
+    ).get(playerId);
+    if (r != null) ratingIn.set(fid, r);
+  }
+  const avgRating = averageRating(Array.from(ratingIn.values()))?.average ?? null;
 
   const careerStats = TEAM_STAT_ROWS.map((row) => ({
     label: row.label,
@@ -731,7 +751,7 @@ export default async function PublicPlayerPage({
                 behind a tap rather than down a page nobody scrolls. */}
             <div className="space-y-2">
               {matchRows.slice(0, 5).map((m) => (
-                <MatchRow key={m.fixture.fixture_id} row={m} />
+                <MatchRow key={m.fixture.fixture_id} row={m} rating={ratingIn.get(m.fixture.fixture_id)} />
               ))}
             </div>
 
@@ -745,7 +765,7 @@ export default async function PublicPlayerPage({
                 </summary>
                 <div className="space-y-2 mt-2">
                   {matchRows.slice(5).map((m) => (
-                    <MatchRow key={m.fixture.fixture_id} row={m} />
+                    <MatchRow key={m.fixture.fixture_id} row={m} rating={ratingIn.get(m.fixture.fixture_id)} />
                   ))}
                 </div>
               </details>
@@ -759,8 +779,10 @@ export default async function PublicPlayerPage({
 
 function MatchRow({
   row,
+  rating,
 }: {
   row: { fixture: any; stats: StatMap };
+  rating?: number;
 }) {
   const { fixture, stats: s } = row;
   const r = one<any>(fixture.result);
@@ -781,8 +803,20 @@ function MatchRow({
           {home?.name ?? "?"} <span className="text-slate-500">v</span>{" "}
           {away?.name ?? "?"}
         </span>
-        <span className="font-display tabular-nums shrink-0">
-          {r ? `${r.home_score} – ${r.away_score}` : "—"}
+        <span className="flex items-center gap-2 shrink-0">
+          {rating != null && (
+            <span
+              className={`text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded bg-white/10 ${
+                rating >= 8 ? "text-ghanaYellow-500" : "text-slate-300"
+              }`}
+              title="Match rating out of ten"
+            >
+              {rating.toFixed(1)}
+            </span>
+          )}
+          <span className="font-display tabular-nums">
+            {r ? `${r.home_score} – ${r.away_score}` : "—"}
+          </span>
         </span>
       </div>
       <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
