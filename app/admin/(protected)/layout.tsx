@@ -6,9 +6,10 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 // Admin pages are per-user (authed) and pull live data — never prerender.
 export const dynamic = "force-dynamic";
 
-// Pinned above the sections: the two you reach for constantly.
+// Pinned above the sections: the ones you reach for constantly.
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard" },
+  { href: "/admin/insights", label: "Insights" },
   { href: "/admin/fixtures", label: "Fixtures" },
 ];
 

@@ -38,3 +38,23 @@ td {
     text-wrap: balance;
   }
 }
+
+/* Chart colours for the admin's Insights page, by the job each does.
+   Categorical slots are fixed to the thing they mean, in this order, and
+   were checked with the dataviz validator on the admin's white cards: the
+   first four pass the colour-blind and normal-vision checks side by side.
+   Aqua and yellow sit under 3:1 on white, so every chart also has a table
+   view. The admin has no dark theme, so neither do these. */
+.viz-root {
+  --viz-surface: #ffffff;
+  --viz-series-1: #2a78d6; /* blue */
+  --viz-series-2: #eb6834; /* orange */
+  --viz-series-3: #1baf7a; /* aqua */
+  --viz-series-4: #eda100; /* yellow */
+  --viz-track: #cde2fb;    /* blue, step 100: a meter's unfilled track */
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #898781;
+  --viz-ink: #0b0b0b;
+  --viz-ink-2: #52514e;
+}
