@@ -1,4 +1,5 @@
 import { requirePlayer } from "@/lib/auth";
+import { getPlayerValue } from "@/lib/playerValue";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { remaining, describeLength, monthsBetween, type Contract } from "@/lib/contracts";
@@ -48,6 +49,9 @@ export default async function PlayerTransfersPage({
         .eq("player_id", playerId)
         .order("season", { ascending: false }),
     ]);
+
+  // The same value their /live page and the portal home show.
+  const valuation = await getPlayerValue(playerId);
 
   const notMigrated = !!error && /transfer_requests/.test(error.message);
 
@@ -102,11 +106,13 @@ export default async function PlayerTransfersPage({
         </div>
         <div className="bg-neutral-900 border border-white/10 rounded-lg p-4">
           <p className="text-xs uppercase tracking-wider text-slate-500">Your value</p>
-          <p className="font-display text-2xl mt-1 leading-tight text-slate-600">
-            Not set yet
+          <p className={`font-display text-2xl mt-1 leading-tight ${valuation ? "text-ghanaYellow-500" : "text-slate-600"}`}>
+            {valuation ? `${valuation.value.toLocaleString("en-GB")} LX` : "Not set yet"}
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            The federation is still working out how this is calculated.
+            {valuation
+              ? "What a club pays to sign you, before the levy."
+              : "You need appearances on record before you have a value."}
           </p>
         </div>
       </div>
