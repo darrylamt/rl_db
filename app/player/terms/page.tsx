@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getAppUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TERMS, TERMS_VERSION } from "@/lib/terms";
-import { decideTerms } from "./actions";
+import { acceptTerms, declineTerms } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -62,17 +62,13 @@ export default async function PlayerTermsPage() {
 
         <form className="mt-6 flex flex-col sm:flex-row gap-3">
           <button
-            formAction={decideTerms}
-            name="decision"
-            value="accept"
+            formAction={acceptTerms}
             className="flex-1 bg-gold-500 hover:bg-gold-400 text-navy-900 font-semibold px-4 py-3 rounded"
           >
             I agree
           </button>
           <button
-            formAction={decideTerms}
-            name="decision"
-            value="decline"
+            formAction={declineTerms}
             className="flex-1 border border-white/20 hover:border-white/40 text-navy-100 font-medium px-4 py-3 rounded"
           >
             I do not agree

@@ -13,11 +13,23 @@ import { TERMS_VERSION } from "@/lib/terms";
  * declined" is a fact somebody may need later and it cannot be recovered
  * from an empty table.
  */
-export async function decideTerms(fd: FormData) {
+/**
+ * One action per button. Both buttons used to share one action and send
+ * their answer as the clicked button's name/value, which never arrived, so
+ * "I agree" was read as a refusal and signed the player out.
+ */
+export async function acceptTerms() {
+  await decideTerms(true);
+}
+
+export async function declineTerms() {
+  await decideTerms(false);
+}
+
+async function decideTerms(accepted: boolean) {
   const user = await getAppUser();
   if (!user) redirect("/admin/login");
 
-  const accepted = fd.get("decision") === "accept";
   const supabase = createAdminClient();
 
   // The table arrives with supabase/player_terms.sql. Until it is run the
