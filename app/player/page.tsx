@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPlayerValue } from "@/lib/playerValue";
 import { requirePlayer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
@@ -107,6 +108,8 @@ export default async function PlayerHomePage({
   ]);
 
   const p = player as any;
+  // Their value, worked out exactly as their /live page shows it.
+  const valuation = await getPlayerValue(playerId);
 
   const all = (contracts ?? []) as any[];
   const offers = all.filter((c) => c.status === "offered");
@@ -358,7 +361,8 @@ export default async function PlayerHomePage({
       )}
 
       {/* Headline numbers */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <Stat label="Value (LX)" value={valuation ? valuation.value.toLocaleString("en-GB") : "—"} accent />
         <Stat label="Matches" value={appearances} />
         <Stat label="Points" value={points} accent />
         <Stat label="Tries" value={tally.get("try") ?? 0} />
