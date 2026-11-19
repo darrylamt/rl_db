@@ -1,4 +1,5 @@
-import { wholeTable } from "@/lib/wholeTable";
+import { unstable_cache } from "next/cache";
+import { MATCH_RECORD_TAG, wholeTable } from "@/lib/wholeTable";
 import { getPlayerValues } from "@/lib/playerValue";
 import {
   effectiveGrade,
@@ -88,7 +89,21 @@ const GRADES = [
 const STRANDS = 3;
 
 
+/** Every club's value, worked out once every five minutes and shared. */
+const cachedClubValues = unstable_cache(() => computeClubValues(), ["club-values-v1"], {
+  revalidate: 300,
+  tags: [MATCH_RECORD_TAG],
+});
+
 export async function getClubValues(): Promise<ClubValue[]> {
+  try {
+    return await cachedClubValues();
+  } catch {
+    return computeClubValues();
+  }
+}
+
+async function computeClubValues(): Promise<ClubValue[]> {
   // Whole tables, through the five-minute cache (lib/wholeTable).
   const [values, teams, players, fixtures, competitions, results] =
     await Promise.all([

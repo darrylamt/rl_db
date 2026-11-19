@@ -1,4 +1,5 @@
-import { wholeTable } from "@/lib/wholeTable";
+import { unstable_cache } from "next/cache";
+import { MATCH_RECORD_TAG, wholeTable } from "@/lib/wholeTable";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 import { formatOf, formatsIn, divisionsIn } from "@/lib/competitionFormat";
 
@@ -86,7 +87,29 @@ function rank(
   });
 }
 
+/**
+ * The record book for a season, format and grade, counted once every five
+ * minutes and shared, rather than recounted for every visitor.
+ */
+const cachedRecords = unstable_cache(
+  (season: string | null, format: string | null, division: string | null) => computeRecords(season, format, division),
+  ["records-v1"],
+  { revalidate: 300, tags: [MATCH_RECORD_TAG] }
+);
+
 export async function getRecords(
+  season?: string | null,
+  format?: string | null,
+  division?: string | null,
+): Promise<RecordsData> {
+  try {
+    return await cachedRecords(season ?? null, format ?? null, division ?? null);
+  } catch {
+    return computeRecords(season, format, division);
+  }
+}
+
+async function computeRecords(
   season?: string | null,
   format?: string | null,
   division?: string | null,

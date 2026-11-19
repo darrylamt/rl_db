@@ -1,4 +1,5 @@
-import { wholeTable } from "@/lib/wholeTable";
+import { unstable_cache } from "next/cache";
+import { MATCH_RECORD_TAG, wholeTable } from "@/lib/wholeTable";
 import { normaliseType, EVENT_POINTS } from "@/lib/matchStats";
 import { effectiveGrade } from "@/lib/grades";
 
@@ -256,8 +257,36 @@ function before(input: ValueInputs, asOf: string): ValueInputs {
 export async function getPlayerValues(
   opts: { asOf?: string } = {}
 ): Promise<Map<string, Valuation>> {
-  const input = await loadValueInputs();
-  return computeValues(opts.asOf ? before(input, opts.asOf) : input);
+  return valuesAsOf(opts.asOf ?? null);
+}
+
+/**
+ * The whole league's values, worked out once every five minutes and shared.
+ *
+ * Every player page, the values page, the player portal and club transfers
+ * each needed every player's value, and each worked all 500 out from
+ * scratch on every visit — a crawler walking the player pages did it
+ * hundreds of times a minute. That arithmetic was most of what used up the
+ * hosting plan's processing time. The record it reads was already cached;
+ * now the answer is too, keyed by the date it was worked out to.
+ */
+const cachedValueEntries = unstable_cache(
+  async (asOf: string | null) => {
+    const input = await loadValueInputs();
+    return Array.from(computeValues(asOf ? before(input, asOf) : input).entries());
+  },
+  ["player-values-v1"],
+  { revalidate: 300, tags: [MATCH_RECORD_TAG] }
+);
+
+async function valuesAsOf(asOf: string | null): Promise<Map<string, Valuation>> {
+  try {
+    return new Map(await cachedValueEntries(asOf));
+  } catch {
+    // Outside a request (scripts) there is no cache: work it out directly.
+    const input = await loadValueInputs();
+    return computeValues(asOf ? before(input, asOf) : input);
+  }
 }
 
 export type MovementPeriod = "matchday" | "30d" | "season";
@@ -303,8 +332,8 @@ export async function getValueMovement(
     asOf = seasonStart ?? null;
   }
 
-  const now = computeValues(input);
-  return { now, then: asOf ? computeValues(before(input, asOf)) : now, asOf };
+  const now = await valuesAsOf(null);
+  return { now, then: asOf ? await valuesAsOf(asOf) : now, asOf };
 }
 
 function computeValues({
