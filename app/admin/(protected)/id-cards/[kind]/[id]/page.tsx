@@ -28,7 +28,7 @@ export default async function IdCardPreview({ params }: { params: { kind: string
     d.revoked ? "This person is marked inactive or revoked. Their verify page will say the card is not valid." : null,
     d.expired
       ? kind === "player"
-        ? "Not registered for a season that is still running, so the card's \"valid until\" date has passed. Register the player for the next season first."
+        ? `Not registered for ${new Date().getFullYear()}, so the card shows an old year. Register the player for this year first.`
         : "The card's \"valid until\" date has passed."
       : null,
     !d.photo ? "No photo could be loaded, so the card shows initials. Add or re-upload a photo first." : null,

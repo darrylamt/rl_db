@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSeasonState } from "@/lib/seasons";
+import { signCard } from "@/lib/cardToken";
 import { appOrigin } from "@/lib/liveShare";
 
 /**
@@ -159,15 +159,18 @@ function loadFonts() {
 const origin = () => appOrigin().toString().replace(/\/$/, "");
 const today = () => new Date().toISOString().slice(0, 10);
 
-/**
- * The season a non-player card is issued for: the running one, or the next
- * one once the current season has ended.
- */
+/** Everyone else's card runs for the current calendar year, 1 January to 31 December. */
 async function issuingSeason() {
-  const state = await getSeasonState();
-  const row = state.ended && state.next ? state.next : state.row;
-  return { season: row?.season ?? state.season, endsOn: row?.endsOn ?? `${state.season}-12-31` };
+  const year = String(new Date().getFullYear());
+  return { season: year, endsOn: `${year}-12-31` };
 }
+
+/**
+ * The address the QR code opens: the verify page, with a code signed by the
+ * server so a QR made from any other link fails the check.
+ */
+const verifyLink = (kind: string, id: string, year: string | null) =>
+  `${origin()}/verify/${signCard(kind, id, year ?? String(new Date().getFullYear()))}`;
 
 async function team(teamId: string | null | undefined) {
   if (!teamId) return null;
@@ -187,15 +190,19 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
       .eq("player_id", id)
       .maybeSingle();
     if (!p) return null;
-    const [club, { data: regs }, state] = await Promise.all([
+    const [club, { data: regs }] = await Promise.all([
       team(p.team_id),
-      supabase.from("player_registrations").select("season_year").eq("player_id", id).order("season_year", { ascending: false }).limit(1),
-      getSeasonState(),
+      supabase.from("player_registrations").select("season_year").eq("player_id", id).order("season_year", { ascending: false }),
     ]);
-    // Valid for the season the player is registered in, until that season ends.
+    // Cards run for a calendar year, 1 January to 31 December: the year the
+    // player is registered for.
     const regSeason = (regs ?? [])[0]?.season_year != null ? String((regs ?? [])[0].season_year) : null;
-    const season = regSeason ?? state.season;
-    const endsOn = state.every.find((s) => s.season === season)?.endsOn ?? (season ? `${season}-12-31` : null);
+    const season = regSeason ?? String(new Date().getFullYear());
+    // The first year they registered with the federation: true for every
+    // registered player, and it doesn't change the way a shirt number does.
+    const years = ((regs ?? []) as any[]).map((r) => Number(r.season_year)).filter(Number.isFinite);
+    const memberSince = years.length ? String(Math.min(...years)) : "—";
+    const endsOn = `${season}-12-31`;
     const theme = THEMES.player;
     return {
       kind, id, theme, holderNoun: "player",
@@ -206,13 +213,13 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
       fields: [
         { label: "Position", value: p.position || "—" },
         { label: "Grade", value: gradeOf(p.category, p.gender) },
-        { label: "Shirt", value: p.jersey_number != null ? `#${p.jersey_number}` : "—" },
+        { label: "Member since", value: memberSince },
         { label: "Valid until", value: day(endsOn) ?? "—" },
       ],
       cardNumber: cardNumberFor(id, "player"),
       season, validUntil: day(endsOn),
       expired: !regSeason || (!!endsOn && endsOn < today()), revoked: false,
-      verifyUrl: `${origin()}/live/player/${id}`, issuedOn,
+      verifyUrl: verifyLink("player", id, season), issuedOn,
     };
   }
 
@@ -236,7 +243,7 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
       ],
       cardNumber: cardNumberFor(id, "coach"), season, validUntil: day(endsOn),
       expired: endsOn < today(), revoked: String(c.status ?? "active").toLowerCase() !== "active",
-      verifyUrl: `${origin()}/live/coach/${id}`, issuedOn,
+      verifyUrl: verifyLink("coach", id, season), issuedOn,
     };
   }
 
@@ -257,7 +264,7 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
       ],
       cardNumber: cardNumberFor(id, "official"), season, validUntil: day(endsOn),
       expired: endsOn < today(), revoked: String(o.status ?? "active").toLowerCase() !== "active",
-      verifyUrl: `${origin()}/live/official/${id}`, issuedOn,
+      verifyUrl: verifyLink("official", id, season), issuedOn,
     };
   }
 
@@ -279,7 +286,7 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
       ],
       cardNumber: cardNumberFor(id, "management"), season, validUntil: day(endsOn),
       expired: endsOn < today(), revoked: String(m.status ?? "active").toLowerCase() === "archived",
-      verifyUrl: `${origin()}/verify/management/${id}`, issuedOn,
+      verifyUrl: verifyLink("management", id, season), issuedOn,
     };
   }
 
@@ -306,7 +313,7 @@ export async function getIdCardData(kind: CardKind, id: string): Promise<IdCardD
     ],
     cardNumber: cardNumberFor(id, "staff", theme.letter), season, validUntil: day(until),
     expired: until < today(), revoked: a.status === "revoked",
-    verifyUrl: `${origin()}/verify/staff/${id}`, issuedOn,
+    verifyUrl: verifyLink("staff", id, season), issuedOn,
   };
 }
 
@@ -394,8 +401,8 @@ function Front({ d, logo }: { d: IdCardData; logo: string }) {
 function Back({ d, logo, qr }: { d: IdCardData; logo: string; qr: string }) {
   const statement =
     d.kind === "player"
-      ? "This card identifies the holder as a player registered with the Rugby League Federation Ghana for the season shown. It must be shown to match officials on request, and remains the property of the federation."
-      : `This card accredits the holder as a ${d.holderNoun} at Rugby League Federation Ghana events for the season shown. It must be shown on request, and remains the property of the federation.`;
+      ? "This card identifies the holder as a player registered with the Rugby League Federation Ghana for the year shown. It must be shown to match officials on request, and remains the property of the federation."
+      : `This card accredits the holder as a ${d.holderNoun} at Rugby League Federation Ghana events for the year shown. It must be shown on request, and remains the property of the federation.`;
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: IVORY, color: INK, fontFamily: "Poppins", position: "relative", overflow: "hidden" }}>
       {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
@@ -410,7 +417,7 @@ function Back({ d, logo, qr }: { d: IdCardData; logo: string; qr: string }) {
           </div>
           <div style={{ display: "flex", fontSize: 15, letterSpacing: 3, marginTop: 14, color: INK }}>SCAN TO VERIFY</div>
           <div style={{ display: "flex", fontSize: 13, color: "#5d6577", marginTop: 4 }}>
-            {d.kind === "player" ? "Club, status and any suspension" : "Shows whether this card is valid"}
+            Checks the card is genuine and valid
           </div>
         </div>
 
