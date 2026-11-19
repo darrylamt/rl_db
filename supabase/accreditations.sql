@@ -32,3 +32,9 @@ create index if not exists accreditations_team_idx on accreditations (team_id);
 -- Service role only: the admin writes through server actions, and the public
 -- verify page reads through the server.
 alter table accreditations enable row level security;
+
+-- Newer Supabase projects don't grant new tables to the API roles on their
+-- own, so the server's key has to be given access explicitly. The public
+-- and signed-in roles get nothing.
+grant select, insert, update on accreditations to service_role;
+revoke all on accreditations from anon, authenticated;
