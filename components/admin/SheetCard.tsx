@@ -86,7 +86,18 @@ export function SheetCard({
         <p className="text-xs text-red-700 mt-2">Sent back — {sheet.review_note}</p>
       )}
 
-      <div className="flex flex-wrap gap-2 mt-3 justify-end">
+      <div className="flex flex-wrap gap-2 mt-3 justify-end items-center">
+        {/* The printable team sheet, as the club sees it: blank numbers to fill in by hand. */}
+        {sheet.fixture?.fixture_id && sheet.team?.team_id && (
+          <a
+            href={`/print/team-sheet/${sheet.fixture.fixture_id}?team=${sheet.team.team_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mr-auto text-xs text-navy-700 hover:underline"
+          >
+            Download team sheet
+          </a>
+        )}
         {reopen ? (
           <form action={reopen.bind(null, sheet.sheet_id)}>
             <button className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50">
