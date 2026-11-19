@@ -278,7 +278,7 @@ export default async function PlayerDetailPage({
       {/* Player header */}
       <div className="flex items-start gap-4 mb-6">
         <Link
-          href={`/admin/id-cards/${playerId}`}
+          href={`/admin/id-cards/player/${playerId}`}
           className="order-last shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-navy-900 px-3 py-2 rounded text-sm font-medium"
         >
           ID card
