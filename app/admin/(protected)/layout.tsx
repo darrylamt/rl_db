@@ -41,6 +41,7 @@ const navSections = [
       { href: "/admin/transfers", label: "Transfers" },
       { href: "/admin/player-history", label: "Club History" },
       { href: "/admin/suspensions", label: "Suspensions" },
+      { href: "/admin/id-cards", label: "ID Cards" },
     ],
   },
   {
@@ -131,8 +132,11 @@ export default async function ProtectedAdminLayout({
 
   return (
     <div className="min-h-screen md:flex bg-slate-50">
-      <AdminSidebar items={navItems} sections={sections} email={user.email ?? undefined} />
-      <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
+      {/* Hidden when printing, so ID card sheets print on their own. */}
+      <div className="contents print:hidden">
+        <AdminSidebar items={navItems} sections={sections} email={user.email ?? undefined} />
+      </div>
+      <main className="flex-1 min-w-0 overflow-x-hidden print:overflow-visible">{children}</main>
     </div>
   );
 }
