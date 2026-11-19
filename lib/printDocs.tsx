@@ -240,6 +240,8 @@ export type TransferSheetData = {
   signatures: Signature[];
   qr: string;
   verifyUrl: string;
+  /** The General Manager's signature, shown in the federation's box. */
+  federationSignature?: { img: string; name: string; title: string } | null;
   example?: boolean;
 };
 
@@ -299,7 +301,11 @@ export function TransferSheetDoc({ d }: { d: TransferSheetData }) {
         {loan
           ? `${d.player.name} is registered to play for ${d.to.name} on loan from ${d.from.name} until ${fmtDate(d.loanUntil)}, after which the registration returns to ${d.from.name}.`
           : `The registration of ${d.player.name} passes from ${d.from.name} to ${d.to.name} from the effective date above.`}{" "}
-        Fees are in LeagueX, the federation&rsquo;s currency, and have been settled on the federation&rsquo;s ledger.
+        Fees are in LeagueX (LX) and have been settled on the federation&rsquo;s ledger.
+      </p>
+      <p className="rl-note" style={{ marginTop: "1.5mm", fontWeight: 600 }}>
+        LeagueX is not real money. It is a points currency used only inside the RLFG platform to balance transfers between clubs: it has
+        no cash value and cannot be bought, sold, paid out or exchanged for money.
       </p>
 
       <div className="rl-h2">Signatures</div>
@@ -325,10 +331,23 @@ export function TransferSheetDoc({ d }: { d: TransferSheetData }) {
             ) : (
               <div className="rl-stamp missing">Awaiting signature</div>
             )}
-            <div className="rl-line">
-              <span>Signature (optional, in ink)</span>
-              <span>Date</span>
-            </div>
+            {s.party === "Federation" && d.federationSignature?.img ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={d.federationSignature.img} alt="" style={{ height: "13mm", maxWidth: "60mm", objectFit: "contain", objectPosition: "left bottom", display: "block", marginTop: "2mm" }} />
+                <div className="rl-line" style={{ marginTop: 0 }}>
+                  <span>
+                    {d.federationSignature.name}, {d.federationSignature.title}
+                  </span>
+                  <span>{s.at ? new Date(s.at).toLocaleDateString("en-GB") : ""}</span>
+                </div>
+              </>
+            ) : (
+              <div className="rl-line">
+                <span>Signature (optional, in ink)</span>
+                <span>Date</span>
+              </div>
+            )}
           </div>
         ))}
       </div>

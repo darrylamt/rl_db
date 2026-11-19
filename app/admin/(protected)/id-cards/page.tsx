@@ -120,7 +120,10 @@ export default async function IdCardsPage({
       <ListHeader title="ID Cards" eyebrow="ACCREDITATION" />
       <p className="text-sm text-slate-500 -mt-3 mb-5 max-w-2xl">
         Bank-card size and print-ready, each group in its own colours. The back carries a QR code that shows whether the
-        card is still valid. Only the federation can issue cards.
+        card is still valid. Only the federation can issue cards.{" "}
+        <Link href="/admin/id-cards/signature" className="text-navy-700 hover:underline">
+          General Manager&rsquo;s signature →
+        </Link>
       </p>
 
       {/* One tab per group */}

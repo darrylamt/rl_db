@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/server";
 import { signCard } from "@/lib/cardToken";
+import { getSignatory, signatureImage } from "@/lib/signature";
 import { appOrigin } from "@/lib/liveShare";
 
 /**
@@ -398,7 +399,9 @@ function Front({ d, logo }: { d: IdCardData; logo: string }) {
   );
 }
 
-function Back({ d, logo, qr }: { d: IdCardData; logo: string; qr: string }) {
+type Sig = { img: string | null; name: string; title: string } | null;
+
+function Back({ d, logo, qr, sig }: { d: IdCardData; logo: string; qr: string; sig: Sig }) {
   const statement =
     d.kind === "player"
       ? "This card identifies the holder as a player registered with the Rugby League Federation Ghana for the year shown. It must be shown to match officials on request, and remains the property of the federation."
@@ -442,8 +445,15 @@ function Back({ d, logo, qr }: { d: IdCardData; logo: string; qr: string }) {
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: "0 46px 30px 46px" }}>
         <div style={{ display: "flex", flexDirection: "column", width: 330 }}>
+          {/* The General Manager's signature, set in Admin → ID Cards → Signature. */}
+          {sig?.img ? (
+            // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+            <img src={sig.img} width={300} height={78} style={{ width: 300, height: 78, objectFit: "contain", objectPosition: "left bottom", marginBottom: -4 }} />
+          ) : null}
           <div style={{ display: "flex", borderTop: `2px solid ${INK}`, width: 330 }} />
-          <div style={{ display: "flex", fontSize: 14, color: "#5d6577", marginTop: 6 }}>General Manager, RLFG</div>
+          <div style={{ display: "flex", fontSize: 14, color: "#5d6577", marginTop: 6 }}>
+            {sig ? `${sig.name}, ${sig.title}` : "General Manager, RLFG"}
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
           <div style={{ display: "flex", fontSize: 13, color: "#5d6577" }}>If found, please return to</div>
@@ -455,13 +465,22 @@ function Back({ d, logo, qr }: { d: IdCardData; logo: string; qr: string }) {
 }
 
 /** One side of a card as a PNG. Never cached: it carries today's status. */
-export async function renderIdCard(d: IdCardData, side: "front" | "back") {
+/** `signature` overrides the saved one, for previews and examples. */
+export async function renderIdCard(d: IdCardData, side: "front" | "back", opts?: { signature?: Sig }) {
   const logo = await federationCrest();
   const node =
     side === "front" ? (
       <Front d={d} logo={logo} />
     ) : (
-      <Back d={d} logo={logo} qr={await QRCode.toDataURL(d.verifyUrl, { margin: 0, width: 524, errorCorrectionLevel: "M", color: { dark: INK, light: "#ffffff" } })} />
+      <Back
+        d={d}
+        logo={logo}
+        qr={await QRCode.toDataURL(d.verifyUrl, { margin: 0, width: 524, errorCorrectionLevel: "M", color: { dark: INK, light: "#ffffff" } })}
+        sig={opts?.signature !== undefined ? opts.signature : await (async () => {
+          const s = await getSignatory();
+          return s ? { img: await signatureImage(s), name: s.name, title: s.title } : null;
+        })()}
+      />
     );
   return new ImageResponse(node, { ...CARD, fonts: await loadFonts(), headers: { "Cache-Control": "private, no-store" } });
 }

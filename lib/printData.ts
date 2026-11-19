@@ -4,6 +4,7 @@ import { cardNumberFor } from "@/lib/idCard";
 import { signCard } from "@/lib/cardToken";
 import { appOrigin } from "@/lib/liveShare";
 import type { TeamSheetData, TransferSheetData } from "@/lib/printDocs";
+import { getSignatory } from "@/lib/signature";
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const fullName = (p: any) => `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim();
@@ -139,5 +140,8 @@ export async function getTransferSheetData(requestId: string, crest = "/federati
     qr,
     verifyUrl,
   };
+  // The General Manager's signature in the federation's box, once approved.
+  const sig = r.status === "approved" ? await getSignatory() : null;
+  data.federationSignature = sig ? { img: sig.url, name: sig.name, title: sig.title } : null;
   return { data, raw: r };
 }
