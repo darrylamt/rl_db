@@ -17,21 +17,34 @@ export default async function IdCardsPage({
   const supabase = createAdminClient();
   const team = searchParams?.team ?? "";
   const q = (searchParams?.q ?? "").trim();
-  const safeQ = q.replace(/[%,()]/g, "");
+  // Each word must match a first or last name, so "Darryl Amoatey" works.
+  const words = q.split(/\s+/).map((w) => w.replace(/[%,()]/g, "")).filter(Boolean);
 
   const { data: teams } = await supabase.from("teams").select("team_id, name").order("name");
 
-  let players: any[] = [];
-  if (team || q) {
+  const find = async (byTeam: boolean) => {
     let query = supabase
       .from("players")
       .select("player_id, first_name, last_name, position, team:team_id(name)")
       .order("last_name")
       .limit(200);
-    if (team) query = query.eq("team_id", team);
-    if (safeQ) query = query.or(`first_name.ilike.%${safeQ}%,last_name.ilike.%${safeQ}%`);
-    players = (await query).data ?? [];
+    if (byTeam && team) query = query.eq("team_id", team);
+    for (const w of words) query = query.or(`first_name.ilike.%${w}%,last_name.ilike.%${w}%`);
+    return (await query).data ?? [];
+  };
+
+  let players: any[] = [];
+  // A name that isn't at the chosen club is looked for everywhere, and the
+  // page says so, rather than reporting nobody.
+  let widened = false;
+  if (team || words.length) {
+    players = await find(true);
+    if (!players.length && team && words.length) {
+      players = await find(false);
+      widened = players.length > 0;
+    }
   }
+  const teamName = (teams ?? []).find((t: any) => t.team_id === team)?.name;
 
   // The season each player last registered for, so an unregistered player's
   // card isn't printed by mistake.
@@ -78,6 +91,11 @@ export default async function IdCardsPage({
         <p className="text-sm text-slate-500">No players found.</p>
       ) : (
         <form method="get" action="/admin/id-cards/print">
+          {widened && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+              Nobody called &ldquo;{q}&rdquo; at {teamName ?? "that club"}, so these are from every club.
+            </p>
+          )}
           <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
             {players.map((p) => {
               const season = latest.get(p.player_id);
