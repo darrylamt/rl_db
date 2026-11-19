@@ -1,5 +1,8 @@
 "use client";
 
+import { shrinkImageInBrowser } from "@/lib/shrinkImageInBrowser";
+import { uploadTooBig } from "@/lib/uploadLimits";
+
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -69,18 +72,23 @@ export function MatchSheets({
     try {
       for (const file of files) {
         setBusy(`Uploading ${file.name}…`);
+        const tooBig = uploadTooBig(file.size, file.type);
+        if (tooBig) throw new Error(tooBig);
+        const upload = await shrinkImageInBrowser(file);
         const res = await fetch("/api/match-sheets/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fixtureId, filename: file.name }),
+          body: JSON.stringify({ fixtureId, filename: upload.name, size: upload.size, type: upload.type }),
         });
         const payload = await res.json();
         if (!payload?.ok) throw new Error(payload?.error ?? "Could not start the upload");
-        const { bucket, path, token, publicUrl } = payload.data;
-        const { error: upErr } = await createClient()
-          .storage.from(bucket)
-          .uploadToSignedUrl(path, token, file);
-        if (upErr) throw new Error(upErr.message);
+        const { uploadUrl, publicUrl } = payload.data;
+        const put = await fetch(uploadUrl, {
+          method: "PUT",
+          body: upload,
+          headers: { "Content-Type": upload.type || "application/octet-stream" },
+        });
+        if (!put.ok) throw new Error(`Upload failed (${put.status})`);
         await save(publicUrl);
       }
     } catch (err: any) {

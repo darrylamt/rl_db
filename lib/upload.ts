@@ -1,6 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { r2Key, r2Put } from "@/lib/r2";
+import { shrinkImage } from "@/lib/shrinkImage";
+import { uploadTooBig } from "@/lib/uploadLimits";
 
 export type UploadBucket =
   | "team-logos"
@@ -8,28 +10,17 @@ export type UploadBucket =
   | "content-images"
   | "documents";
 
-/** Uploads a file and returns its public URL. */
+/** Uploads a file to R2 and returns its public URL. */
 export async function uploadFile(
   file: File,
   bucket: UploadBucket,
   prefix: string
 ): Promise<string> {
-  const supabase = createAdminClient();
-  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
-  const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-    contentType: file.type || "application/octet-stream",
-    upsert: false,
-  });
-
-  if (error) throw new Error(`Upload failed: ${error.message}`);
-
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+  const tooBig = uploadTooBig(file.size, file.type);
+  if (tooBig) throw new Error(tooBig);
+  // Pictures are shrunk before they are stored; documents go as they are.
+  const out = await shrinkImage(await file.arrayBuffer(), file.type || "application/octet-stream", file.name);
+  return r2Put(r2Key(bucket, prefix, out.filename), out.body, out.type);
 }
 
 export async function uploadImageFile(

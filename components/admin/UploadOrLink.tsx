@@ -1,5 +1,8 @@
 "use client";
 
+import { shrinkImageInBrowser } from "@/lib/shrinkImageInBrowser";
+import { uploadTooBig } from "@/lib/uploadLimits";
+
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -51,22 +54,27 @@ export function UploadOrLink({
 
     setStatus({ kind: "uploading", name: file.name });
     try {
+      const tooBig = uploadTooBig(file.size, file.type);
+      if (tooBig) throw new Error(tooBig);
+      // Pictures are shrunk here, before they leave the phone or laptop.
+      const upload = await shrinkImageInBrowser(file);
       const res = await fetch("/api/admin/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bucket, prefix, filename: file.name }),
+        body: JSON.stringify({ bucket, prefix, filename: upload.name, size: upload.size, type: upload.type }),
       });
       const payload = await res.json();
       if (!payload?.ok) {
         throw new Error(payload?.error ?? "Could not start the upload");
       }
 
-      const { path, token, publicUrl } = payload.data;
-      const supabase = createClient();
-      const { error } = await supabase.storage
-        .from(bucket)
-        .uploadToSignedUrl(path, token, file);
-      if (error) throw new Error(error.message);
+      const { uploadUrl, publicUrl } = payload.data;
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        body: upload,
+        headers: { "Content-Type": upload.type || "application/octet-stream" },
+      });
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
 
       setUrl(publicUrl);
       setStatus({ kind: "done", name: file.name });

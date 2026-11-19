@@ -1,3 +1,5 @@
+import { r2Put } from "@/lib/r2";
+import { shrinkImage } from "@/lib/shrinkImage";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { fail } from "@/lib/api";
 import { NextResponse } from "next/server";
@@ -46,31 +48,9 @@ export async function POST(req: Request) {
   const rand = Math.random().toString(36).slice(2, 10);
   const path = `${Date.now()}-${rand}.${ext}`;
 
-  // Upload with service-role client (bypasses RLS on storage.objects)
-  const admin = createAdminClient();
-  const arrayBuffer = await file.arrayBuffer();
-
-  const { error: uploadError } = await admin.storage
-    .from(BUCKET)
-    .upload(path, arrayBuffer, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    // If the bucket doesn't exist yet, give a helpful message
-    if (uploadError.message?.includes("Bucket not found")) {
-      return fail(
-        'Storage bucket "article-images" not found. Run supabase/article_images_bucket.sql in your Supabase SQL editor first.',
-        500
-      );
-    }
-    return fail(uploadError.message, 500);
-  }
-
-  const {
-    data: { publicUrl },
-  } = admin.storage.from(BUCKET).getPublicUrl(path);
+  // Shrunk before storing: article photos were averaging nearly 1 MB each.
+  const out = await shrinkImage(await file.arrayBuffer(), file.type || "image/jpeg", path);
+  const publicUrl = await r2Put(`${BUCKET}/${out.filename}`, out.body, out.type);
 
   return NextResponse.json({ url: publicUrl });
 }

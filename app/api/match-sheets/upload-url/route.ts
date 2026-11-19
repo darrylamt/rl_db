@@ -1,4 +1,5 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { r2Key, r2PublicUrl, r2UploadUrl } from "@/lib/r2";
+import { uploadTooBig } from "@/lib/uploadLimits";
 import { ok, fail, readJson } from "@/lib/api";
 import { getAppUser } from "@/lib/auth";
 
@@ -24,28 +25,15 @@ export async function POST(req: Request) {
     return fail("Match sheets are for recorders and the federation", 403);
   }
 
-  const body = await readJson<{ fixtureId?: string; filename?: string }>(req);
+  const body = await readJson<{ fixtureId?: string; filename?: string; size?: number; type?: string }>(req);
   const fixtureId = (body?.fixtureId ?? "").replace(/[^a-f0-9-]/gi, "");
   if (!fixtureId) return fail("Which match?");
 
-  const ext = (body?.filename?.split(".").pop() ?? "jpg")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "") || "jpg";
-  const path = `${fixtureId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
-  if (error) {
-    const missing = /not found/i.test(error.message);
-    return fail(
-      missing ? "Match sheets aren't set up yet — run supabase/match_sheets.sql." : error.message,
-      500
-    );
-  }
-
-  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const tooBig = uploadTooBig(Number(body?.size ?? 0), body?.type);
+  if (tooBig) return fail(tooBig, 413);
+  const key = r2Key(BUCKET, fixtureId, body?.filename ?? "sheet.jpg");
   return ok(
-    { bucket: BUCKET, path: data.path, token: data.token, publicUrl: pub.publicUrl },
+    { uploadUrl: await r2UploadUrl(key), publicUrl: r2PublicUrl(key) },
     { cache: "none" }
   );
 }

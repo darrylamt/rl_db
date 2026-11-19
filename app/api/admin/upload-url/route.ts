@@ -1,4 +1,5 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { r2Key, r2PublicUrl, r2UploadUrl } from "@/lib/r2";
+import { uploadTooBig } from "@/lib/uploadLimits";
 import { ok, fail, requireAdmin, readJson } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,8 @@ export async function POST(req: Request) {
   const body = await readJson<{
     bucket?: string;
     filename?: string;
+    size?: number;
+    type?: string;
     prefix?: string;
   }>(req);
   if (!body) return fail("Invalid JSON body");
@@ -35,25 +38,13 @@ export async function POST(req: Request) {
   const bucket = body.bucket ?? "";
   if (!ALLOWED_BUCKETS.has(bucket)) return fail("Unknown bucket");
 
-  const ext = (body.filename?.split(".").pop() ?? "bin")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-  const prefix = (body.prefix ?? "misc").replace(/[^a-z0-9/_-]/gi, "");
-  const path = `${prefix}/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}.${ext}`;
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUploadUrl(path);
-
-  if (error) return fail(error.message, 500);
-
-  const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
-
+  // Straight to R2 with a ten-minute signed link; the public address is
+  // what gets saved.
+  const tooBig = uploadTooBig(Number(body?.size ?? 0), body?.type);
+  if (tooBig) return fail(tooBig, 413);
+  const key = r2Key(bucket, body.prefix ?? "misc", body.filename ?? "file.bin");
   return ok(
-    { bucket, path: data.path, token: data.token, publicUrl: pub.publicUrl },
+    { uploadUrl: await r2UploadUrl(key), publicUrl: r2PublicUrl(key) },
     { cache: "none" }
   );
 }

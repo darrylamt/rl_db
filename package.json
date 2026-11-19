@@ -24,9 +24,11 @@
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",
     "@tiptap/starter-kit": "^3.23.6",
+    "aws4fetch": "^1.0.20",
     "next": "14.2.35",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/node": "^20",

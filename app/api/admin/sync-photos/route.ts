@@ -1,3 +1,4 @@
+import { r2Put } from "@/lib/r2";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { fail } from "@/lib/api";
 import { NextResponse } from "next/server";
@@ -174,13 +175,8 @@ export async function POST(req: Request) {
       const ext = photo.filename.split(".").pop()?.toLowerCase() ?? "jpg";
       const path = `${playerId}.${ext}`;
 
-      // Upload (upsert so re-running is safe)
-      const { error: uploadError } = await admin.storage
-        .from(BUCKET)
-        .upload(path, buffer, { contentType, upsert: true });
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: { publicUrl } } = admin.storage.from(BUCKET).getPublicUrl(path);
+      // Upload to R2 (same key each time, so re-running overwrites)
+      const publicUrl = await r2Put(`${BUCKET}/${path}`, buffer, contentType);
 
       // Update player
       const { error: updateError } = await admin
