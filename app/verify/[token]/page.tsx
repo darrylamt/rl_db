@@ -4,6 +4,7 @@ import { readCard } from "@/lib/cardToken";
 import { getIdCardData, type CardKind } from "@/lib/idCard";
 import { currentSuspensions } from "@/lib/suspensions";
 import { createPublicClient } from "@/lib/supabase/server";
+import { getTransferSheetData } from "@/lib/printData";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ const PROFILE: Partial<Record<CardKind, string>> = { player: "player", coach: "c
  */
 export default async function VerifyCard({ params }: { params: { token: string } }) {
   const card = readCard(decodeURIComponent(params.token));
+  if (card?.kind === "transfer") return <TransferCheck id={card.id} />;
   const d = card ? await getIdCardData(card.kind as CardKind, card.id) : null;
 
   if (!card || !d) {
@@ -94,6 +96,40 @@ export default async function VerifyCard({ params }: { params: { token: string }
           </Link>
         )}
       </div>
+    </Shell>
+  );
+}
+
+/** A scanned transfer sheet: the federation's record of the move, to compare with the paper. */
+async function TransferCheck({ id }: { id: string }) {
+  const sheet = await getTransferSheetData(id);
+  if (!sheet) {
+    return (
+      <Shell>
+        <div className="bg-red-700 px-5 py-5">
+          <p className="text-[11px] uppercase tracking-widest text-white/80">RLFG transfer check</p>
+          <p className="font-display text-3xl">Not on record</p>
+        </div>
+      </Shell>
+    );
+  }
+  const d = sheet.data;
+  const done = sheet.raw.status === "approved";
+  return (
+    <Shell>
+      <div className={`${done ? "bg-emerald-600" : "bg-amber-600"} px-5 py-4`}>
+        <p className="text-[11px] uppercase tracking-widest text-white/80">RLFG transfer check</p>
+        <p className="font-display text-3xl">{done ? "Genuine" : "Not completed"}</p>
+        <p className="text-sm text-white/90">{d.reference} · {d.kind === "loan" ? "Loan" : "Transfer"}</p>
+      </div>
+      <dl className="p-5 grid grid-cols-[7rem_1fr] gap-y-2 text-sm">
+        <dt className="text-slate-400">Player</dt><dd>{d.player.name}</dd>
+        <dt className="text-slate-400">From</dt><dd>{d.from.name}</dd>
+        <dt className="text-slate-400">To</dt><dd>{d.to.name}</dd>
+        {d.kind === "loan" && (<><dt className="text-slate-400">Loan ends</dt><dd>{d.loanUntil ?? "—"}</dd></>)}
+        <dt className="text-slate-400">Approved</dt><dd>{done && d.effective ? new Date(d.effective).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "Not yet"}</dd>
+      </dl>
+      <p className="px-5 pb-5 text-xs text-slate-400">Compare these details with the printed sheet. If anything differs, the paper has been changed.</p>
     </Shell>
   );
 }

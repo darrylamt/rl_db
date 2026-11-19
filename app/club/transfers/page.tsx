@@ -222,6 +222,11 @@ export default async function ClubTransfersPage({
               {r.status !== "approved" && (
                 <span className="text-slate-400"> · on sign-off</span>
               )}
+              {r.status === "approved" && (
+                <Link href={`/print/transfer/${r.request_id}`} className="ml-2 text-navy-700 hover:underline">
+                  Print transfer sheet
+                </Link>
+              )}
             </p>
           )}
         </div>

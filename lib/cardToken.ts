@@ -15,10 +15,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * them all if it ever leaks.
  */
 
-export type CardKindLetter = "P" | "C" | "O" | "M" | "S";
+export type CardKindLetter = "P" | "C" | "O" | "M" | "S" | "T";
 
-const KIND_TO_LETTER: Record<string, CardKindLetter> = { player: "P", coach: "C", official: "O", management: "M", staff: "S" };
-const LETTER_TO_KIND: Record<CardKindLetter, string> = { P: "player", C: "coach", O: "official", M: "management", S: "staff" };
+// T is a transfer sheet: the same signature proves a printed sheet is genuine.
+const KIND_TO_LETTER: Record<string, CardKindLetter> = { player: "P", coach: "C", official: "O", management: "M", staff: "S", transfer: "T" };
+const LETTER_TO_KIND: Record<CardKindLetter, string> = { P: "player", C: "coach", O: "official", M: "management", S: "staff", T: "transfer" };
 
 function secret() {
   const s = process.env.ID_CARD_SECRET;
@@ -40,7 +41,7 @@ export function signCard(kind: string, id: string, year: string): string {
 
 /** The card the code was issued for, or null if it isn't one the federation signed. */
 export function readCard(token: string): { kind: string; id: string; year: string } | null {
-  const m = String(token ?? "").match(/^([PCOMS])([0-9a-f]{32})(\d{4})\.([A-Za-z0-9_-]{16})$/);
+  const m = String(token ?? "").match(/^([PCOMST])([0-9a-f]{32})(\d{4})\.([A-Za-z0-9_-]{16})$/);
   if (!m) return null;
   const [, letter, hex, year, sig] = m;
   let expected: string;

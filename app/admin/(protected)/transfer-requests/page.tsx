@@ -137,14 +137,20 @@ export default async function TransferRequestsPage({
               </h2>
               <div className="grid gap-3 md:grid-cols-2">
                 {settled.slice(0, 20).map((r) => (
-                  <TransferCard
-                    key={r.request_id}
-                    request={r}
-                    buyerBalance={balanceOf(r.to_team?.team_id)}
-                    approve={approveTransfer}
-                    decline={declineTransfer}
-                    readOnly
-                  />
+                  <div key={r.request_id} className="grid gap-1">
+                    <TransferCard
+                      request={r}
+                      buyerBalance={balanceOf(r.to_team?.team_id)}
+                      approve={approveTransfer}
+                      decline={declineTransfer}
+                      readOnly
+                    />
+                    {r.status === "approved" && (
+                      <Link href={`/print/transfer/${r.request_id}`} className="text-xs text-navy-700 hover:underline justify-self-end">
+                        Print transfer sheet →
+                      </Link>
+                    )}
+                  </div>
                 ))}
               </div>
             </section>

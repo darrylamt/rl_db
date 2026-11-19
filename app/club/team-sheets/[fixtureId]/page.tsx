@@ -99,9 +99,18 @@ export default async function BuildTeamSheetPage({
       </Link>
 
       <div className="mt-3 mb-5">
-        <h1 className="font-display text-2xl font-bold text-navy-900 break-words">
-          {f.home?.name} v {f.away?.name}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="font-display text-2xl font-bold text-navy-900 break-words">
+            {f.home?.name} v {f.away?.name}
+          </h1>
+          {/* Prints what is saved; blank numbers are left to fill in by hand. */}
+          <Link
+            href={`/print/team-sheet/${fixtureId}`}
+            className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-navy-900 px-3 py-2 rounded text-sm font-medium"
+          >
+            Print team sheet
+          </Link>
+        </div>
         <p className="text-sm text-slate-500 mt-0.5 break-words">
           {[f.scheduled_date, f.scheduled_time?.slice(0, 5), f.venue?.name, f.competition?.name]
             .filter(Boolean)

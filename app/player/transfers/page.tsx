@@ -290,7 +290,7 @@ export default async function PlayerTransfersPage({
                         : b.status === "with_federation"
                         ? "with the federation"
                         : b.status === "approved"
-                        ? "done"
+                        ? <a href={`/print/transfer/${b.request_id}`} className="text-ghanaYellow-500 hover:underline">done · print sheet</a>
                         : b.status === "rejected"
                         ? "your club said no"
                         : b.status === "player_declined"
