@@ -1,6 +1,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
+import { uploadArticleImage } from "@/lib/uploadArticleImage";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -135,12 +136,7 @@ function ImageInsert({ onInsert }: { onInsert: (url: string) => void }) {
     setUploading(true);
     setUploadError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/articles/upload", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
-      onInsert(json.url);
+      onInsert(await uploadArticleImage(file));
       setOpen(false);
     } catch (err: any) {
       setUploadError(err.message ?? "Upload failed");

@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { uploadArticleImage } from "@/lib/uploadArticleImage";
 import { saveArticle, setArticleStatus, deleteArticle } from "../actions";
 
 interface Article {
@@ -107,12 +108,7 @@ export function ArticleEditor({ article }: { article: Article }) {
     setCoverUploading(true);
     setError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/articles/upload", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
-      setCoverUrl(json.url);
+      setCoverUrl(await uploadArticleImage(file));
     } catch (err: any) {
       setError(err.message ?? "Image upload failed");
     } finally {
