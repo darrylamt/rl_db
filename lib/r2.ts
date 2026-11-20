@@ -54,11 +54,20 @@ export async function r2Put(
   body: ArrayBuffer | Uint8Array | Buffer,
   contentType = "application/octet-stream"
 ): Promise<string> {
-  const res = await client().fetch(objectUrl(key), {
+  // Signed first, then sent as plain bytes. Handing the body to the signing
+  // client wraps it in a stream, which goes out without a Content-Length,
+  // and R2 refuses that (411 MissingContentLength) for anything but text.
+  const bytes = body instanceof ArrayBuffer ? new Uint8Array(body) : new Uint8Array(body);
+  const signed = await client().sign(objectUrl(key), {
     method: "PUT",
-    body: body as any,
-    headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=31536000, immutable" },
+    body: bytes,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Length": String(bytes.byteLength),
+    },
   });
+  const res = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: bytes });
   if (!res.ok) throw new Error(`Upload failed (${res.status}): ${await res.text()}`);
   return r2PublicUrl(key);
 }
