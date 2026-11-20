@@ -26,7 +26,7 @@ export default async function RecordersPage({
 
   const { data: accounts, error } = await supabase
     .from("app_users")
-    .select("user_id, role, email, created_at, status, held_reason")
+    .select("user_id, role, email, created_at, status, held_reason, must_change_password")
     .eq("role", "recorder")
     .order("created_at", { ascending: false });
 
@@ -74,6 +74,8 @@ export default async function RecordersPage({
           <p className="text-xs text-slate-500">
             Set the first password yourself and hand it over. Send them to{" "}
             <span className="font-mono text-navy-800">/enter</span> on the day.
+            The first time they sign in they choose their own, and the same
+            happens after you reset it.
           </p>
         </div>
         <label className="text-sm">
@@ -129,6 +131,14 @@ export default async function RecordersPage({
                     {a.status === "on_hold" && (
                       <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                         on hold
+                      </span>
+                    )}
+                    {a.must_change_password && a.status !== "on_hold" && (
+                      <span
+                        className="ml-2 text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded"
+                        title="Still on the password the federation set. They choose their own when they next sign in."
+                      >
+                        not set up
                       </span>
                     )}
                   </td>

@@ -99,6 +99,7 @@ export function AccountRowActions({
             type="text"
             minLength={8}
             placeholder="new password"
+            title="They are asked to choose their own the next time they sign in."
             className="text-xs px-2 py-1 rounded border border-slate-300 w-40"
           />
           <button className="text-xs font-medium px-2.5 py-1 rounded bg-navy-900 hover:bg-navy-800 text-white">

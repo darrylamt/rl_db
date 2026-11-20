@@ -31,13 +31,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Only where a sign-in matters: the admin, club, recorder and player
-  // portals, the print pages, and the API (see above). The public /live
+  // portals, choosing a password, the print pages, and the API (see above). The public /live
   // pages, the verify page and static files never run this at all.
   matcher: [
     "/admin/:path*",
     "/club/:path*",
     "/enter/:path*",
     "/player/:path*",
+    "/account/:path*",
     "/print/:path*",
     "/api/:path*",
   ],

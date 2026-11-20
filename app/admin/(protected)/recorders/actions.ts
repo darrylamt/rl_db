@@ -64,6 +64,7 @@ async function attemptCreate(fd: FormData): Promise<Outcome> {
       user_id: existing.id,
       role: "recorder",
       email,
+      must_change_password: true,
     });
     if (roleError) return { error: describe(roleError.message) };
 
@@ -81,10 +82,13 @@ async function attemptCreate(fd: FormData): Promise<Outcome> {
   const userId = created.user?.id;
   if (!userId) return { error: "The account was not created." };
 
+  // The federation typed this password, so the recorder is asked to replace
+  // it the first time they sign in.
   const { error } = await supabase.from("app_users").insert({
     user_id: userId,
     role: "recorder",
     email,
+    must_change_password: true,
   });
   if (error) {
     // Leave nothing half-made: an account that can sign in but has no role
@@ -157,6 +161,8 @@ export async function resetRecorderPassword(userId: string, fd: FormData) {
   } else {
     const { error } = await supabase.auth.admin.updateUserById(userId, { password });
     if (!error) {
+      // The federation knows this one, so the next sign-in asks for a new one.
+      await supabase.from("app_users").update({ must_change_password: true }).eq("user_id", userId);
       // The one account change with no row for a trigger to see: the
       // password lives in auth.users, which the audit triggers do not cover.
       await record({

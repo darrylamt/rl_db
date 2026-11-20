@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requirePlayer, getAppUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/server";
+import { requirePlayer } from "@/lib/auth";
 import { lengthProblem } from "@/lib/contracts";
 
 type Outcome = { error: string } | { note: string };
@@ -108,44 +108,6 @@ export async function setAvailability(fixtureId: string, status: string) {
         },
     "/player/availability"
   );
-}
-
-/**
- * Changes the password.
- *
- * Every seeded account starts on the same one, so this is the first thing an
- * account is asked to do and the only thing it can reach until it has.
- */
-export async function changePassword(fd: FormData) {
-  const user = await getAppUser();
-  if (!user) redirect("/admin/login");
-
-  const password = (fd.get("password") as string) ?? "";
-  const again = (fd.get("again") as string) ?? "";
-
-  let outcome: Outcome;
-  if (password.length < 8) {
-    outcome = { error: "Pick something at least 8 characters long." };
-  } else if (password !== again) {
-    outcome = { error: "Those two do not match." };
-  } else if (password === "RLFG@08") {
-    outcome = { error: "That is the shared one everybody starts with. Pick your own." };
-  } else {
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      outcome = { error: error.message };
-    } else {
-      const admin = createAdminClient();
-      await admin
-        .from("app_users")
-        .update({ must_change_password: false })
-        .eq("user_id", user.userId);
-      redirect("/player?note=Password+changed.+Welcome+in.");
-    }
-  }
-
-  redirect(`/player/password?${new URLSearchParams(outcome as any)}`);
 }
 
 /**

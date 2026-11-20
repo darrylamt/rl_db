@@ -46,6 +46,10 @@ export async function updateSession(request: NextRequest) {
   // never signed in reaches the form and every save fails silently.
   const isEnterRoute = pathname.startsWith("/enter");
   const isPlayerRoute = pathname.startsWith("/player");
+  // Choosing your own password. Shared by every kind of account, so it sits
+  // outside all four portals and none of the role redirects below touch it.
+  const isAccountRoute = pathname.startsWith("/account");
+  const PASSWORD_PAGE = "/account/password";
   const isLoginRoute = pathname === "/admin/login";
   // Signing out lives under /admin but belongs to everyone. Without this it
   // is treated as the federation's admin and a club or recorder is bounced
@@ -53,7 +57,7 @@ export async function updateSession(request: NextRequest) {
   // them no way to sign out at all.
   const isLogoutRoute = pathname === "/admin/logout";
 
-  if ((isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute) && !isLoginRoute && !user) {
+  if ((isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute || isAccountRoute) && !isLoginRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
@@ -69,7 +73,7 @@ export async function updateSession(request: NextRequest) {
   let mustChange = false;
   let termsVersion: string | null = null;
   let termsColumnPresent = true;
-  if (user && (isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute || isLoginRoute)) {
+  if (user && (isAdminRoute || isClubRoute || isEnterRoute || isPlayerRoute || isAccountRoute || isLoginRoute)) {
     // terms_version arrives with supabase/player_terms.sql. Asking for a
     // column that is not there yet fails the whole row, and a null row here
     // reads as "unprovisioned" — which would lock every account out of the
@@ -135,16 +139,24 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Every seeded player starts on the same password. Nothing else is
-  // reachable until that has been dealt with.
+  // A password the federation set (a new login, or a reset) is one the
+  // federation also knows. Clubs, recorders and players alike reach nothing
+  // else until they have picked their own.
   if (
     user &&
     mustChange &&
     !isLogoutRoute &&
-    pathname !== "/player/password"
+    pathname !== PASSWORD_PAGE
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = "/player/password";
+    url.pathname = PASSWORD_PAGE;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && !mustChange && pathname === PASSWORD_PAGE) {
+    const url = request.nextUrl.clone();
+    url.pathname = home;
     url.search = "";
     return NextResponse.redirect(url);
   }

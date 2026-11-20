@@ -30,7 +30,7 @@ export default async function ClubAccountsPage({
     await Promise.all([
       supabase
         .from("app_users")
-        .select("user_id, role, email, created_at, status, held_reason, team:team_id(team_id, name, logo_url)")
+        .select("user_id, role, email, created_at, status, held_reason, must_change_password, team:team_id(team_id, name, logo_url)")
         .order("created_at", { ascending: false }),
       supabase
         .from("teams")
@@ -108,8 +108,9 @@ export default async function ClubAccountsPage({
         <div className="sm:col-span-4">
           <h2 className="font-display text-lg text-navy-900">Issue a login</h2>
           <p className="text-xs text-slate-500">
-            Set the first password yourself and pass it to the club — they can
-            use it straight away.
+            Set the first password yourself and pass it to the club. The first
+            time they sign in they are asked to choose their own, and the same
+            happens after you reset it.
           </p>
         </div>
         <label className="text-sm">
@@ -183,6 +184,14 @@ export default async function ClubAccountsPage({
                     {a.status === "on_hold" && (
                       <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                         on hold
+                      </span>
+                    )}
+                    {a.must_change_password && a.status !== "on_hold" && (
+                      <span
+                        className="ml-2 text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded"
+                        title="Still on the password the federation set. They choose their own when they next sign in."
+                      >
+                        not set up
                       </span>
                     )}
                   </td>
