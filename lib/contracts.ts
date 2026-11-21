@@ -72,11 +72,21 @@ export function lengthProblem(starts: string, ends: string): string | null {
   return null;
 }
 
-/** The live contract from a set, if there is one. */
-export function liveContract(list: Contract[] | null | undefined): Contract | null {
+/**
+ * The live contract from a set, if there is one.
+ *
+ * A player who has accepted a renewal holds two: the one running now and the
+ * one that follows it. The later one is what they are signed until, so that
+ * is the one that counts.
+ */
+export function liveContract<T extends { status: string; ends_on: string }>(
+  list: T[] | null | undefined
+): T | null {
   const today = new Date().toISOString().slice(0, 10);
   return (
-    (list ?? []).find((c) => c.status === "accepted" && c.ends_on >= today) ?? null
+    (list ?? [])
+      .filter((c) => c.status === "accepted" && c.ends_on >= today)
+      .sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0] ?? null
   );
 }
 

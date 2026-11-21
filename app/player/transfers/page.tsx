@@ -2,7 +2,7 @@ import { requirePlayer } from "@/lib/auth";
 import { getPlayerValue } from "@/lib/playerValue";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
-import { remaining, describeLength, monthsBetween, type Contract } from "@/lib/contracts";
+import { remaining, describeLength, monthsBetween, liveContract, type Contract } from "@/lib/contracts";
 import { answerBid, requestMove, withdrawMoveRequest } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ export default async function PlayerTransfersPage({
 
   const notMigrated = !!error && /transfer_requests/.test(error.message);
 
-  const live = ((contracts ?? []) as any[]).find((c) => c.status === "accepted") ?? null;
+  const live = liveContract((contracts ?? []) as any[]);
   const left = remaining(live as Contract);
   const liveClub = live ? (Array.isArray(live.team) ? live.team[0] : live.team)?.name : null;
 

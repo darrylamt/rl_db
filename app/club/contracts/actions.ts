@@ -86,6 +86,9 @@ export async function offerContract(fd: FormData) {
     .eq("player_id", playerId)
     .eq("team_id", teamId)
     .eq("status", "accepted")
+    // Once a renewal is accepted there are two; the next has to follow the later.
+    .order("ends_on", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const renewal = renewalProblem(current as any, starts);

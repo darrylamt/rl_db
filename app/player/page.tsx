@@ -12,6 +12,7 @@ import {
 } from "@/lib/attributes";
 import {
   remaining,
+  liveContract,
   monthsBetween,
   describeLength,
   type Contract,
@@ -123,7 +124,7 @@ export default async function PlayerHomePage({
     const url = await contractDocumentUrl(c.document_path);
     if (url) docFor.set(c.contract_id, url);
   }
-  const live = all.find((c) => c.status === "accepted") ?? null;
+  const live = liveContract(all as any[]);
   const left = remaining(live as Contract);
   const liveClub = live
     ? (Array.isArray(live.team) ? live.team[0] : live.team)?.name

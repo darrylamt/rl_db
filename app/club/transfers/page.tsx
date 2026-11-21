@@ -140,9 +140,14 @@ export default async function ClubTransfersPage({
 
   // player_id -> "1 year 4 months"
   const contractLeft: Record<string, string> = {};
+  const contractEnds: Record<string, string> = {};
   for (const c of (liveContracts ?? []) as any[]) {
+    // A renewal sits beside the contract it follows; the later end counts.
     const left = remaining(c as Contract);
-    if (left) contractLeft[c.player_id] = left.label;
+    if (left && (!contractEnds[c.player_id] || left.endsOn > contractEnds[c.player_id])) {
+      contractLeft[c.player_id] = left.label;
+      contractEnds[c.player_id] = left.endsOn;
+    }
   }
 
   const asks = (moveRequests ?? []) as any[];

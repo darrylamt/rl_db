@@ -130,7 +130,9 @@ export default async function PublicPlayerPage({
       .from("contracts")
       .select("contract_id, player_id, team_id, starts_on, ends_on, status, terms, decline_note, offered_at, answered_at, team:team_id(name)")
       .eq("player_id", playerId)
-      .eq("status", "accepted"),
+      .eq("status", "accepted")
+      // After a renewal there are two; the later one is what they are signed to.
+      .order("ends_on", { ascending: false }),
   ]);
 
   if (!player) notFound();
