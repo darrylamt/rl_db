@@ -29,7 +29,7 @@ export default async function ClubFixturesPage({
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, status, home_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season), result:match_results(home_score, away_score)"
+      "fixture_id, scheduled_date, scheduled_time, status, home_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season, division), result:match_results(home_score, away_score)"
     )
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .order("scheduled_date", { ascending: false })

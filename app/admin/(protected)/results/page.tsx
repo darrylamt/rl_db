@@ -123,7 +123,7 @@ export default async function ResultsPage({
   let q = supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results!inner(result_id, home_score, away_score, attendance, recorded_at)",
+      "fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, season, division), result:match_results!inner(result_id, home_score, away_score, attendance, recorded_at)",
       { count: "exact" }
     );
 

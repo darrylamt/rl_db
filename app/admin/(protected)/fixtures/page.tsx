@@ -76,7 +76,7 @@ export default async function FixturesPage({
   let q = supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)",
+      "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season, division)",
       { count: "exact" }
     );
 

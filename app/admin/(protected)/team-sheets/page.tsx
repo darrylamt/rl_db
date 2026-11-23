@@ -17,7 +17,7 @@ export default async function TeamSheetsPage({
   const { data, error } = await supabase
     .from("team_sheets")
     .select(
-      "sheet_id, status, submitted_at, review_note, team:team_id(team_id, name, logo_url), fixture:fixture_id(fixture_id, scheduled_date, scheduled_time, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name))"
+      "sheet_id, status, submitted_at, review_note, team:team_id(team_id, name, logo_url), fixture:fixture_id(fixture_id, scheduled_date, scheduled_time, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, division))"
     )
     .in("status", ["submitted", "approved", "declined"])
     .order("submitted_at", { ascending: true, nullsFirst: false })

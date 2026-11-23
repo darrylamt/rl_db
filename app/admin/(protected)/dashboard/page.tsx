@@ -30,7 +30,7 @@ async function getUpcoming() {
   const { data } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, round, status, home_team:home_team_id(name), away_team:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season)"
+      "fixture_id, scheduled_date, scheduled_time, round, status, home_team:home_team_id(name), away_team:away_team_id(name), venue:venue_id(name), competition:competition_id(name, season, division)"
     )
     .gte("scheduled_date", today)
     .eq("status", "scheduled")
@@ -45,7 +45,7 @@ async function getRecentResults() {
   const { data } = await supabase
     .from("match_results")
     .select(
-      "result_id, home_score, away_score, recorded_at, fixture:fixture_id(scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season))"
+      "result_id, home_score, away_score, recorded_at, fixture:fixture_id(scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(name, season, division))"
     )
     .or("home_score.gt.0,away_score.gt.0")
     .order("recorded_at", { ascending: false })

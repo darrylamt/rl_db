@@ -27,7 +27,7 @@ export async function GET(
   const { data: fixture, error: fixtureError } = await supabase
     .from("fixtures")
     .select(
-      "*, scheduled_date, scheduled_time, round, status, home_team:home_team_id(team_id, name, logo_url), away_team:away_team_id(team_id, name, logo_url), venue:venue_id(venue_id, name, city), competition:competition_id(competition_id, name, season, type)"
+      "*, scheduled_date, scheduled_time, round, status, home_team:home_team_id(team_id, name, logo_url), away_team:away_team_id(team_id, name, logo_url), venue:venue_id(venue_id, name, city), competition:competition_id(competition_id, name, season, type, division)"
     )
     .eq(UUID_RE.test(id) ? "fixture_id" : "slug", id)
     .maybeSingle();

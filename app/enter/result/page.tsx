@@ -84,7 +84,7 @@ export default function EnterResultPage() {
       const { data } = await supabase
         .from("fixtures")
         .select(
-          "fixture_id, scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name)"
+          "fixture_id, scheduled_date, home_team:home_team_id(name), away_team:away_team_id(name), competition:competition_id(division)"
         )
         .eq("competition_id", competitionId)
         .order("scheduled_date", { ascending: false });

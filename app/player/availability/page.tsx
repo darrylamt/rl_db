@@ -26,7 +26,7 @@ export default async function AvailabilityPage({
       ? supabase
           .from("fixtures")
           .select(
-            "fixture_id, scheduled_date, scheduled_time, round, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name)"
+            "fixture_id, scheduled_date, scheduled_time, round, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, division)"
           )
           .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
           .gte("scheduled_date", today)

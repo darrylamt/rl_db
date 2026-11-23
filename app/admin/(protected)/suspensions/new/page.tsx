@@ -14,7 +14,7 @@ export default async function NewSuspensionPage() {
   try {
     const [p, f] = await Promise.all([
       supabase.from("players").select("player_id, first_name, last_name, team:team_id(name)").order("last_name"),
-      supabase.from("fixtures").select("fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name)").order("scheduled_date", { ascending: false }).limit(50),
+      supabase.from("fixtures").select("fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(division)").order("scheduled_date", { ascending: false }).limit(50),
     ]);
     players = p.data ?? [];
     fixtures = f.data ?? [];

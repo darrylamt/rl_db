@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { gradingFetch } from "@/lib/teamGrade";
 
 // Fallbacks so build-time prerender doesn't crash if env is missing.
 const FALLBACK_URL = "https://placeholder.supabase.co";
@@ -27,6 +28,7 @@ export function createClient() {
           }
         },
       },
+      global: { fetch: gradingFetch(fetch) },
     }
   );
 }
@@ -37,9 +39,11 @@ import { createClient as createAdminClient_ } from "@supabase/supabase-js";
 // cache also survives a deployment. A live page was serving a squad list
 // captured before half of it was entered, and redeploying could not shift it
 // because the entry was still valid. Nothing here is worth a stale answer.
-function uncachedFetch(input: RequestInfo | URL, init?: RequestInit) {
-  return fetch(input, { ...init, cache: "no-store" });
-}
+// Team names in women's and youth fixtures come back graded too, e.g.
+// "Accra Panthers (W)" (see lib/teamGrade.ts).
+const uncachedFetch = gradingFetch((input: any, init?: RequestInit) =>
+  fetch(input, { ...init, cache: "no-store" })
+);
 
 
 // Admin client — uses the service role key. NEVER expose to the browser.

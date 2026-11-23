@@ -65,7 +65,7 @@ async function linesFor(
   const { data } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season), result:match_results(home_score, away_score)"
+      "fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, season, division), result:match_results(home_score, away_score)"
     )
     .in("fixture_id", fixtureIds)
     .order("scheduled_date", { ascending: false });

@@ -52,7 +52,7 @@ export async function generateMetadata({
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("fixtures")
-    .select("scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name), result:match_results(home_score, away_score)")
+    .select("scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(name, division), result:match_results(home_score, away_score)")
     .eq("fixture_id", params.id)
     .maybeSingle();
   if (!data) return liveShare({ title: "Match — RLFG Live" });
@@ -88,7 +88,7 @@ export default async function MatchCentrePage({
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id",
+        "fixture_id, scheduled_date, scheduled_time, round, status, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), venue:venue_id(name, city), competition:competition_id(name, season, division), kickoff_at, clock_state, paused_at, stoppage_seconds, forfeited_by_team_id",
       )
       .eq("fixture_id", fixtureId)
       .maybeSingle(),

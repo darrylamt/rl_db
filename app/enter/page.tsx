@@ -17,7 +17,7 @@ export default async function EnterHomePage() {
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(
-      "fixture_id, scheduled_date, scheduled_time, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name), result:match_results(home_score, away_score)"
+      "fixture_id, scheduled_date, scheduled_time, status, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, division), result:match_results(home_score, away_score)"
     )
     .gte("scheduled_date", today)
     .order("scheduled_date", { ascending: true })

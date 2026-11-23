@@ -47,7 +47,7 @@ export default async function ArchivePage({
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, competition_id, status, home:home_team_id(name), away:away_team_id(name)"
+        "fixture_id, scheduled_date, competition_id, status, home:home_team_id(name), away:away_team_id(name), competition:competition_id(division)"
       )
       .order("scheduled_date", { ascending: false })
       .limit(1000),

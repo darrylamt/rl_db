@@ -130,9 +130,17 @@ export default async function BuildTeamSheetPage({
       )}
 
       {status === "approved" && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-3 py-2.5 rounded mb-4">
-          Approved by the federation. This is the side the recorder will work
-          from — ask them to reopen it if something has to change.
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-3 py-2.5 rounded mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            Approved by the federation. This is the side the recorder will work
+            from — ask them to reopen it if something has to change.
+          </span>
+          <Link
+            href={`/print/team-sheet/${fixtureId}`}
+            className="shrink-0 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded text-sm font-medium"
+          >
+            Print approved sheet
+          </Link>
         </div>
       )}
       {status === "submitted" && (

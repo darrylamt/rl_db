@@ -15,7 +15,7 @@ export async function getTeamSheetData(fixtureId: string, teamId: string, crest 
   const [{ data: f }, { data: sheet }, { data: lineup }] = await Promise.all([
     supabase
       .from("fixtures")
-      .select("fixture_id, scheduled_date, scheduled_time, round, home_team_id, away_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name)")
+      .select("fixture_id, scheduled_date, scheduled_time, round, home_team_id, away_team_id, home:home_team_id(name), away:away_team_id(name), venue:venue_id(name), competition:competition_id(name, division)")
       .eq("fixture_id", fixtureId)
       .maybeSingle(),
     supabase.from("team_sheets").select("status, submitted_at, head_coach_id, assistant_coach_id").eq("fixture_id", fixtureId).eq("team_id", teamId).maybeSingle(),

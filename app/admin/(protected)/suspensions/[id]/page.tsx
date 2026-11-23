@@ -11,7 +11,7 @@ export default async function EditSuspensionPage({ params }: { params: { id: str
   const [{ data: s }, { data: players }, { data: fixtures }] = await Promise.all([
     supabase.from("suspensions").select("*").eq("suspension_id", params.id).maybeSingle(),
     supabase.from("players").select("player_id, first_name, last_name, team:team_id(name)").order("last_name"),
-    supabase.from("fixtures").select("fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name)").order("scheduled_date", { ascending: false }).limit(100),
+    supabase.from("fixtures").select("fixture_id, scheduled_date, home:home_team_id(name), away:away_team_id(name), competition:competition_id(division)").order("scheduled_date", { ascending: false }).limit(100),
   ]);
   if (!s) notFound();
   const bound = updateSuspension.bind(null, params.id);

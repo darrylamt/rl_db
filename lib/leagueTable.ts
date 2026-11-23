@@ -63,7 +63,7 @@ export async function getLeagueTables(
   let q = supabase
     .from("fixtures")
     .select(
-      "fixture_id, competition_id, round, status, scheduled_date, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), competition:competition_id(name), result:match_results(home_score, away_score)"
+      "fixture_id, competition_id, round, status, scheduled_date, home:home_team_id(team_id, name, logo_url), away:away_team_id(team_id, name, logo_url), competition:competition_id(name, division), result:match_results(home_score, away_score)"
     )
     .order("scheduled_date", { ascending: true });
   if (competitionIds) q = q.in("competition_id", competitionIds);

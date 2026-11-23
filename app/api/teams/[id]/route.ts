@@ -44,7 +44,7 @@ export async function GET(
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, round, status, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(name, season), result:match_results(home_score, away_score)"
+        "fixture_id, scheduled_date, round, status, home_team:home_team_id(team_id, name), away_team:away_team_id(team_id, name), competition:competition_id(name, season, division), result:match_results(home_score, away_score)"
       )
       .or(`home_team_id.eq.${id},away_team_id.eq.${id}`)
       .order("scheduled_date", { ascending: false })

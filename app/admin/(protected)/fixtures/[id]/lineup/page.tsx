@@ -10,7 +10,7 @@ export default async function LineupPage({ params }: { params: { id: string } })
     supabase
       .from("fixtures")
       .select(
-        "fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name)"
+        "fixture_id, scheduled_date, home:home_team_id(team_id, name), away:away_team_id(team_id, name), competition:competition_id(name, division)"
       )
       .eq("fixture_id", params.id)
       .maybeSingle(),
