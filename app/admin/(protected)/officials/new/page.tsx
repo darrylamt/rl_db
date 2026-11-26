@@ -1,16 +1,10 @@
+import { OFFICIAL_LEVELS as LEVELS } from "@/lib/officialLevels";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createOfficial } from "../actions";
 
-const LEVELS = [
-  "Level 1",
-  "Level 2",
-  "Level 3",
-  "National",
-  "International",
-];
 
-const ROLES = ["Referee","Touch judge","Video referee","Match commissioner","Timekeeper","Other"];
+const ROLES = ["Match official","Referee","Touch judge","Video referee","Match commissioner","Timekeeper","Other"];
 const STATUSES = ["active","inactive","retired"];
 
 export default function NewOfficialPage() {

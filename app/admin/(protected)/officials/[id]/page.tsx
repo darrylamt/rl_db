@@ -1,18 +1,12 @@
 import { notFound } from "next/navigation";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { createAdminClient } from "@/lib/supabase/server";
+import { OFFICIAL_LEVELS as LEVELS } from "@/lib/officialLevels";
 import { FormShell, Field, Input, Select } from "@/components/admin/FormShell";
 import { updateOfficial } from "../actions";
 
-const LEVELS = [
-  "Level 1",
-  "Level 2",
-  "Level 3",
-  "National",
-  "International",
-];
 
-const ROLES = ["Referee","Touch judge","Video referee","Match commissioner","Timekeeper","Other"];
+const ROLES = ["Match official","Referee","Touch judge","Video referee","Match commissioner","Timekeeper","Other"];
 const STATUSES = ["active","inactive","retired"];
 
 export default async function EditOfficialPage({ params }: { params: { id: string } }) {
@@ -48,6 +42,8 @@ export default async function EditOfficialPage({ params }: { params: { id: strin
         <Field label="Level" hint="Set by hand as they pass courses.">
           <Select name="level" defaultValue={o.level ?? ""}>
             <option value="">— not set —</option>
+            {/* A level from before this list keeps showing until it is changed. */}
+            {o.level && !LEVELS.includes(o.level) && <option value={o.level}>{o.level}</option>}
             {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
           </Select>
         </Field>
