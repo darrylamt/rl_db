@@ -108,8 +108,12 @@ export default async function ProtectedAdminLayout({
       .eq("approval_status", "pending"),
     supabase
       .from("team_sheets")
-      .select("sheet_id", { count: "exact", head: true })
-      .eq("status", "submitted"),
+      // Only matches still to come, as the Team sheets page lists them; a
+      // sheet left submitted for a match already played counted here and
+      // showed nowhere.
+      .select("sheet_id, fixture:fixture_id!inner(scheduled_date)", { count: "exact", head: true })
+      .eq("status", "submitted")
+      .gte("fixture.scheduled_date", new Date().toISOString().slice(0, 10)),
     supabase
       .from("transfer_requests")
       .select("request_id", { count: "exact", head: true })
